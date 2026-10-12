@@ -4,9 +4,11 @@ SHELL := /bin/bash
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
-PROD := QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) docker compose -f deploy/compose.prod.yaml --env-file .env
+# Local run of the production stack: build images (compose.build.yaml) tagged with the git version.
+PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
+	docker compose -f deploy/compose.prod.yaml -f deploy/compose.build.yaml --env-file .env
 
-.PHONY: help dev test lint build clean prod-up prod-down
+.PHONY: help dev test lint build clean prod-up prod-down deploy
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -41,10 +43,15 @@ clean: ## Remove build output
 	rm -rf bin web/dist
 
 prod-up: .env ## Build and start the production stack locally (127.0.0.1:8080 and :8081)
+	@docker network inspect web >/dev/null 2>&1 || docker network create web
 	$(PROD) up -d --build --wait
 
 prod-down: ## Stop the production stack (keeps the database volume)
 	$(PROD) down
+
+deploy: ## Deploy to the VPS: make deploy TAG=sha-xxxxxxx (or TAG=latest)
+	@test -n "$(TAG)" || { echo "usage: make deploy TAG=sha-xxxxxxx|latest"; exit 2; }
+	deploy/deploy.sh $(TAG)
 
 .env:
 	cp .env.example .env

@@ -1,8 +1,13 @@
-# Production stack for quantumready.fizsar.com.
+# Production stack for quantumready.fizsar.com (on the VPS: /opt/quantumready).
 #
-# Published ports are bound to 127.0.0.1: the host's Caddy is the only public
-# entry point (/api/* -> 127.0.0.1:8080, everything else -> 127.0.0.1:8081).
-# Secrets come from .env (see .env.example). Locally: `make prod-up`.
+# The host's Caddy runs in a container on the shared external network `web` and
+# proxies by name: /api/* -> quantumready-api:8080, everything else ->
+# quantumready-web:8080. The 127.0.0.1:8080/8081 ports are only for local
+# checks (deploy script, curl on the host).
+#
+# Images come from GHCR; QR_TAG (in .env) selects the release, e.g. sha-14226c7.
+# Secrets come from .env (see .env.example). Locally, `make prod-up` adds
+# compose.build.yaml to build the images instead of pulling them.
 #
 # Limits are sized for a small VPS that also serves fizsar.com.
 name: quantumready
@@ -15,12 +20,7 @@ x-hardening: &hardening
     driver: json-file
     options: { max-size: "10m", max-file: "3" }
 
-x-api-build: &api-build
-  context: ..
-  dockerfile: Dockerfile
-  args:
-    VERSION: ${QR_VERSION:-dev}
-    COMMIT: ${QR_COMMIT:-unknown}
+x-api-image: &api-image ghcr.io/fizsar/quantumready-saas-api:${QR_TAG:?set QR_TAG in .env}
 
 x-database-url: &database-url "postgres://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@db:5432/${POSTGRES_DB:?set in .env}?sslmode=disable"
 
@@ -54,8 +54,7 @@ services:
 
   # One-shot: applies migrations and exits. The API starts only if it succeeds.
   migrate:
-    build: *api-build
-    image: quantumready-api:${QR_VERSION:-dev}
+    image: *api-image
     <<: *hardening
     entrypoint: ["/migrate"]
     restart: "no"
@@ -69,8 +68,7 @@ services:
         limits: { cpus: "0.5", memory: 128M, pids: 50 }
 
   api:
-    build: *api-build
-    image: quantumready-api:${QR_VERSION:-dev}
+    image: *api-image
     <<: *hardening
     restart: unless-stopped
     environment:
@@ -78,8 +76,10 @@ services:
       DATABASE_URL: *database-url
     ports:
       - "127.0.0.1:8080:8080"
-    # backend reaches the database; edge allows the published port.
-    networks: [backend, edge]
+    networks:
+      backend: {}
+      web:
+        aliases: [quantumready-api]
     depends_on:
       db: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
@@ -94,19 +94,16 @@ services:
         limits: { cpus: "0.5", memory: 256M, pids: 100 }
 
   web:
-    build:
-      context: ../web
-      args:
-        VERSION: ${QR_VERSION:-dev}
-        COMMIT: ${QR_COMMIT:-unknown}
-    image: quantumready-web:${QR_VERSION:-dev}
+    image: ghcr.io/fizsar/quantumready-saas-web:${QR_TAG:?set QR_TAG in .env}
     <<: *hardening
     restart: unless-stopped
     tmpfs:
       - /tmp
     ports:
       - "127.0.0.1:8081:8080"
-    networks: [edge]
+    networks:
+      web:
+        aliases: [quantumready-web]
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 30s
@@ -120,7 +117,10 @@ networks:
   # No route outside: only api and migrate can reach the database.
   backend:
     internal: true
-  edge: {}
+  # Shared with the host's Caddy container (created by /srv/caddy/compose.yaml).
+  web:
+    external: true
+    name: web
 
 volumes:
   db-data:

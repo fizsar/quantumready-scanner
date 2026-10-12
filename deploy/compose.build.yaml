@@ -1,0 +1,20 @@
+# Local override for `make prod-up`: build the images from source instead of
+# pulling them from GHCR. Not used on the VPS.
+x-api-build: &api-build
+  context: ..
+  dockerfile: Dockerfile
+  args:
+    VERSION: ${QR_VERSION:-dev}
+    COMMIT: ${QR_COMMIT:-unknown}
+
+services:
+  migrate:
+    build: *api-build
+  api:
+    build: *api-build
+  web:
+    build:
+      context: ../web
+      args:
+        VERSION: ${QR_VERSION:-dev}
+        COMMIT: ${QR_COMMIT:-unknown}
