@@ -51,7 +51,7 @@ prod-down: ## Stop the production stack (keeps the database volume)
 
 deploy: ## Deploy to the VPS: make deploy TAG=sha-xxxxxxx (or TAG=latest)
 	@test -n "$(TAG)" || { echo "usage: make deploy TAG=sha-xxxxxxx|latest"; exit 2; }
-	deploy/deploy.sh $(TAG)
+	bash deploy/deploy.sh $(TAG)
 
 .env:
 	cp .env.example .env
