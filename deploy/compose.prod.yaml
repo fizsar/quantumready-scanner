@@ -51,6 +51,8 @@ services:
     deploy:
       resources:
         limits: { cpus: "1.0", memory: 512M, pids: 200 }
+    # Equal to the memory limit: containers never use host swap.
+    memswap_limit: 512M
 
   # One-shot: applies migrations and exits. The API starts only if it succeeds.
   migrate:
@@ -66,6 +68,8 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.5", memory: 128M, pids: 50 }
+    # Equal to the memory limit: containers never use host swap.
+    memswap_limit: 128M
 
   api:
     image: *api-image
@@ -92,6 +96,8 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.5", memory: 256M, pids: 100 }
+    # Equal to the memory limit: containers never use host swap.
+    memswap_limit: 256M
 
   web:
     image: ghcr.io/fizsar/quantumready-saas-web:${QR_TAG:?set QR_TAG in .env}
@@ -112,6 +118,8 @@ services:
     deploy:
       resources:
         limits: { cpus: "0.25", memory: 64M, pids: 50 }
+    # Equal to the memory limit: containers never use host swap.
+    memswap_limit: 64M
 
 networks:
   # No route outside: only api and migrate can reach the database.
