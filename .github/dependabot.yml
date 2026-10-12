@@ -2,6 +2,9 @@ version: 2
 
 # Weekly, grouped to keep PR noise low. Dependabot keeps SHA-pinned actions
 # pinned (it updates the SHA and the version comment).
+#
+# Version policy (see CLAUDE.md): PostgreSQL stays on 17 and Node on 24 LTS.
+# Major bumps of either are ignored here and done deliberately by hand.
 updates:
   - package-ecosystem: gomod
     directory: /
@@ -12,18 +15,28 @@ updates:
   - package-ecosystem: npm
     directory: /web
     schedule: { interval: weekly }
+    ignore:
+      # Types must match the Node runtime (24 LTS).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       npm: { patterns: ["*"] }
 
   - package-ecosystem: docker
     directories: [/, /web]
     schedule: { interval: weekly }
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     groups:
       docker: { patterns: ["*"] }
 
   - package-ecosystem: docker-compose
     directories: [/, /deploy]
     schedule: { interval: weekly }
+    ignore:
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

@@ -11,12 +11,12 @@ Estado: en desarrollo. https://quantumready.fizsar.com
 
 ## Desarrollo
 
-Requisitos: Go 1.25+, Node 24+, Docker.
+Requisitos: Go 1.26+, Node 24+, Docker.
 
 ```sh
 make dev     # PostgreSQL (Docker) + API en :8080 + web en http://localhost:5173
 make test    # tests de Go
-make lint    # gofmt, go vet, oxlint, tsc
+make lint    # golangci-lint, oxlint, tsc
 make build   # bin/api, bin/migrate, bin/worker y web/dist
 make prod-up # stack de producción (deploy/compose.prod.yaml) en 127.0.0.1:8080 y :8081
 ```
@@ -33,12 +33,12 @@ Status: in development. https://quantumready.fizsar.com
 
 ### Development
 
-Requirements: Go 1.25+, Node 24+, Docker.
+Requirements: Go 1.26+, Node 24+, Docker.
 
 ```sh
 make dev     # PostgreSQL (Docker) + API on :8080 + web on http://localhost:5173
 make test    # Go tests
-make lint    # gofmt, go vet, oxlint, tsc
+make lint    # golangci-lint, oxlint, tsc
 make build   # bin/api, bin/migrate, bin/worker and web/dist
 make prod-up # production stack (deploy/compose.prod.yaml) on 127.0.0.1:8080 and :8081
 ```

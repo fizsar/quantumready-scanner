@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"io/fs"
-	"os"
 	"regexp"
 	"strings"
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/fizsar/quantumready-saas/internal/testdb"
 )
 
 var fileName = regexp.MustCompile(`^\d{5}_[a-z0-9_]+\.sql$`)
@@ -38,13 +39,9 @@ func TestMigrationFiles(t *testing.T) {
 	}
 }
 
-// TestUpPostgres runs against a real PostgreSQL when QR_TEST_DATABASE_URL is set.
+// TestUpPostgres runs against a real PostgreSQL (see testdb.DSN).
 func TestUpPostgres(t *testing.T) {
-	dsn := os.Getenv("QR_TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("QR_TEST_DATABASE_URL not set")
-	}
-	db, err := sql.Open("pgx", dsn)
+	db, err := sql.Open("pgx", testdb.DSN(t))
 	if err != nil {
 		t.Fatal(err)
 	}

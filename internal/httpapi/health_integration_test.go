@@ -3,20 +3,17 @@ package httpapi
 import (
 	"context"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/fizsar/quantumready-saas/internal/testdb"
 )
 
-// TestHealthPostgres runs against a real PostgreSQL when QR_TEST_DATABASE_URL is
-// set (make test sets it from DATABASE_URL if the dev database is up).
+// TestHealthPostgres runs against a real PostgreSQL (see testdb.DSN; make test
+// provides it when the dev database is up).
 func TestHealthPostgres(t *testing.T) {
-	dsn := os.Getenv("QR_TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("QR_TEST_DATABASE_URL not set")
-	}
-	pool, err := pgxpool.New(context.Background(), dsn)
+	pool, err := pgxpool.New(context.Background(), testdb.DSN(t))
 	if err != nil {
 		t.Fatalf("pgxpool.New: %v", err)
 	}
