@@ -2,9 +2,11 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X main.version=$(VERSION)
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
+PROD := QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) docker compose -f deploy/compose.prod.yaml --env-file .env
 
-.PHONY: help dev test lint build clean
+.PHONY: help dev test lint build clean prod-up prod-down
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -12,8 +14,9 @@ help: ## List targets
 dev: .env web/node_modules ## Start PostgreSQL, the API (:8080) and Vite (:5173)
 	docker compose up -d --wait db
 	@set -a; . ./.env; set +a; \
+	go run ./cmd/migrate && \
 	trap 'kill 0' EXIT; \
-	go run -ldflags "-X main.version=$(VERSION)" ./cmd/api & \
+	go run -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT)" ./cmd/api & \
 	npm --prefix web run dev; \
 	wait
 
@@ -31,12 +34,18 @@ lint: web/node_modules ## gofmt, go vet, oxlint and TypeScript type check
 	npm --prefix web run lint
 	npm --prefix web run typecheck
 
-build: web/node_modules ## Build bin/api, bin/worker and web/dist
+build: web/node_modules ## Build bin/{api,migrate,worker} and web/dist
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/ ./cmd/...
 	npm --prefix web run build
 
 clean: ## Remove build output
 	rm -rf bin web/dist
+
+prod-up: .env ## Build and start the production stack locally (127.0.0.1:8080 and :8081)
+	$(PROD) up -d --build --wait
+
+prod-down: ## Stop the production stack (keeps the database volume)
+	$(PROD) down
 
 .env:
 	cp .env.example .env

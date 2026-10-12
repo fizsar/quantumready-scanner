@@ -17,10 +17,21 @@ import (
 	"github.com/fizsar/quantumready-saas/internal/httpapi"
 )
 
-// version is set at build time with -ldflags "-X main.version=...".
-var version = "dev"
+// Set at build time with -ldflags "-X main.version=... -X main.commit=...".
+var (
+	version = "dev"
+	commit  = "unknown"
+)
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		if err := healthcheck(envOr("API_ADDR", "127.0.0.1:8080")); err != nil {
+			fmt.Fprintln(os.Stderr, "unhealthy:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 	if err := run(logger); err != nil {
@@ -58,7 +69,7 @@ func run(logger *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
-	logger.Info("api listening", "addr", addr, "version", version)
+	logger.Info("api listening", "addr", addr, "version", version, "commit", commit)
 
 	select {
 	case err := <-errCh:

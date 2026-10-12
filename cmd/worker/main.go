@@ -8,10 +8,13 @@ import (
 	"os"
 )
 
-// version is set at build time with -ldflags "-X main.version=...".
-var version = "dev"
+// Set at build time with -ldflags "-X main.version=... -X main.commit=...".
+var (
+	version = "dev"
+	commit  = "unknown"
+)
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	logger.Info("worker not implemented yet", "version", version)
+	logger.Info("worker not implemented yet", "version", version, "commit", commit)
 }

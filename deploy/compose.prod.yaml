@@ -1,0 +1,126 @@
+# Production stack for quantumready.fizsar.com.
+#
+# Published ports are bound to 127.0.0.1: the host's Caddy is the only public
+# entry point (/api/* -> 127.0.0.1:8080, everything else -> 127.0.0.1:8081).
+# Secrets come from .env (see .env.example). Locally: `make prod-up`.
+#
+# Limits are sized for a small VPS that also serves fizsar.com.
+name: quantumready
+
+x-hardening: &hardening
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-api-build: &api-build
+  context: ..
+  dockerfile: Dockerfile
+  args:
+    VERSION: ${QR_VERSION:-dev}
+    COMMIT: ${QR_COMMIT:-unknown}
+
+x-database-url: &database-url "postgres://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@db:5432/${POSTGRES_DB:?set in .env}?sslmode=disable"
+
+services:
+  db:
+    image: postgres:17-alpine
+    <<: *hardening
+    # uid 70 in the alpine image: no root entrypoint, so no capabilities needed.
+    user: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    shm_size: 128m
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M, pids: 200 }
+
+  # One-shot: applies migrations and exits. The API starts only if it succeeds.
+  migrate:
+    build: *api-build
+    image: quantumready-api:${QR_VERSION:-dev}
+    <<: *hardening
+    entrypoint: ["/migrate"]
+    restart: "no"
+    environment:
+      DATABASE_URL: *database-url
+    networks: [backend]
+    depends_on:
+      db: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M, pids: 50 }
+
+  api:
+    build: *api-build
+    image: quantumready-api:${QR_VERSION:-dev}
+    <<: *hardening
+    restart: unless-stopped
+    environment:
+      API_ADDR: ":8080"
+      DATABASE_URL: *database-url
+    ports:
+      - "127.0.0.1:8080:8080"
+    # backend reaches the database; edge allows the published port.
+    networks: [backend, edge]
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "/api", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M, pids: 100 }
+
+  web:
+    build:
+      context: ../web
+      args:
+        VERSION: ${QR_VERSION:-dev}
+        COMMIT: ${QR_COMMIT:-unknown}
+    image: quantumready-web:${QR_VERSION:-dev}
+    <<: *hardening
+    restart: unless-stopped
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:8081:8080"
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 64M, pids: 50 }
+
+networks:
+  # No route outside: only api and migrate can reach the database.
+  backend:
+    internal: true
+  edge: {}
+
+volumes:
+  db-data:

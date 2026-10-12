@@ -1,0 +1,7 @@
+# Allowlist: only what the API image needs (keeps .env, .git and web/ out).
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!migrations/

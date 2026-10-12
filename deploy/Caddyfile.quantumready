@@ -1,0 +1,13 @@
+# Site block for the VPS Caddyfile (applied in milestone 1.4).
+# Caddy terminates TLS, compresses and adds HSTS; the containers listen on loopback only.
+quantumready.fizsar.com {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8081
+	}
+}

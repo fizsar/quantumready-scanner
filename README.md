@@ -14,7 +14,8 @@ Requisitos: Go 1.25+, Node 24+, Docker.
 make dev     # PostgreSQL (Docker) + API en :8080 + web en http://localhost:5173
 make test    # tests de Go
 make lint    # gofmt, go vet, oxlint, tsc
-make build   # bin/api, bin/worker y web/dist
+make build   # bin/api, bin/migrate, bin/worker y web/dist
+make prod-up # stack de producción (deploy/compose.prod.yaml) en 127.0.0.1:8080 y :8081
 ```
 
 `make dev` crea `.env` a partir de `.env.example` si no existe. Nunca subas `.env` al repositorio.
@@ -35,7 +36,8 @@ Requirements: Go 1.25+, Node 24+, Docker.
 make dev     # PostgreSQL (Docker) + API on :8080 + web on http://localhost:5173
 make test    # Go tests
 make lint    # gofmt, go vet, oxlint, tsc
-make build   # bin/api, bin/worker and web/dist
+make build   # bin/api, bin/migrate, bin/worker and web/dist
+make prod-up # production stack (deploy/compose.prod.yaml) on 127.0.0.1:8080 and :8081
 ```
 
 `make dev` creates `.env` from `.env.example` if missing. Never commit `.env`.
