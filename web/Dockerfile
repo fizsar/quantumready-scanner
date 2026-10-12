@@ -2,7 +2,7 @@
 
 # Web image: Vite build served by nginx-unprivileged (uid 101, port 8080).
 
-FROM node:24-alpine AS build
+FROM node:24.21-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-fund --no-audit

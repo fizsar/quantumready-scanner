@@ -2,6 +2,8 @@ module github.com/fizsar/quantumready-saas
 
 go 1.25.7
 
+toolchain go1.27.2
+
 require (
 	github.com/go-chi/chi/v5 v5.4.0
 	github.com/jackc/pgx/v5 v5.11.0
@@ -16,5 +18,5 @@ require (
 	github.com/sethvargo/go-retry v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 )

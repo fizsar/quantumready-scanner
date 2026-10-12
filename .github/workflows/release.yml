@@ -1,0 +1,107 @@
+name: Release
+
+# Publishes the images to GHCR after CI passes on a push to main.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish (${{ matrix.image }})
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: api
+            context: .
+            file: Dockerfile
+          - image: web
+            context: web
+            file: web/Dockerfile
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/quantumready-saas-${{ matrix.image }}
+      # Official image pinned by digest, run directly instead of a third-party action
+      # in a job that holds packages:write. Bump the tag and digest together.
+      TRIVY_IMAGE: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Version
+        id: meta
+        run: |
+          {
+            echo "version=$(git describe --tags --always)"
+            echo "commit=$(git rev-parse --short HEAD)"
+            echo "tag=sha-$(git rev-parse --short=7 HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          load: true
+          push: false
+          tags: ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            COMMIT=${{ steps.meta.outputs.commit }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+
+      # The scanned image is the one that gets pushed.
+      - name: Trivy (report HIGH and CRITICAL)
+        env:
+          REF: ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+        run: |
+          trivy() {
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$RUNNER_TEMP/trivy:/cache" "$TRIVY_IMAGE" --cache-dir /cache "$@"
+          }
+          trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 0 --format table "$REF" | tee trivy.txt
+          {
+            echo "### Trivy: \`$REF\`"
+            echo '```'
+            cat trivy.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Trivy (fail on CRITICAL)
+        env:
+          REF: ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$RUNNER_TEMP/trivy:/cache" "$TRIVY_IMAGE" --cache-dir /cache \
+            image --scanners vuln --severity CRITICAL --exit-code 1 --skip-db-update --quiet "$REF"
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          docker tag "$IMAGE:$TAG" "$IMAGE:latest"
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:latest"
+          echo "Pushed \`$IMAGE:$TAG\` and \`:latest\`" >> "$GITHUB_STEP_SUMMARY"

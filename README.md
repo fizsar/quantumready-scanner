@@ -1,5 +1,8 @@
 # QuantumReady SaaS
 
+[![CI](https://github.com/fizsar/quantumready-saas/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fizsar/quantumready-saas/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+
 **ES** · [EN](#english)
 
 Auditoría de preparación post-cuántica (PQC) para endpoints TLS de pymes y empresas europeas: soporte de ML-KEM híbrido, versiones TLS, cifrados y algoritmos de certificado, con informes que mapean NIS2, DORA y la hoja de ruta PQC de la UE.
@@ -41,3 +44,9 @@ make prod-up # production stack (deploy/compose.prod.yaml) on 127.0.0.1:8080 and
 ```
 
 `make dev` creates `.env` from `.env.example` if missing. Never commit `.env`.
+
+---
+
+## Licencia / License
+
+[AGPL-3.0-only](LICENSE). Copyright (C) 2026 Fiz Sar López.

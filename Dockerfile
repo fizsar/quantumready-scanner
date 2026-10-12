@@ -3,7 +3,7 @@
 # API image: static Go binaries on distroless (nonroot, no shell).
 # Ships /api and /migrate; compose runs /migrate as a one-shot service.
 
-FROM golang:1.27-alpine AS build
+FROM golang:1.27.2-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download

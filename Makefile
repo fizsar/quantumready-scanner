@@ -27,10 +27,9 @@ test: ## Run Go tests (integration tests too if the dev database is running)
 	fi; \
 	go test -race -count=1 ./...
 
-lint: web/node_modules ## gofmt, go vet, oxlint and TypeScript type check
-	@unformatted=$$(gofmt -l $$(go list -f '{{.Dir}}' ./...)); \
-	if [ -n "$$unformatted" ]; then echo "gofmt needed:"; echo "$$unformatted"; exit 1; fi
-	go vet ./...
+lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint and tsc
+	@command -v golangci-lint >/dev/null || { echo "golangci-lint not found: https://golangci-lint.run/docs/welcome/install/"; exit 1; }
+	golangci-lint run ./...
 	npm --prefix web run lint
 	npm --prefix web run typecheck
 
