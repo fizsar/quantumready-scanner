@@ -124,7 +124,10 @@ type Certificate struct {
 	SelfSigned    bool   `json:"self_signed"`
 
 	OCSPStapled bool `json:"ocsp_stapled"`
-	SCTs        int  `json:"scts"` // stapled Signed Certificate Timestamps
+	// Signed Certificate Timestamps (Certificate Transparency): embedded in the
+	// certificate by the CA, or delivered in the TLS handshake extension.
+	SCTsEmbedded  int `json:"scts_embedded"`
+	SCTsHandshake int `json:"scts_handshake"`
 
 	Chain []ChainCert `json:"chain"` // as sent by the server, leaf first
 }

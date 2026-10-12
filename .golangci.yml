@@ -27,6 +27,9 @@ linters:
       # Tests may use simpler HTTP helpers.
       - path: _test\.go
         linters: [noctx, gosec]
+      # Bilingual user-facing texts: the English spell checker flags Spanish words.
+      - path: internal/scoring/catalog\.go
+        linters: [misspell]
 
 formatters:
   enable:

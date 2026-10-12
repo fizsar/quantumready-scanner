@@ -278,6 +278,24 @@ func TestCertificate(t *testing.T) {
 			tt.check(t, r.Certificate)
 		})
 	}
+
+	t.Run("SCTs embedded and in the handshake", func(t *testing.T) {
+		cert := pki.leaf(t, leafOpts{scts: 3})
+		cert.SignedCertificateTimestamps = [][]byte{[]byte("sct-one"), []byte("sct-two")}
+		port := startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}})
+		c := scan(t, newTestScanner(pki, Options{}), port).Certificate
+		if c.SCTsEmbedded != 3 || c.SCTsHandshake != 2 {
+			t.Errorf("SCTs embedded=%d handshake=%d, want 3 and 2", c.SCTsEmbedded, c.SCTsHandshake)
+		}
+	})
+
+	t.Run("no SCTs", func(t *testing.T) {
+		port := startTLS(t, &tls.Config{Certificates: []tls.Certificate{pki.leaf(t, leafOpts{})}})
+		c := scan(t, newTestScanner(pki, Options{}), port).Certificate
+		if c.SCTsEmbedded != 0 || c.SCTsHandshake != 0 {
+			t.Errorf("SCTs embedded=%d handshake=%d, want 0 and 0", c.SCTsEmbedded, c.SCTsHandshake)
+		}
+	})
 }
 
 func TestUnreachable(t *testing.T) {

@@ -53,6 +53,17 @@ jobs:
             | tee -a "$GITHUB_STEP_SUMMARY"
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      # tlssha1=1 / rsa1024min=0 relax crypto/tls for the scanner only (docs/scanner.md).
+      - name: Weak-TLS GODEBUG only in scanner binaries
+        run: |
+          go build -o "$RUNNER_TEMP/api" ./cmd/api
+          go build -o "$RUNNER_TEMP/migrate" ./cmd/migrate
+          for b in api migrate; do
+            if go version -m "$RUNNER_TEMP/$b" | grep -E 'DefaultGODEBUG=.*(tlssha1=1|rsa1024min=0)'; then
+              echo "::error::$b must not carry the scanner's weak-TLS GODEBUG settings"
+              exit 1
+            fi
+          done
 
   web:
     name: Web

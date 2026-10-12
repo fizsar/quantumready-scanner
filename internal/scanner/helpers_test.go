@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -10,6 +11,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -64,6 +67,25 @@ type leafOpts struct {
 	key       string   // "p256" (default), "rsa2048", "rsa1024"
 	notBefore time.Time
 	notAfter  time.Time
+	scts      int // embedded SCTs (fake entries)
+}
+
+// sctListExtension builds an SCT list extension with n dummy entries.
+func sctListExtension(t *testing.T, n int) pkix.Extension {
+	t.Helper()
+	var entries []byte
+	for i := range n {
+		sct := bytes.Repeat([]byte{byte(i + 1)}, 40)
+		entries = binary.BigEndian.AppendUint16(entries, uint16(len(sct)))
+		entries = append(entries, sct...)
+	}
+	list := binary.BigEndian.AppendUint16(nil, uint16(len(entries)))
+	list = append(list, entries...)
+	val, err := asn1.Marshal(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pkix.Extension{Id: oidSCTList, Value: val}
 }
 
 func (p *testPKI) leaf(t *testing.T, o leafOpts) tls.Certificate {
@@ -100,6 +122,9 @@ func (p *testPKI) leaf(t *testing.T, o leafOpts) tls.Certificate {
 		NotAfter:     o.notAfter,
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	if o.scts > 0 {
+		tmpl.ExtraExtensions = []pkix.Extension{sctListExtension(t, o.scts)}
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, p.ca, key.Public(), p.caKey)
 	if err != nil {

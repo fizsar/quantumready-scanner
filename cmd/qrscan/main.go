@@ -1,7 +1,8 @@
-// Command qrscan runs one scan from the command line (development tool; not
-// shipped in the images).
+// Command qrscan runs one scan from the command line and prints its scoring
+// as a user would read it (development tool; not shipped in the images).
 //
 //	go run ./cmd/qrscan quantumready.fizsar.com
+//	go run ./cmd/qrscan -lang en -facts example.com
 //	go run ./cmd/qrscan -json -port 8443 example.com
 //
 // The godebug settings let crypto/tls complete handshakes with very old
@@ -22,13 +23,16 @@ import (
 	"strings"
 
 	"github.com/fizsar/quantumready-saas/internal/scanner"
+	"github.com/fizsar/quantumready-saas/internal/scoring"
 )
 
 func main() {
 	port := flag.Int("port", 443, "TCP port")
-	asJSON := flag.Bool("json", false, "print the full result as JSON")
+	lang := flag.String("lang", "es", "language of the report: es or en")
+	facts := flag.Bool("facts", false, "also print the raw scan facts")
+	asJSON := flag.Bool("json", false, "print scan and scoring as JSON")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: qrscan [-port N] [-json] host")
+		fmt.Fprintln(os.Stderr, "usage: qrscan [-port N] [-lang es|en] [-facts] [-json] host")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -42,16 +46,71 @@ func main() {
 		fmt.Fprintln(os.Stderr, "qrscan:", err)
 		os.Exit(1)
 	}
+	s := scoring.Evaluate(r)
 	if *asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		_ = enc.Encode(r)
+		_ = enc.Encode(struct {
+			Scan    *scanner.Result `json:"scan"`
+			Scoring scoring.Result  `json:"scoring"`
+		}{r, s})
 		return
 	}
-	printSummary(r)
+	if *facts {
+		printFacts(r)
+		fmt.Println()
+	}
+	printReport(r, s, *lang)
 }
 
-func printSummary(r *scanner.Result) {
+var ui = map[string]map[string]string{
+	"es": {"score": "Nota", "model": "modelo", "yes": "sí", "no": "no", "cap": "Tope por riesgo actual", "breakdown": "Desglose", "findings": "Hallazgos", "fix": "Qué hacer", "noteval": "No evaluado (no suma ni resta)"},
+	"en": {"score": "Score", "model": "model", "yes": "yes", "no": "no", "cap": "Cap from current risk", "breakdown": "Breakdown", "findings": "Findings", "fix": "What to do", "noteval": "Not evaluated (never scored)"},
+}
+
+func printReport(r *scanner.Result, s scoring.Result, lang string) {
+	t, ok := ui[lang]
+	if !ok {
+		lang, t = "es", ui["es"]
+	}
+	fmt.Printf("%s — %s %d/100 · %s   (%s %s)\n", r.Host, t["score"], s.Score, s.Grade, t["model"], s.ScoringVersion)
+	pqc := t["no"]
+	if s.PQC {
+		pqc = t["yes"] + " (" + r.KeyExchange.Selected + ")"
+	}
+	fmt.Printf("PQC: %s · %s: %s · %s: %s\n", pqc,
+		scoring.Label("axis.quantum", lang), scoring.Label("severity."+s.QuantumRisk, lang),
+		scoring.Label("axis.current", lang), scoring.Label("severity."+s.CurrentRisk, lang))
+	if s.Cap != nil {
+		fmt.Printf("%s: %s (%s)\n", t["cap"], s.Cap.Grade, strings.Join(s.Cap.Codes, ", "))
+	}
+
+	fmt.Printf("\n%s\n", t["breakdown"])
+	for _, b := range s.Blocks {
+		fmt.Printf("  %-40s %3d/%d\n", scoring.Label("block."+b.ID, lang), b.Points, b.Max)
+		for _, it := range b.Items {
+			fmt.Printf("    %-38s %3d/%d\n", scoring.Label("item."+it.ID, lang), it.Points, it.Max)
+		}
+	}
+
+	fmt.Printf("\n%s\n", t["findings"])
+	for _, f := range s.Findings {
+		txt := scoring.Describe(f.Code, f.Params, lang)
+		fmt.Printf("  [%s · %s] %s\n", scoring.Label("severity."+string(f.Severity), lang), scoring.Label("axis."+string(f.Axis), lang), txt.Title)
+		fmt.Printf("      %s\n", txt.Detail)
+		if txt.Remediation != "" {
+			fmt.Printf("      → %s: %s\n", t["fix"], txt.Remediation)
+		}
+	}
+
+	var ne []string
+	for _, c := range s.NotEvaluated {
+		ne = append(ne, scoring.Label("noteval."+c, lang))
+	}
+	fmt.Printf("\n%s: %s\n", t["noteval"], strings.Join(ne, "; "))
+}
+
+func printFacts(r *scanner.Result) {
 	fmt.Printf("%s:%d (%s) in %d ms\n", r.Host, r.Port, r.IP, r.DurationMS)
 	fmt.Printf("default handshake: %s %s %s group=%s\n", r.Default.Status, r.Default.Version, r.Default.CipherSuite, r.Default.Group)
 	fmt.Printf("key exchange: selected=%q hybrid=%v\n", r.KeyExchange.Selected, r.KeyExchange.SelectedHybrid)
@@ -69,11 +128,10 @@ func printSummary(r *scanner.Result) {
 	}
 	if c := r.Certificate; c != nil {
 		fmt.Printf("certificate: %s, issuer %q %v, %s %d %s, sig %s\n", c.Subject, c.Issuer, c.IssuerOrg, c.KeyAlgorithm, c.KeySize, c.Curve, c.SignatureAlgorithm)
-		fmt.Printf("  trusted=%v hostname=%v expired=%v validity=%dd expires_in=%dd ocsp=%v scts=%d chain=%d\n",
-			c.Trusted, c.HostnameMatch, c.Expired, c.ValidityDays, c.DaysToExpiry, c.OCSPStapled, c.SCTs, len(c.Chain))
+		fmt.Printf("  trusted=%v hostname=%v expired=%v validity=%dd expires_in=%dd ocsp=%v scts=%d embedded/%d handshake chain=%d\n",
+			c.Trusted, c.HostnameMatch, c.Expired, c.ValidityDays, c.DaysToExpiry, c.OCSPStapled, c.SCTsEmbedded, c.SCTsHandshake, len(c.Chain))
 		if c.TrustError != "" {
 			fmt.Printf("  trust error: %s\n", c.TrustError)
 		}
 	}
-	fmt.Printf("not evaluated: %s\n", strings.Join(r.NotEvaluated, ", "))
 }

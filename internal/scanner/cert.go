@@ -7,6 +7,8 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/asn1"
+	"encoding/binary"
 	"time"
 )
 
@@ -39,9 +41,10 @@ func analyzeCertificate(chain []*x509.Certificate, st *tls.ConnectionState, host
 	if c.Subject == "" {
 		c.Subject = leaf.Subject.String()
 	}
+	c.SCTsEmbedded = countEmbeddedSCTs(leaf)
 	if st != nil {
 		c.OCSPStapled = len(st.OCSPResponse) > 0
-		c.SCTs = len(st.SignedCertificateTimestamps)
+		c.SCTsHandshake = len(st.SignedCertificateTimestamps)
 	}
 
 	inter := x509.NewCertPool()
@@ -76,6 +79,39 @@ func analyzeCertificate(chain []*x509.Certificate, st *tls.ConnectionState, host
 		})
 	}
 	return c
+}
+
+// oidSCTList is the X.509 extension carrying embedded SCTs (RFC 6962, 3.3).
+var oidSCTList = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
+
+// countEmbeddedSCTs counts the SCTs in the certificate's SCT list extension:
+// an OCTET STRING holding a TLS-encoded list (2-byte length, then entries
+// each prefixed by a 2-byte length). Malformed lists count what parsed.
+func countEmbeddedSCTs(c *x509.Certificate) int {
+	for _, ext := range c.Extensions {
+		if !ext.Id.Equal(oidSCTList) {
+			continue
+		}
+		var list []byte
+		if _, err := asn1.Unmarshal(ext.Value, &list); err != nil || len(list) < 2 {
+			return 0
+		}
+		body := list[2:]
+		if n := int(binary.BigEndian.Uint16(list)); n < len(body) {
+			body = body[:n]
+		}
+		count := 0
+		for len(body) >= 2 {
+			n := int(binary.BigEndian.Uint16(body))
+			if n == 0 || len(body) < 2+n {
+				break
+			}
+			count++
+			body = body[2+n:]
+		}
+		return count
+	}
+	return 0
 }
 
 // publicKeyInfo returns the key algorithm, its size in bits and, for ECDSA, the curve.
