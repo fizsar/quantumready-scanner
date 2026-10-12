@@ -30,6 +30,7 @@ else
 fi
 
 echo "==> $HOST: deploying $TAG (compose from $(git rev-parse --short "$ref"))"
+# shellcheck disable=SC2029 # $DIR is meant to expand locally.
 git show "$ref:deploy/compose.prod.yaml" | ssh "$HOST" "cat > $DIR/compose.yaml.new"
 
 ssh "$HOST" bash -s -- "$TAG" <<'REMOTE'
@@ -47,10 +48,13 @@ fi
 docker compose pull --quiet
 docker compose up -d --wait --remove-orphans
 docker compose ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}'
-echo "==> api (127.0.0.1:8080): $(curl -fsS --max-time 5 http://127.0.0.1:8080/api/health)"
+# Assign first: a failing curl inside "echo $(...)" would not stop the script.
+api=$(curl -fsS --max-time 5 http://127.0.0.1:8080/api/health)
+echo "==> api (127.0.0.1:8080): $api"
 curl -fsS -o /dev/null --max-time 5 http://127.0.0.1:8081/
 echo "==> web (127.0.0.1:8081): ok"
 REMOTE
 
-echo "==> public: $(curl -fsS --max-time 10 "$URL/api/health")"
+public=$(curl -fsS --max-time 10 "$URL/api/health")
+echo "==> public ($URL): $public"
 echo "==> done: $TAG"
