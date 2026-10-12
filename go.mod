@@ -1,13 +1,13 @@
 module github.com/fizsar/quantumready-saas
 
-go 1.25.7
+go 1.26.0
 
 toolchain go1.27.2
 
 require (
 	github.com/go-chi/chi/v5 v5.4.0
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/pressly/goose/v3 v3.27.3
+	github.com/pressly/goose/v3 v3.28.0
 )
 
 require (
