@@ -49,20 +49,31 @@ jobs:
         run: go test -race -count=1 -json ./... | tee go-test.json | jq -rj 'select(.Action == "output") | .Output'
       - name: Integration tests ran
         run: |
-          jq -r 'select((.Action == "pass" or .Action == "skip" or .Action == "fail") and (.Test // "" | test("Postgres$"))) | "\(.Action) \(.Package | sub(".*/quantumready-saas/"; "")) \(.Test)"' go-test.json \
+          jq -r 'select((.Action == "pass" or .Action == "skip" or .Action == "fail") and .Test != null and (.Test | contains("/") | not)
+                  and ((.Test | test("Postgres$")) or (.Package | test("internal/(store|worker)$"))))
+                 | "\(.Action) \(.Package | sub(".*/quantumready-saas/"; "")) \(.Test)"' go-test.json \
             | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: sqlc generated code is up to date
+        run: docker run --rm -v "$PWD:/src" -w /src "sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537" diff
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       # tlssha1=1 / rsa1024min=0 relax crypto/tls for the scanner only (docs/scanner.md).
       - name: Weak-TLS GODEBUG only in scanner binaries
         run: |
-          go build -o "$RUNNER_TEMP/api" ./cmd/api
-          go build -o "$RUNNER_TEMP/migrate" ./cmd/migrate
+          for b in api migrate worker qrscan; do go build -o "$RUNNER_TEMP/$b" "./cmd/$b"; done
           for b in api migrate; do
             if go version -m "$RUNNER_TEMP/$b" | grep -E 'DefaultGODEBUG=.*(tlssha1=1|rsa1024min=0)'; then
               echo "::error::$b must not carry the scanner's weak-TLS GODEBUG settings"
               exit 1
             fi
+          done
+          for b in worker qrscan; do
+            for s in tlssha1=1 rsa1024min=0; do
+              if ! go version -m "$RUNNER_TEMP/$b" | grep -E "DefaultGODEBUG=.*$s" >/dev/null; then
+                echo "::error::$b must carry GODEBUG $s to analyze very old servers"
+                exit 1
+              fi
+            done
           done
 
   web:

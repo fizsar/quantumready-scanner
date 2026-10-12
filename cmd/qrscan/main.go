@@ -8,7 +8,7 @@
 // The godebug settings let crypto/tls complete handshakes with very old
 // servers (SHA-1 signatures in TLS 1.2, RSA keys under 1024 bits) so they can
 // be analyzed. The scanner only observes these connections and never trusts
-// them; cmd/worker will use the same settings (milestone 2.3).
+// them; cmd/worker uses the same settings.
 //
 //go:debug tlssha1=1
 //go:debug rsa1024min=0

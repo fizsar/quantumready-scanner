@@ -58,7 +58,7 @@ Otras limitaciones: no se reproduce byte a byte el ClientHello de un navegador (
 
 ## Ajustes de GODEBUG
 
-`cmd/qrscan` (y `cmd/worker` a partir del hito 2.3) declaran `//go:debug tlssha1=1` y `//go:debug rsa1024min=0` para que `crypto/tls` complete handshakes con servidores muy antiguos (firmas SHA-1 en TLS 1.2, RSA de menos de 1024 bits) y se puedan analizar. El escáner solo observa esas conexiones y nunca confía en ellas. Los tests de la librería se ejecutan sin esos ajustes.
+`cmd/qrscan` y `cmd/worker` declaran `//go:debug tlssha1=1` y `//go:debug rsa1024min=0` para que `crypto/tls` complete handshakes con servidores muy antiguos (firmas SHA-1 en TLS 1.2, RSA de menos de 1024 bits) y se puedan analizar. El escáner solo observa esas conexiones y nunca confía en ellas. Los tests de la librería se ejecutan sin esos ajustes.
 
 ---
 
@@ -72,4 +72,4 @@ Otras limitaciones: no se reproduce byte a byte el ClientHello de un navegador (
 
 **Not evaluated by crypto/tls** (reported in `Result.NotEvaluated`, shown as "not evaluated", never "not supported"): SSLv2/v3, DHE suites, CCM/Camellia/ARIA/NULL/EXPORT/anonymous suites, the full TLS 1.3 suite list, server cipher preference, legacy groups, non-standard PQC groups, implementation vulnerabilities (Heartbleed, ROBOT…). The browser ClientHello is not reproduced byte for byte. Coverage option: raw ClientHello probes (build the ClientHello, read only the ServerHello), as testssl.sh does; to be decided in milestone 2.7 after the testssl.sh comparison. Bundling OpenSSL/testssl.sh in the worker is ruled out.
 
-**GODEBUG**: `cmd/qrscan` (and `cmd/worker` from milestone 2.3) set `tlssha1=1` and `rsa1024min=0` so very old servers can be analyzed; the scanner only observes those connections and never trusts them.
+**GODEBUG**: `cmd/qrscan` and `cmd/worker` set `tlssha1=1` and `rsa1024min=0` so very old servers can be analyzed; the scanner only observes those connections and never trusts them.

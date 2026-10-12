@@ -346,6 +346,13 @@ func TestUnreachable(t *testing.T) {
 		}
 	})
 
+	t.Run("name does not resolve", func(t *testing.T) {
+		_, err := newTestScanner(nil, Options{}).Scan(context.Background(), "nowhere.test", 443)
+		if !errors.Is(err, ErrResolve) {
+			t.Fatalf("error = %v, want ErrResolve", err)
+		}
+	})
+
 	t.Run("invalid port", func(t *testing.T) {
 		_, err := newTestScanner(nil, Options{}).Scan(context.Background(), testHost, 70000)
 		if !errors.Is(err, ErrInvalidTarget) {

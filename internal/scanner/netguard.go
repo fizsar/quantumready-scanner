@@ -17,6 +17,9 @@ var ErrBlockedAddress = errors.New("scanner: address not allowed")
 // ErrInvalidTarget is returned for malformed host names or ports.
 var ErrInvalidTarget = errors.New("scanner: invalid target")
 
+// ErrResolve is returned when the host name does not resolve.
+var ErrResolve = errors.New("scanner: name does not resolve")
+
 // globalUnicast6 is the only IPv6 space we connect to (RFC 4291 2000::/3).
 var globalUnicast6 = netip.MustParsePrefix("2000::/3")
 
@@ -116,10 +119,10 @@ func (s *Scanner) resolve(ctx context.Context, host string, literal netip.Addr) 
 	} else {
 		all, err = s.opts.Resolver.LookupNetIP(ctx, "ip", host)
 		if err != nil {
-			return nil, netip.Addr{}, fmt.Errorf("resolve %s: %w", host, err)
+			return nil, netip.Addr{}, fmt.Errorf("%w: %s: %w", ErrResolve, host, err)
 		}
 		if len(all) == 0 {
-			return nil, netip.Addr{}, fmt.Errorf("resolve %s: no addresses", host)
+			return nil, netip.Addr{}, fmt.Errorf("%w: %s: no addresses", ErrResolve, host)
 		}
 	}
 	for _, a := range all {

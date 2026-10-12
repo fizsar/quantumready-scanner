@@ -8,7 +8,10 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
 	docker compose -f deploy/compose.prod.yaml -f deploy/compose.build.yaml --env-file .env
 
-.PHONY: help dev test lint build clean prod-up prod-down deploy
+# Pinned by digest; bump tag and digest together (CI uses the same image).
+SQLC_IMAGE := sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537
+
+.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -38,6 +41,9 @@ lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint
 build: web/node_modules ## Build bin/{api,migrate,worker} and web/dist
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/ ./cmd/...
 	npm --prefix web run build
+
+sqlc: ## Regenerate internal/store from migrations/ and internal/store/queries/
+	docker run --rm --user $$(id -u):$$(id -g) -v "$$PWD:/src" -w /src $(SQLC_IMAGE) generate
 
 clean: ## Remove build output
 	rm -rf bin web/dist
