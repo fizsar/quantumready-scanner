@@ -101,12 +101,12 @@ var findingTexts = map[string]langTexts{
 		"en": {Title: "TLS 1.3 available", Detail: "TLS 1.3 is the current protocol version and the only one where hybrid post-quantum groups exist."},
 	},
 	"TLS13_MISSING": {
-		"es": {Title: "Sin TLS 1.3",
-			Detail:      "El servidor no acepta TLS 1.3. Los grupos híbridos ML-KEM solo existen en TLS 1.3, así que sin él la migración post-cuántica es imposible.",
-			Remediation: "Activa TLS 1.3 (cualquier servidor con OpenSSL 1.1.1 o posterior lo soporta) y después el grupo X25519MLKEM768."},
-		"en": {Title: "No TLS 1.3",
-			Detail:      "The server does not accept TLS 1.3. Hybrid ML-KEM groups only exist in TLS 1.3, so without it the post-quantum migration is impossible.",
-			Remediation: "Enable TLS 1.3 (any server with OpenSSL 1.1.1 or later supports it), then the X25519MLKEM768 group."},
+		"es": {Title: "Sin TLS 1.3 no es posible adoptar intercambio de claves híbrido ML-KEM",
+			Detail:      "El servidor solo acepta versiones anteriores a TLS 1.3. Hoy puede ser seguro, pero los grupos híbridos ML-KEM solo existen en TLS 1.3: mientras no se active, el tráfico seguirá expuesto a \"cosechar ahora, descifrar después\" y no hay forma de corregirlo con configuración de grupos.",
+			Remediation: "Activa TLS 1.3 (lo soporta cualquier servidor con OpenSSL 1.1.1 o posterior, y todos los navegadores actuales) y después el grupo X25519MLKEM768. Mantén TLS 1.2 para clientes antiguos."},
+		"en": {Title: "Without TLS 1.3, hybrid ML-KEM key exchange cannot be adopted",
+			Detail:      "The server only accepts versions older than TLS 1.3. That may be secure today, but hybrid ML-KEM groups only exist in TLS 1.3: until it is enabled, traffic stays exposed to \"harvest now, decrypt later\" and no group configuration can fix it.",
+			Remediation: "Enable TLS 1.3 (any server with OpenSSL 1.1.1 or later supports it, as do all current browsers), then the X25519MLKEM768 group. Keep TLS 1.2 for older clients."},
 	},
 	"PROTO_LEGACY_TLS": {
 		"es": {Title: "Versiones obsoletas activas: {versions}",
@@ -260,6 +260,7 @@ var labels = map[string]map[string]string{
 	"item.key":              {"es": "Clave", "en": "Key"},
 	"item.signature":        {"es": "Firma", "en": "Signature"},
 	"item.automation":       {"es": "Renovación automatizada", "en": "Automated renewal"},
+	"adjust.floor":          {"es": "Suelo: nada roto ni débil (mínimo D)", "en": "Floor: nothing broken or weak (minimum D)"},
 
 	"axis.quantum": {"es": "Riesgo cuántico", "en": "Quantum risk"},
 	"axis.current": {"es": "Riesgo actual", "en": "Current risk"},

@@ -128,6 +128,12 @@ type golden struct {
 	quantum  string
 	current  string
 	blockPts map[string]int
+	floor    int // expected FloorPoints
+}
+
+func tls12Only(r *scanner.Result) {
+	r.Default.Version, r.Versions, r.TLS13Suite = "TLS 1.2", versions("TLS 1.2"), ""
+	r.Default.CipherSuite = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
 }
 
 func goldenCases() []golden {
@@ -161,13 +167,30 @@ func goldenCases() []golden {
 			codes: []string{"KEX_HYBRID_NOT_PREFERRED"}, notCodes: []string{"KEX_NO_HYBRID", "KEX_HYBRID_PREFERRED"},
 		},
 		{
-			name: "TLS 1.2 only, well configured -> F (no TLS 1.3, no PQC possible)",
-			in: apply(noPQC, func(r *scanner.Result) {
-				r.Default.Version, r.Versions, r.TLS13Suite = "TLS 1.2", versions("TLS 1.2"), ""
-				r.Default.CipherSuite = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+			name:  "TLS 1.2 only, well configured -> bottom of D through the floor",
+			in:    apply(noPQC, tls12Only),
+			score: 40, grade: "D", floor: 10, quantum: "critical", current: "none",
+			codes:    []string{"TLS13_MISSING", "KEX_NO_HYBRID", "FS_ALL"},
+			blockPts: map[string]int{"key_exchange": 0, "tls13": 0, "forward_secrecy": 10, "hybrid_variety": 0, "certificate": 20},
+		},
+		{
+			name:  "TLS 1.2 only with a commercial certificate -> D, never F",
+			in:    apply(noPQC, tls12Only, commercialRSA),
+			score: 40, grade: "D", floor: 15, codes: []string{"TLS13_MISSING", "CERT_NOT_AUTOMATED"},
+		},
+		{
+			name: "TLS 1.2 only with CBC suites -> D (a B cap does not remove the floor)",
+			in: apply(noPQC, tls12Only, func(r *scanner.Result) {
+				r.TLS12Suites = append(r.TLS12Suites, suite("TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"))
 			}),
-			score: 30, grade: "F", quantum: "critical", current: "none",
-			codes: []string{"TLS13_MISSING", "KEX_NO_HYBRID", "FS_ALL"},
+			score: 40, grade: "D", floor: 10, cap: "B", codes: []string{"SUITE_CBC"},
+		},
+		{
+			name: "TLS 1.2 only with RC4 -> no floor, F",
+			in: apply(noPQC, tls12Only, func(r *scanner.Result) {
+				r.TLS12Suites = append(r.TLS12Suites, suite("TLS_ECDHE_ECDSA_WITH_RC4_128_SHA"))
+			}),
+			score: 30, grade: "F", cap: "C", codes: []string{"SUITE_RC4"},
 		},
 		{
 			name: "expired certificate caps at F", in: apply(func(r *scanner.Result) {
@@ -257,6 +280,16 @@ func TestEvaluateGolden(t *testing.T) {
 			}
 			if got.ScoreGrade != GradeFor(tc.score) {
 				t.Errorf("score_grade = %s, want %s", got.ScoreGrade, GradeFor(tc.score))
+			}
+			if got.FloorPoints != tc.floor {
+				t.Errorf("floor_points = %d, want %d", got.FloorPoints, tc.floor)
+			}
+			sum := got.FloorPoints
+			for _, b := range got.Blocks {
+				sum += b.Points
+			}
+			if sum != got.Score {
+				t.Errorf("blocks + floor = %d, but score = %d", sum, got.Score)
 			}
 			gotCap := ""
 			if got.Cap != nil {
@@ -458,7 +491,7 @@ func TestCatalog(t *testing.T) {
 	for _, s := range []Severity{Pass, Info, Low, Medium, High, Critical} {
 		labelKeys = append(labelKeys, "severity."+string(s))
 	}
-	labelKeys = append(labelKeys, "severity.none", "axis.quantum", "axis.current")
+	labelKeys = append(labelKeys, "severity.none", "axis.quantum", "axis.current", "adjust.floor")
 	for _, k := range labelKeys {
 		for _, lang := range Languages {
 			if l := Label(k, lang); l == k || l == "" {

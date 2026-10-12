@@ -86,10 +86,13 @@ type Cap struct {
 // Result is the judgement of one scan.
 type Result struct {
 	ScoringVersion string `json:"scoring_version"`
-	Score          int    `json:"score"`       // 0–100, post-quantum readiness points
+	Score          int    `json:"score"`       // 0–100: sum of the blocks plus FloorPoints
 	ScoreGrade     string `json:"score_grade"` // letter from Score alone
-	Grade          string `json:"grade"`       // final letter: the worse of ScoreGrade and Cap
-	Cap            *Cap   `json:"cap,omitempty"`
+	// FloorPoints lifts the score to FloorScore when nothing is broken or weak
+	// (no F or C cap): classical TLS done right is never an F.
+	FloorPoints int    `json:"floor_points,omitempty"`
+	Grade       string `json:"grade"` // final letter: the worse of ScoreGrade and Cap
+	Cap         *Cap   `json:"cap,omitempty"`
 	// PQC: the server negotiates a hybrid ML-KEM group with a browser-like offer.
 	PQC bool `json:"pqc"`
 	// Worst non-pass severity per axis ("none" if nothing to report).
@@ -113,6 +116,10 @@ const (
 	PointsCertSig      = 5
 	PointsCertAuto     = 5
 )
+
+// FloorScore is the minimum score of a server with no F or C cap: the bottom
+// of D. F is reserved for broken or weak setups.
+const FloorScore = 40
 
 // Grade thresholds: minimum score per letter.
 var gradeThresholds = []struct {
@@ -480,6 +487,12 @@ func (e *evaluator) result() Result {
 	}
 	for _, b := range e.blocks {
 		res.Score += b.Points
+	}
+	_, broken := e.caps["F"]
+	_, weak := e.caps["C"]
+	if !broken && !weak && res.Score < FloorScore {
+		res.FloorPoints = FloorScore - res.Score
+		res.Score = FloorScore
 	}
 	res.ScoreGrade = GradeFor(res.Score)
 	res.Grade = res.ScoreGrade

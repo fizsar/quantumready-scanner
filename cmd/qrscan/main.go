@@ -92,6 +92,9 @@ func printReport(r *scanner.Result, s scoring.Result, lang string) {
 			fmt.Printf("    %-38s %3d/%d\n", scoring.Label("item."+it.ID, lang), it.Points, it.Max)
 		}
 	}
+	if s.FloorPoints > 0 {
+		fmt.Printf("  %-40s +%d\n", scoring.Label("adjust.floor", lang), s.FloorPoints)
+	}
 
 	fmt.Printf("\n%s\n", t["findings"])
 	for _, f := range s.Findings {
