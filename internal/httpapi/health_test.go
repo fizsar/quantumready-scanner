@@ -112,3 +112,30 @@ func TestHealthRouting(t *testing.T) {
 		t.Errorf("GET /api/nope status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }
+
+func TestHealthHead(t *testing.T) {
+	// A real server so that net/http applies HEAD semantics (no body).
+	srv := httptest.NewServer(newTestRouter(fakePinger{}))
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodHead, srv.URL+"/api/health", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("HEAD /api/health status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "application/json; charset=utf-8" {
+		t.Errorf("Content-Type = %q", ct)
+	}
+	if len(body) != 0 {
+		t.Errorf("HEAD returned a body: %q", body)
+	}
+}

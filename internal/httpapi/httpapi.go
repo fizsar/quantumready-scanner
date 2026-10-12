@@ -42,6 +42,8 @@ func NewRouter(cfg Config) http.Handler {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
+	// Serve HEAD with the GET handlers (net/http drops the body).
+	r.Use(middleware.GetHead)
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/health", healthHandler(cfg))
 	})
