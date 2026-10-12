@@ -1,0 +1,41 @@
+# QuantumReady SaaS
+
+**ES** · [EN](#english)
+
+Auditoría de preparación post-cuántica (PQC) para endpoints TLS de pymes y empresas europeas: soporte de ML-KEM híbrido, versiones TLS, cifrados y algoritmos de certificado, con informes que mapean NIS2, DORA y la hoja de ruta PQC de la UE.
+
+Estado: en desarrollo. https://quantumready.fizsar.com
+
+## Desarrollo
+
+Requisitos: Go 1.25+, Node 24+, Docker.
+
+```sh
+make dev     # PostgreSQL (Docker) + API en :8080 + web en http://localhost:5173
+make test    # tests de Go
+make lint    # gofmt, go vet, oxlint, tsc
+make build   # bin/api, bin/worker y web/dist
+```
+
+`make dev` crea `.env` a partir de `.env.example` si no existe. Nunca subas `.env` al repositorio.
+
+---
+
+## English
+
+Post-quantum (PQC) readiness audits for the TLS endpoints of European SMEs and companies: hybrid ML-KEM support, TLS versions, ciphers and certificate algorithms, with reports mapped to NIS2, DORA and the EU PQC roadmap.
+
+Status: in development. https://quantumready.fizsar.com
+
+### Development
+
+Requirements: Go 1.25+, Node 24+, Docker.
+
+```sh
+make dev     # PostgreSQL (Docker) + API on :8080 + web on http://localhost:5173
+make test    # Go tests
+make lint    # gofmt, go vet, oxlint, tsc
+make build   # bin/api, bin/worker and web/dist
+```
+
+`make dev` creates `.env` from `.env.example` if missing. Never commit `.env`.
