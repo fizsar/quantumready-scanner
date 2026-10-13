@@ -6,12 +6,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -38,6 +41,21 @@ type scanFunc func(ctx context.Context, host string, port int) (*scanner.Result,
 
 func (f scanFunc) Scan(ctx context.Context, host string, port int) (*scanner.Result, error) {
 	return f(ctx, host, port)
+}
+
+// ScanTimeout is short so tests can use leases of a few hundred milliseconds.
+func (f scanFunc) ScanTimeout() time.Duration { return 100 * time.Millisecond }
+
+func mustNew(t *testing.T, st *store.Store, sc Scanner, cfg Config) *Worker {
+	t.Helper()
+	if cfg.LeaseMargin == 0 {
+		cfg.LeaseMargin = 50 * time.Millisecond
+	}
+	w, err := New(st, sc, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return w
 }
 
 // canned returns a fixed scan result: PQC preferred, valid certificate.
@@ -101,7 +119,7 @@ func TestEndToEndWithRealScanner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := New(st, sc, Config{Logger: quiet})
+	w := mustNew(t, st, sc, Config{Logger: quiet})
 	if ok, err := w.ProcessOne(context.Background()); !ok || err != nil {
 		t.Fatalf("ProcessOne = %v, %v", ok, err)
 	}
@@ -141,26 +159,195 @@ func (r staticResolver) LookupNetIP(_ context.Context, _, host string) ([]netip.
 	return nil, errors.New("no such host")
 }
 
-func TestFailureCodes(t *testing.T) {
-	st := newTestStore(t)
+type timeoutErr struct{}
+
+func (timeoutErr) Error() string   { return "i/o timeout" }
+func (timeoutErr) Timeout() bool   { return true }
+func (timeoutErr) Temporary() bool { return true }
+
+// unreachable wraps a dial-level cause the way the scanner reports it.
+func unreachable(cause error) error {
+	return fmt.Errorf("%w: connect: %w", scanner.ErrUnreachable,
+		&net.OpError{Op: "dial", Net: "tcp", Err: cause})
+}
+
+func resolveErr(d *net.DNSError) error {
+	return fmt.Errorf("%w: example.com: %w", scanner.ErrResolve, d)
+}
+
+func TestClassify(t *testing.T) {
 	for _, tt := range []struct {
-		err  error
-		code string
+		name      string
+		err       error
+		code      string
+		transient bool
 	}{
-		{scanner.ErrBlockedAddress, "blocked_address"},
-		{scanner.ErrInvalidTarget, "invalid_target"},
-		{scanner.ErrResolve, "dns"},
-		{scanner.ErrUnreachable, "unreachable"},
-		{errors.New("boom"), "scan_error"},
+		{"anti-SSRF block", fmt.Errorf("%w: 10.0.0.1 is in 10.0.0.0/8", scanner.ErrBlockedAddress), "blocked_address", false},
+		{"invalid target", fmt.Errorf("%w: port 70000", scanner.ErrInvalidTarget), "invalid_target", false},
+		{"NXDOMAIN", resolveErr(&net.DNSError{Err: "no such host", Name: "example.com", IsNotFound: true}), "dns_not_found", false},
+		{"DNS timeout", resolveErr(&net.DNSError{Err: "i/o timeout", IsTimeout: true}), "dns_temporary", true},
+		{"DNS SERVFAIL", resolveErr(&net.DNSError{Err: "server misbehaving", IsTemporary: true}), "dns_temporary", true},
+		{"DNS other", fmt.Errorf("%w: no addresses", scanner.ErrResolve), "dns", false},
+		{"connection refused", unreachable(os.NewSyscallError("connect", syscall.ECONNREFUSED)), "connection_refused", false},
+		{"connect timeout", unreachable(timeoutErr{}), "timeout", true},
+		{"scan deadline", fmt.Errorf("%w: %w", scanner.ErrUnreachable, context.DeadlineExceeded), "timeout", true},
+		{"connection reset", unreachable(os.NewSyscallError("read", syscall.ECONNRESET)), "network", true},
+		{"network unreachable", unreachable(os.NewSyscallError("connect", syscall.ENETUNREACH)), "network", true},
+		{"closed mid-handshake", fmt.Errorf("%w: %w", scanner.ErrUnreachable, io.EOF), "network", true},
+		{"not TLS", fmt.Errorf("%w: tls: first record does not look like a TLS handshake", scanner.ErrUnreachable), "unreachable", false},
+		{"unknown", errors.New("boom"), "scan_error", false},
+	} {
+		if got := Classify(tt.err); got.Code != tt.code || got.Transient != tt.transient {
+			t.Errorf("%s: Classify = %+v, want %s transient=%v", tt.name, got, tt.code, tt.transient)
+		}
+	}
+}
+
+func failingScanner(err error) Scanner {
+	return scanFunc(func(context.Context, string, int) (*scanner.Result, error) { return nil, err })
+}
+
+func TestDefinitiveErrorsFailDirectly(t *testing.T) {
+	st := newTestStore(t)
+	for _, err := range []error{
+		fmt.Errorf("%w: x", scanner.ErrBlockedAddress),
+		resolveErr(&net.DNSError{Err: "no such host", IsNotFound: true}),
+		unreachable(os.NewSyscallError("connect", syscall.ECONNREFUSED)),
 	} {
 		q := enqueue(t, st, "example.com")
-		w := New(st, scanFunc(func(context.Context, string, int) (*scanner.Result, error) { return nil, tt.err }), Config{Logger: quiet})
+		w := mustNew(t, st, failingScanner(err), Config{Logger: quiet})
+		if ok, perr := w.ProcessOne(context.Background()); !ok || perr != nil {
+			t.Fatalf("ProcessOne = %v, %v", ok, perr)
+		}
+		got := mustGet(t, st, q.ID)
+		if got.Status != "failed" || got.Retries != 0 || got.Attempts != 1 || *got.Error != Classify(err).Code {
+			t.Errorf("%v: status %s retries %d attempts %d error %v, want failed without retry", err, got.Status, got.Retries, got.Attempts, *got.Error)
+		}
+	}
+}
+
+// A transient error sends the scan back to the queue once, not before the
+// retry delay; a second transient error fails it.
+func TestTransientErrorIsRetriedOnce(t *testing.T) {
+	st := newTestStore(t)
+	q := enqueue(t, st, "example.com")
+	w := mustNew(t, st, failingScanner(unreachable(timeoutErr{})), Config{RetryDelay: 400 * time.Millisecond, Logger: quiet})
+
+	if ok, err := w.ProcessOne(context.Background()); !ok || err != nil {
+		t.Fatalf("first ProcessOne = %v, %v", ok, err)
+	}
+	got := mustGet(t, st, q.ID)
+	if got.Status != "queued" || got.Retries != 1 || got.Attempts != 1 || *got.Error != "timeout" || got.NotBefore == nil || got.LeaseToken != nil {
+		t.Fatalf("after a transient error = %+v, want queued for a retry", got)
+	}
+	if d := time.Until(*got.NotBefore); d < 200*time.Millisecond || d > 500*time.Millisecond {
+		t.Errorf("retry due in %v, want about 400ms", d)
+	}
+	if ok, err := w.ProcessOne(context.Background()); ok || err != nil {
+		t.Fatalf("claimed before the retry delay: %v, %v", ok, err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+	if ok, err := w.ProcessOne(context.Background()); !ok || err != nil {
+		t.Fatalf("retry ProcessOne = %v, %v", ok, err)
+	}
+	got = mustGet(t, st, q.ID)
+	if got.Status != "failed" || got.Retries != 1 || got.Attempts != 2 || *got.Error != "timeout" {
+		t.Fatalf("after the second transient error = %+v, want failed", got)
+	}
+}
+
+func TestTransientErrorThenSuccess(t *testing.T) {
+	st := newTestStore(t)
+	q := enqueue(t, st, "example.com")
+	calls := 0
+	flaky := scanFunc(func(_ context.Context, host string, port int) (*scanner.Result, error) {
+		calls++
+		if calls == 1 {
+			return nil, unreachable(os.NewSyscallError("read", syscall.ECONNRESET))
+		}
+		return canned(host, port, "X25519MLKEM768"), nil
+	})
+	w := mustNew(t, st, flaky, Config{RetryDelay: 100 * time.Millisecond, Logger: quiet})
+	_, _ = w.ProcessOne(context.Background())
+	time.Sleep(200 * time.Millisecond)
+	if ok, err := w.ProcessOne(context.Background()); !ok || err != nil {
+		t.Fatalf("retry ProcessOne = %v, %v", ok, err)
+	}
+	if got := mustGet(t, st, q.ID); got.Status != "done" || got.Retries != 1 || got.Error != nil {
+		t.Fatalf("after a successful retry = status %s retries %d error %v", got.Status, got.Retries, got.Error)
+	}
+}
+
+// Real network failures from the real scanner are classified as expected.
+func TestRealNetworkErrors(t *testing.T) {
+	st := newTestStore(t)
+	sc := scanner.New(scanner.Options{
+		Resolver:         staticResolver{"example.com": netip.MustParseAddr("127.0.0.1")},
+		AddrPolicy:       func(netip.Addr) error { return nil },
+		HandshakeTimeout: 300 * time.Millisecond,
+	})
+	w := mustNew(t, st, sc, Config{Logger: quiet})
+
+	closed, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedPort := closed.Addr().(*net.TCPAddr).Port
+	closed.Close()
+
+	silent, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { silent.Close() })
+	go func() {
+		for {
+			c, err := silent.Accept()
+			if err != nil {
+				return
+			}
+			t.Cleanup(func() { c.Close() })
+		}
+	}()
+
+	for _, tt := range []struct {
+		port   int
+		status string
+		code   string
+	}{
+		{closedPort, "failed", "connection_refused"},
+		{silent.Addr().(*net.TCPAddr).Port, "queued", "timeout"}, // transient: back to the queue
+	} {
+		q, err := st.Enqueue(context.Background(), "example.com", int32(tt.port))
+		if err != nil {
+			t.Fatal(err)
+		}
 		if ok, err := w.ProcessOne(context.Background()); !ok || err != nil {
 			t.Fatalf("ProcessOne = %v, %v", ok, err)
 		}
-		got := mustGet(t, st, q.ID)
-		if got.Status != "failed" || got.Error == nil || *got.Error != tt.code {
-			t.Errorf("%v: scan = status %s error %v, want failed %s", tt.err, got.Status, got.Error, tt.code)
+		if got := mustGet(t, st, q.ID); got.Status != tt.status || *got.Error != tt.code {
+			t.Errorf("port %d: status %s error %v, want %s %s", tt.port, got.Status, *got.Error, tt.status, tt.code)
+		}
+	}
+}
+
+func TestLeaseMustOutlastScanTimeout(t *testing.T) {
+	st := newTestStore(t)
+	real := scanner.New(scanner.Options{}) // 60 s scan timeout
+	for _, tt := range []struct {
+		lease, margin time.Duration
+		ok            bool
+	}{
+		{0, 0, true}, // defaults: 90 s > 60 s + 15 s
+		{60 * time.Second, 0, false},
+		{75 * time.Second, 0, false}, // must exceed, not equal
+		{76 * time.Second, 0, true},
+		{70 * time.Second, 5 * time.Second, true},
+	} {
+		_, err := New(st, real, Config{Lease: tt.lease, LeaseMargin: tt.margin})
+		if (err == nil) != tt.ok {
+			t.Errorf("lease %v margin %v: err = %v, want ok=%v", tt.lease, tt.margin, err, tt.ok)
 		}
 	}
 }
@@ -177,7 +364,7 @@ func TestWorkerDiesMidScanAndAnotherRecovers(t *testing.T) {
 		<-ctx.Done() // until the worker "dies"
 		return nil, ctx.Err()
 	})
-	a := New(st, blocking, Config{Lease: 500 * time.Millisecond, Logger: quiet})
+	a := mustNew(t, st, blocking, Config{Lease: 500 * time.Millisecond, Logger: quiet})
 	ctxA, kill := context.WithCancel(context.Background())
 	doneA := make(chan error, 1)
 	go func() { _, err := a.ProcessOne(ctxA); doneA <- err }()
@@ -190,7 +377,7 @@ func TestWorkerDiesMidScanAndAnotherRecovers(t *testing.T) {
 		t.Fatalf("after A died: status %s attempts %d, want running 1 (not failed)", got.Status, got.Attempts)
 	}
 
-	b := New(st, fastScanner("X25519MLKEM768"), Config{Lease: time.Minute, Logger: quiet})
+	b := mustNew(t, st, fastScanner("X25519MLKEM768"), Config{Lease: time.Minute, Logger: quiet})
 	if ok, err := b.ProcessOne(context.Background()); ok || err != nil {
 		t.Fatalf("B claimed while A's lease was valid: %v, %v", ok, err)
 	}
@@ -217,13 +404,13 @@ func TestStalledWorkerResultIsDiscarded(t *testing.T) {
 		<-release
 		return canned(host, port, "x25519"), nil // would score worse than B's
 	})
-	a := New(st, stalled, Config{Lease: 300 * time.Millisecond, Logger: quiet})
+	a := mustNew(t, st, stalled, Config{Lease: 300 * time.Millisecond, Logger: quiet})
 	doneA := make(chan error, 1)
 	go func() { _, err := a.ProcessOne(context.Background()); doneA <- err }()
 	<-started
 
 	time.Sleep(400 * time.Millisecond)
-	b := New(st, fastScanner("X25519MLKEM768"), Config{Logger: quiet})
+	b := mustNew(t, st, fastScanner("X25519MLKEM768"), Config{Logger: quiet})
 	if ok, err := b.ProcessOne(context.Background()); !ok || err != nil {
 		t.Fatalf("B ProcessOne = %v, %v", ok, err)
 	}
@@ -254,7 +441,7 @@ func TestRunProcessesTheQueue(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		return canned(host, port, "X25519MLKEM768"), nil
 	})
-	w := New(st, slow, Config{Concurrency: 2, PollInterval: 20 * time.Millisecond, Logger: quiet})
+	w := mustNew(t, st, slow, Config{Concurrency: 2, PollInterval: 20 * time.Millisecond, Logger: quiet})
 	ctx, stop := context.WithCancel(context.Background())
 	runDone := make(chan error, 1)
 	go func() { runDone <- w.Run(ctx) }()
@@ -285,7 +472,7 @@ func TestRunShutdownLeavesInFlightScansToTheLease(t *testing.T) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	})
-	w := New(st, blocking, Config{Concurrency: 1, ShutdownTimeout: 200 * time.Millisecond, Logger: quiet})
+	w := mustNew(t, st, blocking, Config{Concurrency: 1, ShutdownTimeout: 200 * time.Millisecond, Logger: quiet})
 	ctx, stop := context.WithCancel(context.Background())
 	runDone := make(chan error, 1)
 	go func() { runDone <- w.Run(ctx) }()

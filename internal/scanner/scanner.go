@@ -81,6 +81,9 @@ func New(opts Options) *Scanner {
 	return &Scanner{opts: opts, sem: make(chan struct{}, opts.GlobalConcurrency)}
 }
 
+// ScanTimeout is the upper bound of one Scan call.
+func (s *Scanner) ScanTimeout() time.Duration { return s.opts.ScanTimeout }
+
 type target struct {
 	host string // normalized name or IP literal
 	sni  string // "" for IP literals

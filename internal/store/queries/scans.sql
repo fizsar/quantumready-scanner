@@ -4,9 +4,9 @@ VALUES (@host, @port, @organization_id)
 RETURNING *;
 
 -- name: ClaimScan :one
--- Leases the oldest queued scan, or a running one whose lease expired (its
--- worker died), to the caller. SKIP LOCKED lets workers claim concurrently
--- without waiting on each other or taking the same row.
+-- Leases the oldest queued scan that is due (not_before passed), or a running
+-- one whose lease expired (its worker died), to the caller. SKIP LOCKED lets
+-- workers claim concurrently without waiting on each other or taking the same row.
 UPDATE scans
 SET status      = 'running',
     attempts    = attempts + 1,
@@ -15,7 +15,8 @@ SET status      = 'running',
     started_at  = now()
 WHERE id = (
     SELECT s.id FROM scans s
-    WHERE (s.status = 'queued' OR (s.status = 'running' AND s.lease_until < now()))
+    WHERE ((s.status = 'queued' AND (s.not_before IS NULL OR s.not_before <= now()))
+           OR (s.status = 'running' AND s.lease_until < now()))
       AND s.attempts < s.max_attempts
     ORDER BY s.created_at
     LIMIT 1
@@ -45,6 +46,15 @@ WHERE id = @id AND status = 'running' AND lease_token = @lease_token;
 -- Only the current lease holder can fail a scan.
 UPDATE scans
 SET status = 'failed', finished_at = now(), error = @error,
+    lease_token = NULL, lease_until = NULL
+WHERE id = @id AND status = 'running' AND lease_token = @lease_token;
+
+-- name: RetryScan :execrows
+-- Back to the queue after a transient error, not before the delay. Only the
+-- current lease holder can do it. error keeps the transient reason meanwhile.
+UPDATE scans
+SET status = 'queued', retries = retries + 1, error = @error,
+    not_before = now() + make_interval(secs => @delay_seconds::float8),
     lease_token = NULL, lease_until = NULL
 WHERE id = @id AND status = 'running' AND lease_token = @lease_token;
 

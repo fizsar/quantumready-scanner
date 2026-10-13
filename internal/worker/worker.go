@@ -7,8 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/fizsar/quantumready-saas/internal/scanner"
@@ -19,15 +22,26 @@ import (
 // Scanner is what the worker needs from internal/scanner.
 type Scanner interface {
 	Scan(ctx context.Context, host string, port int) (*scanner.Result, error)
+	// ScanTimeout bounds one Scan; the lease must outlast it.
+	ScanTimeout() time.Duration
 }
 
 // Config tunes a Worker. Zero values select the defaults.
 type Config struct {
 	// Concurrency is the number of scans run in parallel. Default 2.
 	Concurrency int
-	// Lease is how long a claim lasts. It must exceed the scanner's own
-	// timeout (60 s), so a healthy worker never loses a scan. Default 90 s.
+	// Lease is how long a claim lasts. It must exceed the scanner's timeout
+	// plus LeaseMargin, so a healthy worker never loses a scan. Default 90 s.
 	Lease time.Duration
+	// LeaseMargin is the minimum slack between the scanner's timeout and the
+	// lease, for scoring and storing the result. Default 15 s.
+	LeaseMargin time.Duration
+	// RetryDelay is the wait before retrying a scan after a transient error
+	// (timeout, connection reset…). Default 30 s.
+	RetryDelay time.Duration
+	// MaxRetries is how many times a transient error is retried. Default 1;
+	// negative disables retries.
+	MaxRetries int
 	// PollInterval is the wait when the queue is empty. Default 1 s.
 	PollInterval time.Duration
 	// ShutdownTimeout bounds the wait for in-flight scans on stop. Scans still
@@ -44,13 +58,24 @@ type Worker struct {
 	cfg Config
 }
 
-// New returns a Worker with cfg, filling in defaults.
-func New(st *store.Store, sc Scanner, cfg Config) *Worker {
+// New returns a Worker with cfg, filling in defaults. It refuses a lease that
+// does not outlast the scanner's timeout plus LeaseMargin: such a worker could
+// lose healthy scans to another worker.
+func New(st *store.Store, sc Scanner, cfg Config) (*Worker, error) {
 	if cfg.Concurrency <= 0 {
 		cfg.Concurrency = 2
 	}
 	if cfg.Lease <= 0 {
 		cfg.Lease = 90 * time.Second
+	}
+	if cfg.LeaseMargin <= 0 {
+		cfg.LeaseMargin = 15 * time.Second
+	}
+	if cfg.RetryDelay <= 0 {
+		cfg.RetryDelay = 30 * time.Second
+	}
+	if cfg.MaxRetries == 0 {
+		cfg.MaxRetries = 1
 	}
 	if cfg.PollInterval <= 0 {
 		cfg.PollInterval = time.Second
@@ -61,7 +86,11 @@ func New(st *store.Store, sc Scanner, cfg Config) *Worker {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	return &Worker{st: st, sc: sc, cfg: cfg}
+	if minLease := sc.ScanTimeout() + cfg.LeaseMargin; cfg.Lease <= minLease {
+		return nil, fmt.Errorf("worker: lease %v must exceed the scan timeout %v plus a margin of %v (> %v)",
+			cfg.Lease, sc.ScanTimeout(), cfg.LeaseMargin, minLease)
+	}
+	return &Worker{st: st, sc: sc, cfg: cfg}, nil
 }
 
 // Run processes scans until ctx is canceled, then stops claiming and waits up
@@ -130,10 +159,17 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 	if err != nil {
-		code := FailureCode(err)
-		log.Info("worker: scan failed", "code", code, "err", err)
-		if ferr := w.st.Fail(ctx, sc.ID, *sc.LeaseToken, code); ferr != nil && !errors.Is(ferr, store.ErrLeaseLost) {
-			return true, fmt.Errorf("store failure: %w", ferr)
+		f := Classify(err)
+		var serr error
+		if f.Transient && int(sc.Retries) < w.cfg.MaxRetries {
+			log.Info("worker: transient scan error, retrying later", "code", f.Code, "err", err, "in", w.cfg.RetryDelay)
+			serr = w.st.Retry(ctx, sc.ID, *sc.LeaseToken, f.Code, w.cfg.RetryDelay)
+		} else {
+			log.Info("worker: scan failed", "code", f.Code, "transient", f.Transient, "err", err)
+			serr = w.st.Fail(ctx, sc.ID, *sc.LeaseToken, f.Code)
+		}
+		if serr != nil && !errors.Is(serr, store.ErrLeaseLost) {
+			return true, fmt.Errorf("store failure: %w", serr)
 		}
 		return true, nil
 	}
@@ -153,19 +189,50 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// FailureCode maps a scanner error to the stable code stored in scans.error.
-func FailureCode(err error) string {
+// Failure is a scanner error classified for the queue: Code is stored in
+// scans.error; Transient errors are worth one more try after a delay.
+type Failure struct {
+	Code      string
+	Transient bool
+}
+
+// Classify maps a scanner error to a stable code and decides whether it is
+// transient (a timeout or a network hiccup may not happen again) or definitive
+// (the target does not exist, refuses connections or must not be scanned).
+func Classify(err error) Failure {
+	var dnsErr *net.DNSError
 	switch {
 	case errors.Is(err, scanner.ErrBlockedAddress):
-		return "blocked_address"
+		return Failure{Code: "blocked_address"}
 	case errors.Is(err, scanner.ErrInvalidTarget):
-		return "invalid_target"
+		return Failure{Code: "invalid_target"}
+	case errors.As(err, &dnsErr):
+		if dnsErr.IsNotFound {
+			return Failure{Code: "dns_not_found"} // NXDOMAIN or no address
+		}
+		if dnsErr.IsTimeout || dnsErr.IsTemporary {
+			return Failure{Code: "dns_temporary", Transient: true}
+		}
+		return Failure{Code: "dns"}
 	case errors.Is(err, scanner.ErrResolve):
-		return "dns"
+		return Failure{Code: "dns"}
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return Failure{Code: "connection_refused"}
+	case isTimeout(err):
+		return Failure{Code: "timeout", Transient: true}
+	case errors.Is(err, syscall.ECONNRESET), errors.Is(err, syscall.ECONNABORTED),
+		errors.Is(err, syscall.ENETUNREACH), errors.Is(err, syscall.EHOSTUNREACH),
+		errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		return Failure{Code: "network", Transient: true}
 	case errors.Is(err, scanner.ErrUnreachable):
-		return "unreachable"
+		return Failure{Code: "unreachable"}
 	}
-	return "scan_error"
+	return Failure{Code: "scan_error"}
+}
+
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &ne) && ne.Timeout())
 }
 
 func completion(sc store.Scan, res *scanner.Result, s scoring.Result) (store.CompleteScanParams, []store.InsertFindingsParams, error) {

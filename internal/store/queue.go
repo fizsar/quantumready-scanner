@@ -64,6 +64,19 @@ func (s *Store) Complete(ctx context.Context, p CompleteScanParams, findings []I
 	})
 }
 
+// Retry puts the scan back in the queue after a transient error, due after
+// delay, if the caller still holds the lease.
+func (s *Store) Retry(ctx context.Context, id, token uuid.UUID, code string, delay time.Duration) error {
+	n, err := s.RetryScan(ctx, RetryScanParams{ID: id, LeaseToken: &token, Error: &code, DelaySeconds: delay.Seconds()})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrLeaseLost
+	}
+	return nil
+}
+
 // Fail marks the scan as failed with a stable reason code, if the caller
 // still holds the lease.
 func (s *Store) Fail(ctx context.Context, id, token uuid.UUID, code string) error {

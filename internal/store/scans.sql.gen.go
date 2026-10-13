@@ -20,13 +20,14 @@ SET status      = 'running',
     started_at  = now()
 WHERE id = (
     SELECT s.id FROM scans s
-    WHERE (s.status = 'queued' OR (s.status = 'running' AND s.lease_until < now()))
+    WHERE ((s.status = 'queued' AND (s.not_before IS NULL OR s.not_before <= now()))
+           OR (s.status = 'running' AND s.lease_until < now()))
       AND s.attempts < s.max_attempts
     ORDER BY s.created_at
     LIMIT 1
     FOR UPDATE SKIP LOCKED
 )
-RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc
+RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before
 `
 
 type ClaimScanParams struct {
@@ -34,9 +35,9 @@ type ClaimScanParams struct {
 	LeaseSeconds float64
 }
 
-// Leases the oldest queued scan, or a running one whose lease expired (its
-// worker died), to the caller. SKIP LOCKED lets workers claim concurrently
-// without waiting on each other or taking the same row.
+// Leases the oldest queued scan that is due (not_before passed), or a running
+// one whose lease expired (its worker died), to the caller. SKIP LOCKED lets
+// workers claim concurrently without waiting on each other or taking the same row.
 func (q *Queries) ClaimScan(ctx context.Context, arg ClaimScanParams) (Scan, error) {
 	row := q.db.QueryRow(ctx, claimScan, arg.LeaseToken, arg.LeaseSeconds)
 	var i Scan
@@ -61,6 +62,8 @@ func (q *Queries) ClaimScan(ctx context.Context, arg ClaimScanParams) (Scan, err
 		&i.Score,
 		&i.Grade,
 		&i.Pqc,
+		&i.Retries,
+		&i.NotBefore,
 	)
 	return i, err
 }
@@ -109,7 +112,7 @@ func (q *Queries) CompleteScan(ctx context.Context, arg CompleteScanParams) (int
 const enqueueScan = `-- name: EnqueueScan :one
 INSERT INTO scans (host, port, organization_id)
 VALUES ($1, $2, $3)
-RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc
+RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before
 `
 
 type EnqueueScanParams struct {
@@ -142,6 +145,8 @@ func (q *Queries) EnqueueScan(ctx context.Context, arg EnqueueScanParams) (Scan,
 		&i.Score,
 		&i.Grade,
 		&i.Pqc,
+		&i.Retries,
+		&i.NotBefore,
 	)
 	return i, err
 }
@@ -198,7 +203,7 @@ func (q *Queries) FailScan(ctx context.Context, arg FailScanParams) (int64, erro
 }
 
 const getScan = `-- name: GetScan :one
-SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc FROM scans WHERE id = $1
+SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before FROM scans WHERE id = $1
 `
 
 func (q *Queries) GetScan(ctx context.Context, id uuid.UUID) (Scan, error) {
@@ -225,6 +230,8 @@ func (q *Queries) GetScan(ctx context.Context, id uuid.UUID) (Scan, error) {
 		&i.Score,
 		&i.Grade,
 		&i.Pqc,
+		&i.Retries,
+		&i.NotBefore,
 	)
 	return i, err
 }
@@ -270,4 +277,34 @@ func (q *Queries) ListFindings(ctx context.Context, scanID uuid.UUID) ([]Finding
 		return nil, err
 	}
 	return items, nil
+}
+
+const retryScan = `-- name: RetryScan :execrows
+UPDATE scans
+SET status = 'queued', retries = retries + 1, error = $1,
+    not_before = now() + make_interval(secs => $2::float8),
+    lease_token = NULL, lease_until = NULL
+WHERE id = $3 AND status = 'running' AND lease_token = $4
+`
+
+type RetryScanParams struct {
+	Error        *string
+	DelaySeconds float64
+	ID           uuid.UUID
+	LeaseToken   *uuid.UUID
+}
+
+// Back to the queue after a transient error, not before the delay. Only the
+// current lease holder can do it. error keeps the transient reason meanwhile.
+func (q *Queries) RetryScan(ctx context.Context, arg RetryScanParams) (int64, error) {
+	result, err := q.db.Exec(ctx, retryScan,
+		arg.Error,
+		arg.DelaySeconds,
+		arg.ID,
+		arg.LeaseToken,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

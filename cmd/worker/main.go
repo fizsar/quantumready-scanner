@@ -67,10 +67,13 @@ func run(logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	w := worker.New(store.NewStore(pool), scanner.New(scanner.Options{}), worker.Config{
+	w, err := worker.New(store.NewStore(pool), scanner.New(scanner.Options{}), worker.Config{
 		Concurrency: concurrency,
 		Logger:      logger,
 	})
+	if err != nil {
+		return err
+	}
 	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency)
 	err = w.Run(ctx)
 	logger.Info("worker stopped")

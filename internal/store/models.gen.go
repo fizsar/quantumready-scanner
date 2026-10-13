@@ -42,4 +42,6 @@ type Scan struct {
 	Score          *int32
 	Grade          *string
 	Pqc            *bool
+	Retries        int32
+	NotBefore      *time.Time
 }
