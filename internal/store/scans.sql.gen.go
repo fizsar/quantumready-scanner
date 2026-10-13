@@ -279,6 +279,61 @@ func (q *Queries) ListFindings(ctx context.Context, scanID uuid.UUID) ([]Finding
 	return items, nil
 }
 
+const lockTarget = `-- name: LockTarget :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
+`
+
+// Serializes enqueues of the same target until the transaction ends.
+func (q *Queries) LockTarget(ctx context.Context, target string) error {
+	_, err := q.db.Exec(ctx, lockTarget, target)
+	return err
+}
+
+const recentScanForTarget = `-- name: RecentScanForTarget :one
+SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before FROM scans
+WHERE host = $1 AND port = $2 AND status <> 'failed'
+  AND created_at > now() - make_interval(secs => $3::float8)
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type RecentScanForTargetParams struct {
+	Host          string
+	Port          int32
+	WithinSeconds float64
+}
+
+// The latest scan of a target created within the cooldown that has not failed.
+func (q *Queries) RecentScanForTarget(ctx context.Context, arg RecentScanForTargetParams) (Scan, error) {
+	row := q.db.QueryRow(ctx, recentScanForTarget, arg.Host, arg.Port, arg.WithinSeconds)
+	var i Scan
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Host,
+		&i.Port,
+		&i.Status,
+		&i.Attempts,
+		&i.MaxAttempts,
+		&i.LeaseToken,
+		&i.LeaseUntil,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Error,
+		&i.Result,
+		&i.ScannerSchema,
+		&i.Scoring,
+		&i.ScoringVersion,
+		&i.Score,
+		&i.Grade,
+		&i.Pqc,
+		&i.Retries,
+		&i.NotBefore,
+	)
+	return i, err
+}
+
 const retryScan = `-- name: RetryScan :execrows
 UPDATE scans
 SET status = 'queued', retries = retries + 1, error = $1,

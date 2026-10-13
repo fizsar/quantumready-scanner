@@ -34,6 +34,30 @@ func (s *Store) Enqueue(ctx context.Context, host string, port int32) (Scan, err
 	return s.EnqueueScan(ctx, EnqueueScanParams{Host: host, Port: port})
 }
 
+// EnqueueOrReuse enqueues a scan of host:port unless one was created within
+// cooldown and has not failed, in which case it returns that one with
+// reused=true. Concurrent calls for the same target are serialized, so they
+// cannot both enqueue.
+func (s *Store) EnqueueOrReuse(ctx context.Context, host string, port int32, cooldown time.Duration) (sc Scan, reused bool, err error) {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		q := s.WithTx(tx)
+		if err := q.LockTarget(ctx, fmt.Sprintf("%s:%d", host, port)); err != nil {
+			return err
+		}
+		recent, err := q.RecentScanForTarget(ctx, RecentScanForTargetParams{Host: host, Port: port, WithinSeconds: cooldown.Seconds()})
+		if err == nil {
+			sc, reused = recent, true
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		sc, err = q.EnqueueScan(ctx, EnqueueScanParams{Host: host, Port: port})
+		return err
+	})
+	return sc, reused, err
+}
+
 // Claim leases the next scan for lease. The returned Scan carries the lease
 // token needed to complete or fail it.
 func (s *Store) Claim(ctx context.Context, lease time.Duration) (Scan, error) {

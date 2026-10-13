@@ -12,6 +12,8 @@ services:
     build: *api-build
   api:
     build: *api-build
+  worker:
+    build: *api-build
   web:
     build:
       context: ../web

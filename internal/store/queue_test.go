@@ -247,6 +247,65 @@ func TestFail(t *testing.T) {
 	}
 }
 
+func TestEnqueueOrReuse(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	first, reused, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+	if err != nil || reused {
+		t.Fatalf("first = %v reused=%v", err, reused)
+	}
+	again, reused, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+	if err != nil || !reused || again.ID != first.ID {
+		t.Fatalf("within cooldown: %v reused=%v id=%s, want the first scan", err, reused, again.ID)
+	}
+	if _, reused, _ := s.EnqueueOrReuse(ctx, "other.example", 443, time.Minute); reused {
+		t.Error("another target was reused")
+	}
+
+	// A failed scan is not reused.
+	c, _ := s.Claim(ctx, time.Minute)
+	if err := s.Fail(ctx, c.ID, *c.LeaseToken, "unreachable"); err != nil {
+		t.Fatal(err)
+	}
+	if fresh, reused, _ := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute); reused || fresh.ID == first.ID {
+		t.Errorf("a failed scan was reused")
+	}
+
+	// Outside the cooldown a new scan is created.
+	time.Sleep(300 * time.Millisecond)
+	if _, reused, _ := s.EnqueueOrReuse(ctx, "other.example", 443, 200*time.Millisecond); reused {
+		t.Error("reused after the cooldown")
+	}
+}
+
+// Concurrent requests for the same target create a single scan.
+func TestEnqueueOrReuseConcurrent(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	var (
+		mu  sync.Mutex
+		ids = map[uuid.UUID]bool{}
+		wg  sync.WaitGroup
+	)
+	for range 10 {
+		wg.Go(func() {
+			sc, _, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			mu.Lock()
+			ids[sc.ID] = true
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
+	if len(ids) != 1 {
+		t.Errorf("%d scans created, want 1", len(ids))
+	}
+}
+
 func TestSchemaConstraints(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()

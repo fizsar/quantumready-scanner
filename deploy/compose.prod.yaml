@@ -78,6 +78,11 @@ services:
     environment:
       API_ADDR: ":8080"
       DATABASE_URL: *database-url
+      # Exact hosts that may be scanned in this phase.
+      SCAN_ALLOWLIST: ${SCAN_ALLOWLIST:-fizsar.com,quantumready.fizsar.com}
+      # X-Forwarded-For is only believed from the Caddy network (subnet of the
+      # `web` network; deploy.sh and make prod-up fill it in).
+      TRUSTED_PROXIES: ${QR_TRUSTED_PROXIES:-}
     ports:
       - "127.0.0.1:8080:8080"
     networks:
@@ -93,6 +98,37 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M, pids: 100 }
+    # Equal to the memory limit: containers never use host swap.
+    memswap_limit: 256M
+
+  # Scans the queue. Reaches PostgreSQL (backend) and the Internet (egress),
+  # never the Caddy network (web): a scan target cannot reach Caddy or the API
+  # through it, and the scanner's anti-SSRF guard blocks private ranges anyway.
+  worker:
+    image: *api-image
+    <<: *hardening
+    entrypoint: ["/worker"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: *database-url
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+    tmpfs:
+      - /tmp # heartbeat file for the healthcheck
+    networks: [backend, egress]
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "/worker", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # In-flight scans get up to 50 s to finish on stop (worker ShutdownTimeout).
+    stop_grace_period: 60s
     deploy:
       resources:
         limits: { cpus: "0.5", memory: 256M, pids: 100 }
@@ -122,9 +158,11 @@ services:
     memswap_limit: 64M
 
 networks:
-  # No route outside: only api and migrate can reach the database.
+  # No route outside: only api, migrate and worker can reach the database.
   backend:
     internal: true
+  # The worker's own way out to the Internet (scan targets); nothing else on it.
+  egress: {}
   # Shared with the host's Caddy container (created by /srv/caddy/compose.yaml).
   web:
     external: true

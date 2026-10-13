@@ -1,7 +1,14 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -26,6 +33,49 @@ func TestRequirePlaintextDB(t *testing.T) {
 		if err := requirePlaintextDB(cfg); (err == nil) != tt.wantOK {
 			t.Errorf("%s: requirePlaintextDB = %v, want ok=%v", tt.dsn, err, tt.wantOK)
 		}
+	}
+}
+
+func TestHeartbeat(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hb")
+	now := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	if err := checkHeartbeat(path, now, heartbeatMaxAge); err == nil {
+		t.Error("missing heartbeat accepted")
+	}
+	if err := writeHeartbeat(path, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkHeartbeat(path, now.Add(30*time.Second), heartbeatMaxAge); err != nil {
+		t.Errorf("fresh heartbeat: %v", err)
+	}
+	if err := checkHeartbeat(path, now.Add(time.Minute), heartbeatMaxAge); err == nil {
+		t.Error("stale heartbeat accepted")
+	}
+	if err := os.WriteFile(path, []byte("garbage"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkHeartbeat(path, now, heartbeatMaxAge); err == nil {
+		t.Error("garbage heartbeat accepted")
+	}
+}
+
+// The heartbeat is only written while the database answers.
+func TestHeartbeatNeedsTheDatabase(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	down := filepath.Join(t.TempDir(), "down")
+	go heartbeat(ctx, down, func(context.Context) error { return errors.New("db down") }, logger)
+	up := filepath.Join(t.TempDir(), "up")
+	go heartbeat(ctx, up, func(context.Context) error { return nil }, logger)
+
+	time.Sleep(200 * time.Millisecond)
+	if err := checkHeartbeat(up, time.Now(), heartbeatMaxAge); err != nil {
+		t.Errorf("db up: %v", err)
+	}
+	if err := checkHeartbeat(down, time.Now(), heartbeatMaxAge); err == nil {
+		t.Error("db down: heartbeat written")
 	}
 }
 

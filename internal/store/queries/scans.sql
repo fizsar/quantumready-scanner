@@ -62,6 +62,18 @@ WHERE id = @id AND status = 'running' AND lease_token = @lease_token;
 INSERT INTO findings (scan_id, position, code, axis, severity, category, params)
 VALUES (@scan_id, @position, @code, @axis, @severity, @category, @params);
 
+-- name: LockTarget :exec
+-- Serializes enqueues of the same target until the transaction ends.
+SELECT pg_advisory_xact_lock(hashtextextended(@target::text, 0));
+
+-- name: RecentScanForTarget :one
+-- The latest scan of a target created within the cooldown that has not failed.
+SELECT * FROM scans
+WHERE host = @host AND port = @port AND status <> 'failed'
+  AND created_at > now() - make_interval(secs => @within_seconds::float8)
+ORDER BY created_at DESC
+LIMIT 1;
+
 -- name: GetScan :one
 SELECT * FROM scans WHERE id = @id;
 

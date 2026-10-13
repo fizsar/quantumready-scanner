@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/fizsar/quantumready-saas/internal/httpapi"
+	"github.com/fizsar/quantumready-saas/internal/store"
 )
 
 // Set at build time with -ldflags "-X main.version=... -X main.commit=...".
@@ -46,6 +47,17 @@ func run(logger *slog.Logger) error {
 	if dsn == "" {
 		return errors.New("DATABASE_URL is required")
 	}
+	allow, err := httpapi.ParseAllowlist(os.Getenv("SCAN_ALLOWLIST"))
+	if err != nil {
+		return err
+	}
+	if allow.Len() == 0 {
+		logger.Warn("SCAN_ALLOWLIST is empty: every scan request will be refused")
+	}
+	trusted, err := httpapi.ParsePrefixes(os.Getenv("TRUSTED_PROXIES"))
+	if err != nil {
+		return fmt.Errorf("TRUSTED_PROXIES: %w", err)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -59,8 +71,15 @@ func run(logger *slog.Logger) error {
 	defer pool.Close()
 
 	srv := &http.Server{
-		Addr:              addr,
-		Handler:           httpapi.NewRouter(httpapi.Config{Version: version, DB: pool, Logger: logger}),
+		Addr: addr,
+		Handler: httpapi.NewRouter(httpapi.Config{
+			Version:        version,
+			DB:             pool,
+			Scans:          store.NewStore(pool),
+			Allowlist:      allow,
+			TrustedProxies: trusted,
+			Logger:         logger,
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -69,7 +88,8 @@ func run(logger *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
-	logger.Info("api listening", "addr", addr, "version", version, "commit", commit)
+	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,
+		"allowlist", allow.Len(), "trusted_proxies", len(trusted))
 
 	select {
 	case err := <-errCh:

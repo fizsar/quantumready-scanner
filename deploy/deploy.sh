@@ -40,11 +40,18 @@ cd /opt/quantumready
 prev=$(sed -n 's/^QR_TAG=//p' .env)
 echo "==> previous tag: ${prev:-none} (rollback: deploy/deploy.sh ${prev:-<tag>})"
 mv compose.yaml.new compose.yaml
-if grep -q '^QR_TAG=' .env; then
-	sed -i "s/^QR_TAG=.*/QR_TAG=$TAG/" .env
-else
-	echo "QR_TAG=$TAG" >> .env
-fi
+set_env() { # set_env KEY VALUE: replace or append in .env
+	if grep -q "^$1=" .env; then
+		sed -i "s|^$1=.*|$1=$2|" .env
+	else
+		echo "$1=$2" >> .env
+	fi
+}
+set_env QR_TAG "$TAG"
+# The API believes X-Forwarded-For only from Caddy's network.
+proxies=$(docker network inspect web -f '{{range .IPAM.Config}}{{.Subnet}},{{end}}')
+[ -n "$proxies" ] || { echo "cannot read the subnet of the web network" >&2; exit 1; }
+set_env QR_TRUSTED_PROXIES "$proxies"
 docker compose pull --quiet
 docker compose up -d --wait --remove-orphans
 docker compose ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}'

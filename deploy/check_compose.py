@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Checks the security policy of deploy/compose.prod.yaml.
+
+Usage: docker compose -f deploy/compose.prod.yaml config --format json | python3 deploy/check_compose.py
+
+Run by CI (and `make check-compose`). Exits 1 listing every violation.
+"""
+import json
+import sys
+
+cfg = json.load(sys.stdin)
+services, networks = cfg["services"], cfg["networks"]
+errors = []
+
+
+def check(ok, msg):
+    if not ok:
+        errors.append(msg)
+
+
+# Networks: backend has no route outside; web is Caddy's (external).
+check(networks.get("backend", {}).get("internal") is True, "network backend must be internal")
+check(networks.get("web", {}).get("external") is True, "network web must be the external Caddy network")
+
+expected_networks = {
+    "db": {"backend"},
+    "migrate": {"backend"},
+    "api": {"backend", "web"},
+    "worker": {"backend", "egress"},  # never web: scan targets must not reach Caddy/API through it
+    "web": {"web"},
+}
+for name, want in expected_networks.items():
+    check(name in services, f"service {name} missing")
+    if name in services:
+        got = set(services[name].get("networks", {}))
+        check(got == want, f"{name}: networks {sorted(got)}, want {sorted(want)}")
+
+for name, svc in services.items():
+    check(svc.get("read_only") is True, f"{name}: read_only must be true")
+    check("no-new-privileges:true" in svc.get("security_opt", []), f"{name}: no-new-privileges missing")
+    check(svc.get("cap_drop") == ["ALL"], f"{name}: cap_drop must be [ALL]")
+    limits = svc.get("deploy", {}).get("resources", {}).get("limits", {})
+    check("memory" in limits and "cpus" in limits, f"{name}: CPU and memory limits required")
+    check(str(svc.get("memswap_limit")) == str(limits.get("memory")), f"{name}: memswap_limit must equal the memory limit")
+    for p in svc.get("ports", []):
+        check(p.get("host_ip") == "127.0.0.1", f"{name}: port {p.get('published')} must bind 127.0.0.1")
+    check("healthcheck" in svc or name == "migrate", f"{name}: healthcheck required")
+
+for name in ("db", "worker", "migrate"):
+    check(not services.get(name, {}).get("ports"), f"{name}: must not publish ports")
+
+if "worker" in services:
+    test = services["worker"]["healthcheck"]["test"]
+    check(test[:1] == ["CMD"], "worker: healthcheck must not use a shell (CMD, not CMD-SHELL)")
+    env = services["worker"].get("environment", {})
+    check("sslmode=disable" in env.get("DATABASE_URL", ""), "worker: DATABASE_URL must set sslmode=disable")
+
+if errors:
+    print("compose policy violations:\n  " + "\n  ".join(errors))
+    sys.exit(1)
+print(f"compose policy ok ({len(services)} services)")

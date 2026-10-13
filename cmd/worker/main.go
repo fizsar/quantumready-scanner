@@ -21,6 +21,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,6 +38,14 @@ var (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		if err := checkHeartbeat(heartbeatPath(), time.Now(), heartbeatMaxAge); err != nil {
+			fmt.Fprintln(os.Stderr, "unhealthy:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 	if err := run(logger); err != nil {
@@ -74,6 +83,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	go heartbeat(ctx, heartbeatPath(), pool.Ping, logger)
 	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency)
 	err = w.Run(ctx)
 	logger.Info("worker stopped")
