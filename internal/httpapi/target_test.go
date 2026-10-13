@@ -144,6 +144,15 @@ func TestClientAddr(t *testing.T) {
 	if _, err := ParsePrefixes("172.18.0.0/16, nope"); err == nil {
 		t.Error("invalid prefix accepted")
 	}
+	// Empty items (a trailing comma, an unset variable) are ignored.
+	for _, s := range []string{"172.18.0.0/16,", ",172.18.0.0/16, ,"} {
+		if ps, err := ParsePrefixes(s); err != nil || len(ps) != 1 || ps[0].String() != "172.18.0.0/16" {
+			t.Errorf("ParsePrefixes(%q) = %v, %v", s, ps, err)
+		}
+	}
+	if ps, err := ParsePrefixes(""); err != nil || len(ps) != 0 {
+		t.Errorf("ParsePrefixes(\"\") = %v, %v", ps, err)
+	}
 }
 
 func TestRateKeyGroupsIPv6By64(t *testing.T) {

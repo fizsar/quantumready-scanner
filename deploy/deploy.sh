@@ -50,6 +50,7 @@ set_env() { # set_env KEY VALUE: replace or append in .env
 set_env QR_TAG "$TAG"
 # The API believes X-Forwarded-For only from Caddy's network.
 proxies=$(docker network inspect web -f '{{range .IPAM.Config}}{{.Subnet}},{{end}}')
+proxies=${proxies%,} # no trailing comma
 [ -n "$proxies" ] || { echo "cannot read the subnet of the web network" >&2; exit 1; }
 set_env QR_TRUSTED_PROXIES "$proxies"
 docker compose pull --quiet

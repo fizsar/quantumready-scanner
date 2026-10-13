@@ -56,7 +56,7 @@ clean: ## Remove build output
 
 prod-up: .env ## Build and start the production stack locally (127.0.0.1:8080 and :8081)
 	@docker network inspect web >/dev/null 2>&1 || docker network create web
-	QR_TRUSTED_PROXIES=$$(docker network inspect web -f '{{range .IPAM.Config}}{{.Subnet}},{{end}}') \
+	QR_TRUSTED_PROXIES=$$(docker network inspect web -f '{{range .IPAM.Config}}{{.Subnet}},{{end}}' | sed 's/,$$//') \
 	$(PROD) up -d --build --wait
 
 prod-down: ## Stop the production stack (keeps the database volume)
