@@ -3,7 +3,7 @@
 # same capabilities as the production one (no deleteFiles). Run from WSL:
 #   make b2-verify
 # Reads ~/.config/quantumready/b2-test.env (0600), never printed:
-#   B2_KEY_ID=…  B2_APP_KEY=…  B2_BUCKET=quantumready-backups-test
+#   B2_KEY_ID=…  B2_APP_KEY=…  B2_BUCKET=fizsar-qr-backups-test
 # Checks:
 #   1. restic init, two backups, forget --prune and unlock work, leaving no locks
 #   2. that key cannot delete a file version for good (native API and S3 API)
@@ -24,6 +24,8 @@ set -a
 . "$conf"
 set +a
 : "${B2_KEY_ID:?} ${B2_APP_KEY:?} ${B2_BUCKET:?}"
+# B2 native API version (since 10/2026 b2_authorize_account rejects v1–v3).
+B2_API=${B2_API:-v4}
 
 fails=0
 ok() { echo "ok   $*"; }
@@ -37,7 +39,7 @@ trap 'rm -rf "$work"' EXIT
 chmod 700 "$work"
 
 # --- B2 native API: who are we, what can this key do
-auth=$(curl -fsS -u "$B2_KEY_ID:$B2_APP_KEY" https://api.backblazeb2.com/b2api/v3/b2_authorize_account)
+auth=$(curl -fsS -u "$B2_KEY_ID:$B2_APP_KEY" "https://api.backblazeb2.com/b2api/$B2_API/b2_authorize_account")
 token=$(json 'd["authorizationToken"]' <<<"$auth")
 account=$(json 'd["accountId"]' <<<"$auth")
 api=$(json 'd["apiInfo"]["storageApi"]["apiUrl"]' <<<"$auth")
@@ -52,7 +54,9 @@ echo "key capabilities: $caps"
 echo "key restricted to bucket(s): ${bucket_names:-ALL}   s3: $s3"
 [ "$bucket_names" = "$B2_BUCKET" ] && ok "key restricted to $B2_BUCKET" || bad "key must be restricted to $B2_BUCKET only"
 case " $caps " in *" deleteFiles "*) bad "key has deleteFiles (it must not)" ;; *) ok "key has no deleteFiles" ;; esac
-b2() { curl -sS -o "$work/out" -w '%{http_code}' -H "Authorization: $token" -d "$2" "$api/b2api/v3/$1"; }
+# B2 answers 503 when busy: clients must retry.
+download() { curl -fsS --retry 5 --retry-all-errors -H "Authorization: $token" "$dl/b2api/$B2_API/b2_download_file_by_id?fileId=$1" | sha1sum | cut -d" " -f1; }
+b2() { curl -sS --retry 5 -o "$work/out" -w '%{http_code}' -H "Authorization: $token" -d "$2" "$api/b2api/$B2_API/$1"; }
 
 code=$(b2 b2_list_buckets "{\"accountId\":\"$account\",\"bucketId\":\"$bucket_id\"}")
 [ "$code" = 200 ] || { echo "b2_list_buckets: HTTP $code $(cat "$work/out")"; exit 1; }
@@ -131,7 +135,7 @@ grep -q '^data ' "$work/hidden" && ok "prune hid at least one data pack" || bad 
 n=0 good=0
 while read -r _ id sha _; do
 	n=$((n + 1))
-	got=$(curl -fsS -H "Authorization: $token" "$dl/b2api/v3/b2_download_file_by_id?fileId=$id" | sha1sum | cut -d' ' -f1)
+	got=$(download "$id") || got=failed
 	[ "$got" = "$sha" ] && good=$((good + 1))
 done <"$work/hidden"
 [ "$n" -gt 0 ] && [ "$good" = "$n" ] && ok "all $n hidden versions downloadable, SHA-1 matches" || bad "$good of $n hidden versions downloadable"
@@ -145,7 +149,7 @@ code=$(curl -sS -o "$work/out" -w '%{http_code}' --aws-sigv4 "aws:amz:$region:s3
 	-X DELETE "$s3/$B2_BUCKET/$name?versionId=$id")
 echo "S3 DeleteObject?versionId → HTTP $code $(grep -o '<Code>[^<]*' "$work/out" | cut -c7- || true)"
 [ "$code" = 403 ] && ok "S3 API: definitive delete refused" || bad "S3 API: definitive delete NOT refused (HTTP $code)"
-got=$(curl -fsS -H "Authorization: $token" "$dl/b2api/v3/b2_download_file_by_id?fileId=$id" | sha1sum | cut -d' ' -f1)
+got=$(download "$id") || got=failed
 grep -q "$id $got " "$work/hidden" && ok "that version is still there afterwards" || bad "that version is gone"
 
 echo
