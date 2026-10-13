@@ -11,7 +11,7 @@ PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
 # Pinned by digest; bump tag and digest together (CI uses the same image).
 SQLC_IMAGE := sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537
 
-.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose
+.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -50,6 +50,12 @@ sqlc: ## Regenerate internal/store from migrations/ and internal/store/queries/
 check-compose: ## Check the security policy of deploy/compose.prod.yaml (networks, limits, ports)
 	QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d \
 	docker compose -f deploy/compose.prod.yaml config --format json | python3 deploy/check_compose.py
+
+test-backup: ## Test the backup scripts (local restic repository, throwaway PostgreSQL)
+	bash deploy/backup/test.sh
+
+b2-verify: ## Check a no-deleteFiles B2 key with restic (needs ~/.config/quantumready/b2-test.env)
+	bash deploy/backup/b2-verify.sh
 
 clean: ## Remove build output
 	rm -rf bin web/dist
