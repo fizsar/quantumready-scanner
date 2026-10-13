@@ -56,10 +56,10 @@ b2() { curl -sS -o "$work/out" -w '%{http_code}' -H "Authorization: $token" -d "
 
 code=$(b2 b2_list_buckets "{\"accountId\":\"$account\",\"bucketId\":\"$bucket_id\"}")
 [ "$code" = 200 ] || { echo "b2_list_buckets: HTTP $code $(cat "$work/out")"; exit 1; }
-rules=$(json 'd["buckets"][0]["lifecycleRules"]' <"$work/out")
+rules=$(json 'd["buckets"][0].get("lifecycleRules", "not visible to this key: check it in the web UI")' <"$work/out")
 echo "lifecycle rules: $rules"
 python3 -Ic 'import json,sys
-r = json.load(sys.stdin)["buckets"][0]["lifecycleRules"]
+r = json.load(sys.stdin)["buckets"][0].get("lifecycleRules") or []
 whole = [x for x in r if x.get("fileNamePrefix", "") == ""]
 ok = len(whole) == 1 and (whole[0].get("daysFromHidingToDeleting") or 0) >= 7 and whole[0].get("daysFromUploadingToHiding") is None
 sys.exit(0 if ok else 1)' <"$work/out" &&
