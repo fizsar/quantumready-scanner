@@ -1,10 +1,6 @@
 package main
 
 import (
-	"context"
-	"errors"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -45,10 +41,11 @@ func TestHeartbeat(t *testing.T) {
 	if err := writeHeartbeat(path, now); err != nil {
 		t.Fatal(err)
 	}
-	if err := checkHeartbeat(path, now.Add(30*time.Second), heartbeatMaxAge); err != nil {
-		t.Errorf("fresh heartbeat: %v", err)
+	// A full scan (60 s) plus storing is still healthy; past the lease + margin it is not.
+	if err := checkHeartbeat(path, now.Add(100*time.Second), heartbeatMaxAge); err != nil {
+		t.Errorf("heartbeat after a long scan: %v", err)
 	}
-	if err := checkHeartbeat(path, now.Add(time.Minute), heartbeatMaxAge); err == nil {
+	if err := checkHeartbeat(path, now.Add(121*time.Second), heartbeatMaxAge); err == nil {
 		t.Error("stale heartbeat accepted")
 	}
 	if err := os.WriteFile(path, []byte("garbage"), 0o600); err != nil {
@@ -59,23 +56,10 @@ func TestHeartbeat(t *testing.T) {
 	}
 }
 
-// The heartbeat is only written while the database answers.
-func TestHeartbeatNeedsTheDatabase(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	down := filepath.Join(t.TempDir(), "down")
-	go heartbeat(ctx, down, func(context.Context) error { return errors.New("db down") }, logger)
-	up := filepath.Join(t.TempDir(), "up")
-	go heartbeat(ctx, up, func(context.Context) error { return nil }, logger)
-
-	time.Sleep(200 * time.Millisecond)
-	if err := checkHeartbeat(up, time.Now(), heartbeatMaxAge); err != nil {
-		t.Errorf("db up: %v", err)
-	}
-	if err := checkHeartbeat(down, time.Now(), heartbeatMaxAge); err == nil {
-		t.Error("db down: heartbeat written")
+// heartbeatMaxAge must outlast the default lease (see health.go).
+func TestHeartbeatMaxAgeOutlastsTheLease(t *testing.T) {
+	if heartbeatMaxAge <= 90*time.Second {
+		t.Errorf("heartbeatMaxAge %v must exceed the 90 s lease", heartbeatMaxAge)
 	}
 }
 

@@ -79,6 +79,7 @@ func NewRouter(cfg Config) http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/health", healthHandler(cfg))
 		if cfg.Scans != nil {
+			r.Get("/targets", a.listTargets)
 			r.Post("/scans", a.createScan)
 			r.Get("/scans/{id}", a.getScan)
 		}

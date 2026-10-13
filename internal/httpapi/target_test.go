@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http/httptest"
 	"net/netip"
 	"strings"
@@ -13,7 +14,6 @@ func TestNormalizeHost(t *testing.T) {
 		"fizsar.com":                       "fizsar.com",
 		"  QuantumReady.Fizsar.COM.  ":     "quantumready.fizsar.com",
 		"https://fizsar.com/path?q=1#frag": "fizsar.com",
-		"HTTP://fizsar.com:8443":           "fizsar.com",
 		"fizsar.com:443":                   "fizsar.com",
 		"user:secret@fizsar.com/x":         "fizsar.com",
 		"bücher.de":                        "xn--bcher-kva.de",
@@ -27,6 +27,11 @@ func TestNormalizeHost(t *testing.T) {
 		got, err := NormalizeHost(in)
 		if err != nil || got != want {
 			t.Errorf("NormalizeHost(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"fizsar.com:8443", "HTTP://fizsar.com:80/", "[2606:4700:4700::1111]:8443", "fizsar.com:0"} {
+		if _, err := NormalizeHost(in); !errors.Is(err, errPortNotAllowed) {
+			t.Errorf("NormalizeHost(%q) error = %v, want errPortNotAllowed", in, err)
 		}
 	}
 	for _, in := range []string{"", "   ", "localhost", "https://", "exa mple.com", "-a.com", "a-.com", "a..com",

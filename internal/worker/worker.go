@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -48,7 +49,12 @@ type Config struct {
 	// running then keep their lease and another worker retries them after it
 	// expires. Default 50 s.
 	ShutdownTimeout time.Duration
-	Logger          *slog.Logger
+	// Heartbeat, if set, is called after every loop iteration that did not
+	// fail (including idle ones) with the oldest last-iteration time across
+	// all slots: one stuck slot keeps it from advancing. The container
+	// healthcheck is built on it.
+	Heartbeat func(oldest time.Time)
+	Logger    *slog.Logger
 }
 
 // Worker processes the scan queue.
@@ -100,13 +106,33 @@ func (w *Worker) Run(ctx context.Context) error {
 	work, cancelWork := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancelWork()
 
+	// Last successful iteration per slot (Unix nanoseconds), for Heartbeat.
+	last := make([]atomic.Int64, w.cfg.Concurrency)
+	start := time.Now().UnixNano()
+	for i := range last {
+		last[i].Store(start)
+	}
+	beat := func(slot int) {
+		last[slot].Store(time.Now().UnixNano())
+		if w.cfg.Heartbeat == nil {
+			return
+		}
+		oldest := last[0].Load()
+		for i := range last {
+			oldest = min(oldest, last[i].Load())
+		}
+		w.cfg.Heartbeat(time.Unix(0, oldest))
+	}
+
 	var wg sync.WaitGroup
-	for range w.cfg.Concurrency {
+	for slot := range w.cfg.Concurrency {
 		wg.Go(func() {
 			for ctx.Err() == nil {
 				processed, err := w.ProcessOne(work)
 				if err != nil {
 					w.cfg.Logger.Error("worker: process scan", "err", err)
+				} else {
+					beat(slot)
 				}
 				if processed && err == nil {
 					continue // there may be more work: no wait

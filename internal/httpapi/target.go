@@ -4,17 +4,24 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"slices"
 	"strings"
 
 	"golang.org/x/net/idna"
 )
 
-var errInvalidHost = errors.New("invalid host")
+var (
+	errInvalidHost = errors.New("invalid host")
+	// errPortNotAllowed: an explicit port other than 443 (only 443 is scanned
+	// in this phase; it is refused rather than silently replaced).
+	errPortNotAllowed = errors.New("port not allowed")
+)
 
 // NormalizeHost turns user input into the bare host that is scanned: trimmed,
-// lower case, without scheme, user info, port, path, query or trailing dot,
-// and internationalized names converted to punycode (bücher.de →
-// xn--bcher-kva.de). IP literals are returned as such (the allowlist decides).
+// lower case, without scheme, user info, path, query or trailing dot, and
+// internationalized names converted to punycode (bücher.de →
+// xn--bcher-kva.de). An explicit port is accepted only if it is 443. IP
+// literals are returned as such (the allowlist decides).
 func NormalizeHost(in string) (string, error) {
 	s := strings.TrimSpace(in)
 	if s == "" || len(s) > 1024 {
@@ -29,7 +36,10 @@ func NormalizeHost(in string) (string, error) {
 	if i := strings.LastIndex(s, "@"); i >= 0 {
 		s = s[i+1:]
 	}
-	if h, _, err := net.SplitHostPort(s); err == nil {
+	if h, port, err := net.SplitHostPort(s); err == nil {
+		if port != "443" {
+			return "", errPortNotAllowed
+		}
 		s = h
 	}
 	s = strings.TrimSuffix(strings.Trim(s, "[]"), ".")
@@ -78,6 +88,19 @@ func ParseAllowlist(s string) (*Allowlist, error) {
 
 // Allows reports whether host (already normalized) is listed.
 func (a *Allowlist) Allows(host string) bool { return a != nil && a.hosts[host] }
+
+// Hosts returns the allowed hosts, sorted.
+func (a *Allowlist) Hosts() []string {
+	out := []string{}
+	if a == nil {
+		return out
+	}
+	for h := range a.hosts {
+		out = append(out, h)
+	}
+	slices.Sort(out)
+	return out
+}
 
 // Len is the number of allowed hosts.
 func (a *Allowlist) Len() int {

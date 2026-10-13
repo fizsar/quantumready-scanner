@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -137,6 +138,18 @@ func TestCreateScan(t *testing.T) {
 	}
 }
 
+func TestListTargets(t *testing.T) {
+	a := newScanAPI(t, nil, "quantumready.fizsar.com, fizsar.com")
+	rec := a.do(t, "GET", "/api/targets", "", reqOpts{})
+	got := decode[struct {
+		Hosts []string `json:"hosts"`
+		Port  int      `json:"port"`
+	}](t, rec)
+	if rec.Code != 200 || strings.Join(got.Hosts, ",") != "fizsar.com,quantumready.fizsar.com" || got.Port != 443 {
+		t.Fatalf("GET /api/targets = %d %+v", rec.Code, got)
+	}
+}
+
 func TestCreateScanRejects(t *testing.T) {
 	a := newScanAPI(t, nil, "fizsar.com")
 	for _, tt := range []struct {
@@ -148,6 +161,8 @@ func TestCreateScanRejects(t *testing.T) {
 		{"subdomain is not an exact match", `{"host":"www.fizsar.com"}`, "", 403, "host_not_allowed"},
 		{"IP literal", `{"host":"149.56.13.98"}`, "", 403, "host_not_allowed"},
 		{"invalid host", `{"host":"not a host"}`, "", 400, "invalid_host"},
+		{"port other than 443", `{"host":"fizsar.com:8443"}`, "", 400, "port_not_allowed"},
+		{"URL with port 80", `{"host":"http://fizsar.com:80/"}`, "", 400, "port_not_allowed"},
 		{"empty host", `{"host":""}`, "", 400, "invalid_host"},
 		{"invalid JSON", `{"host":`, "", 400, "invalid_json"},
 		{"unknown field", `{"host":"fizsar.com","port":8443}`, "", 400, "invalid_json"},
@@ -163,6 +178,14 @@ func TestCreateScanRejects(t *testing.T) {
 	e := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"example.com"}`, reqOpts{lang: "en-US,en;q=0.9"}), 403, "host_not_allowed")
 	if !strings.HasPrefix(e.Message, "For now") {
 		t.Errorf("English message = %q", e.Message)
+	}
+	es := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"fizsar.com:8443"}`, reqOpts{lang: "es"}), 400, "port_not_allowed")
+	en := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"fizsar.com:8443"}`, reqOpts{lang: "en"}), 400, "port_not_allowed")
+	if !strings.Contains(es.Message, "puerto 443") || !strings.Contains(en.Message, "port 443") {
+		t.Errorf("port messages = %q / %q", es.Message, en.Message)
+	}
+	if rec := a.do(t, "POST", "/api/scans", `{"host":"https://fizsar.com:443/"}`, reqOpts{}); rec.Code != 202 {
+		t.Errorf("explicit :443 = %d, want 202", rec.Code)
 	}
 	wantError(t, a.do(t, "OPTIONS", "/api/scans", "", reqOpts{}), 405, "method_not_allowed")
 	wantError(t, a.do(t, "DELETE", "/api/scans/"+uuid.NewString(), "", reqOpts{}), 405, "method_not_allowed")
@@ -187,8 +210,8 @@ func TestRateLimit(t *testing.T) {
 	}
 	rec := post("c.example.com", client)
 	wantError(t, rec, 429, "rate_limited")
-	if ra := rec.Header().Get("Retry-After"); ra == "" || ra == "0" {
-		t.Errorf("Retry-After = %q", ra)
+	if ra, err := strconv.Atoi(rec.Header().Get("Retry-After")); err != nil || ra < 1 || ra > 61 {
+		t.Errorf("Retry-After = %q, want 1-61 seconds", rec.Header().Get("Retry-After"))
 	}
 
 	// A spoofed X-Forwarded-For from a direct client changes nothing.

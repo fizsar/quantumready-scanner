@@ -33,6 +33,12 @@ type createScanRequest struct {
 	Host string `json:"host"`
 }
 
+// listTargets: GET /api/targets, the hosts that may be scanned (the
+// frontend shows them as buttons instead of keeping its own copy).
+func (a *api) listTargets(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort})
+}
+
 // createScan: POST /api/scans {"host": "..."}.
 func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
@@ -53,6 +59,10 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	host, err := NormalizeHost(req.Host)
+	if errors.Is(err, errPortNotAllowed) {
+		writeError(w, r, http.StatusBadRequest, "port_not_allowed")
+		return
+	}
 	if err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_host")
 		return

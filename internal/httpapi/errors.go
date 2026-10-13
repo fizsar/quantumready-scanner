@@ -30,6 +30,7 @@ var messages = map[string]map[string]string{
 	"body_too_large":         {"es": "El cuerpo de la petición es demasiado grande.", "en": "The request body is too large."},
 	"unsupported_media_type": {"es": "Content-Type debe ser application/json.", "en": "Content-Type must be application/json."},
 	"invalid_host":           {"es": "El dominio no es válido.", "en": "The domain is not valid."},
+	"port_not_allowed":       {"es": "Por ahora solo se escanea el puerto 443 (HTTPS). Quita el puerto o usa :443.", "en": "For now only port 443 (HTTPS) is scanned. Remove the port or use :443."},
 	"host_not_allowed":       {"es": "Por ahora solo se pueden escanear los dominios de demostración.", "en": "For now only the demo domains can be scanned."},
 	"rate_limited":           {"es": "Demasiados escaneos. Espera un poco y vuelve a intentarlo.", "en": "Too many scans. Wait a little and try again."},
 	"not_found":              {"es": "No encontrado.", "en": "Not found."},
