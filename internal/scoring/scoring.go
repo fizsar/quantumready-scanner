@@ -418,9 +418,44 @@ func (e *evaluator) protocols() {
 	}
 }
 
+// allSuites returns the suites accepted in any version up to TLS 1.2, once
+// each. Suites missing from TLS 1.2 are labeled with the versions that accept
+// them, e.g. "TLS_RSA_WITH_3DES_EDE_CBC_SHA (TLS 1.0)".
+func (e *evaluator) allSuites() []scanner.CipherSuite {
+	in12 := map[string]bool{}
+	for _, s := range e.r.TLS12Suites {
+		in12[s.Name] = true
+	}
+	out := append([]scanner.CipherSuite{}, e.r.TLS12Suites...)
+	var order []string
+	legacy := map[string][]string{}
+	byName := map[string]scanner.CipherSuite{}
+	for _, v := range []struct {
+		name   string
+		suites []scanner.CipherSuite
+	}{{"TLS 1.0", e.r.TLS10Suites}, {"TLS 1.1", e.r.TLS11Suites}} {
+		for _, s := range v.suites {
+			if in12[s.Name] {
+				continue
+			}
+			if _, seen := legacy[s.Name]; !seen {
+				order = append(order, s.Name)
+				byName[s.Name] = s
+			}
+			legacy[s.Name] = append(legacy[s.Name], v.name)
+		}
+	}
+	for _, n := range order {
+		s := byName[n]
+		s.Name = n + " (" + strings.Join(legacy[n], ", ") + ")"
+		out = append(out, s)
+	}
+	return out
+}
+
 func (e *evaluator) suites() {
 	var rc4, des, cbc []string
-	for _, s := range e.r.TLS12Suites {
+	for _, s := range e.allSuites() {
 		switch {
 		case strings.Contains(s.Name, "_RC4_"):
 			rc4 = append(rc4, s.Name)
@@ -471,6 +506,9 @@ func (e *evaluator) coverage() {
 		}
 	}
 	if !e.r.TLS12SuitesComplete {
+		failed++
+	}
+	if !e.r.LegacySuitesComplete {
 		failed++
 	}
 	if failed > 0 {

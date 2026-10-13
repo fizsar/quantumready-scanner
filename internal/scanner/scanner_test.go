@@ -151,6 +151,9 @@ func TestProtocolsAndSuites(t *testing.T) {
 		if len(r.TLS12Suites) == 0 || !r.TLS12SuitesComplete {
 			t.Fatalf("TLS 1.2 suites = %v (complete %v)", r.TLS12Suites, r.TLS12SuitesComplete)
 		}
+		if len(r.TLS10Suites)+len(r.TLS11Suites) != 0 || !r.LegacySuitesComplete {
+			t.Errorf("legacy suites on a TLS 1.2-only server: %v %v", r.TLS10Suites, r.TLS11Suites)
+		}
 		for _, s := range r.TLS12Suites {
 			if !strings.Contains(s.Name, "ECDSA") || !s.ForwardSecrecy {
 				t.Errorf("unexpected suite for an ECDSA server: %+v", s)
@@ -203,6 +206,42 @@ func TestProtocolsAndSuites(t *testing.T) {
 			if s.ForwardSecrecy != w.ForwardSecrecy || s.AEAD != w.AEAD || s.Insecure != w.Insecure {
 				t.Errorf("%s = %+v, want fs=%v aead=%v insecure=%v", name, s, w.ForwardSecrecy, w.AEAD, w.Insecure)
 			}
+		}
+	})
+
+	// Like cloudflare.com (testssl.sh, 2026-10-13): 3DES only when the client
+	// asks for TLS 1.0. A Go server cannot restrict suites per version, so the
+	// config is chosen per ClientHello.
+	t.Run("3DES only in TLS 1.0", func(t *testing.T) {
+		modern := &tls.Config{
+			Certificates: []tls.Certificate{rsaCert},
+			MinVersion:   tls.VersionTLS10,
+			CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA},
+		}
+		port := startTLS(t, &tls.Config{
+			Certificates: []tls.Certificate{rsaCert},
+			GetConfigForClient: func(chi *tls.ClientHelloInfo) (*tls.Config, error) {
+				if slices.Max(chi.SupportedVersions) == tls.VersionTLS10 {
+					old := modern.Clone()
+					old.CipherSuites = append(old.CipherSuites, tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA)
+					return old, nil
+				}
+				return modern, nil
+			},
+		})
+		r := scan(t, newTestScanner(pki, Options{}), port)
+		if _, ok := suiteNames(r)["TLS_RSA_WITH_3DES_EDE_CBC_SHA"]; ok {
+			t.Errorf("3DES reported in TLS 1.2: %v", r.TLS12Suites)
+		}
+		got10 := map[string]bool{}
+		for _, s := range r.TLS10Suites {
+			got10[s.Name] = true
+		}
+		if !got10["TLS_RSA_WITH_3DES_EDE_CBC_SHA"] || !got10["TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"] || len(r.TLS10Suites) != 2 {
+			t.Errorf("TLS 1.0 suites = %v, want 3DES and ECDHE-AES128-CBC", r.TLS10Suites)
+		}
+		if len(r.TLS11Suites) != 1 || !r.LegacySuitesComplete {
+			t.Errorf("TLS 1.1 suites = %v (complete %v), want only ECDHE-AES128-CBC", r.TLS11Suites, r.LegacySuitesComplete)
 		}
 	})
 

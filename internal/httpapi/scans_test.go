@@ -298,7 +298,7 @@ func (cannedScanner) Scan(_ context.Context, host string, port int) (*scanner.Re
 		KeyExchange:         scanner.KeyExchange{Selected: "X25519MLKEM768", SelectedHybrid: true, Groups: []scanner.GroupProbe{{Name: "X25519MLKEM768", Hybrid: true, Status: scanner.Supported}}},
 		Versions:            []scanner.VersionProbe{{Version: "TLS 1.2", Status: scanner.Supported}, {Version: "TLS 1.3", Status: scanner.Supported}},
 		TLS12Suites:         []scanner.CipherSuite{{Name: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", ForwardSecrecy: true, AEAD: true}},
-		TLS12SuitesComplete: true, TLS13Suite: "TLS_AES_128_GCM_SHA256",
+		TLS12SuitesComplete: true, LegacySuitesComplete: true, TLS13Suite: "TLS_AES_128_GCM_SHA256",
 		Certificate: &scanner.Certificate{
 			Trusted: true, HostnameMatch: true, KeyAlgorithm: "ECDSA", KeySize: 256, Curve: "P-256",
 			SignatureAlgorithm: "ECDSA-SHA384", ValidityDays: 90, DaysToExpiry: 60, IssuerOrg: []string{"Let's Encrypt"}, SCTsEmbedded: 2,

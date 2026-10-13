@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"strings"
 	"syscall"
 )
@@ -170,6 +171,19 @@ func allTLS12Suites() []uint16 {
 					ids = append(ids, cs.ID)
 					break
 				}
+			}
+		}
+	}
+	return ids
+}
+
+// suitesFor returns the suites crypto/tls can negotiate in version v (TLS 1.0–1.2).
+func suitesFor(v uint16) []uint16 {
+	var ids []uint16
+	for _, list := range [][]*tls.CipherSuite{tls.CipherSuites(), tls.InsecureCipherSuites()} {
+		for _, cs := range list {
+			if slices.Contains(cs.SupportedVersions, v) {
+				ids = append(ids, cs.ID)
 			}
 		}
 	}

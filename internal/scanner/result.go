@@ -42,6 +42,13 @@ type Result struct {
 	TLS12Suites []CipherSuite `json:"tls12_cipher_suites"`
 	// TLS12SuitesComplete is false when the enumeration stopped on an error.
 	TLS12SuitesComplete bool `json:"tls12_cipher_suites_complete"`
+	// TLS10Suites and TLS11Suites list the suites accepted in TLS 1.0 and 1.1
+	// (empty when the version is refused). Weak suites such as 3DES sometimes
+	// survive only there.
+	TLS10Suites []CipherSuite `json:"tls10_cipher_suites,omitempty"`
+	TLS11Suites []CipherSuite `json:"tls11_cipher_suites,omitempty"`
+	// LegacySuitesComplete is false when the TLS 1.0/1.1 enumeration stopped on an error.
+	LegacySuitesComplete bool `json:"legacy_cipher_suites_complete"`
 	// TLS13Suite is the suite negotiated in TLS 1.3 (the full list cannot be enumerated).
 	TLS13Suite string `json:"tls13_cipher_suite,omitempty"`
 

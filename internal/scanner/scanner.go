@@ -120,13 +120,14 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	}
 
 	res := &Result{
-		SchemaVersion:       SchemaVersion,
-		Host:                name,
-		Port:                port,
-		IP:                  ip.String(),
-		StartedAt:           start.UTC(),
-		TLS12SuitesComplete: true,
-		NotEvaluated:        notEvaluated,
+		SchemaVersion:        SchemaVersion,
+		Host:                 name,
+		Port:                 port,
+		IP:                   ip.String(),
+		StartedAt:            start.UTC(),
+		TLS12SuitesComplete:  true,
+		LegacySuitesComplete: true,
+		NotEvaluated:         notEvaluated,
 	}
 	for _, a := range all {
 		res.ResolvedIPs = append(res.ResolvedIPs, a.String())
@@ -183,10 +184,21 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 		})
 	}
 	g.Go(func() error {
-		res.TLS12Suites, res.TLS12SuitesComplete = s.enumerateTLS12Suites(ctx, t)
+		res.TLS12Suites, res.TLS12SuitesComplete = s.enumerateSuites(ctx, t, tls.VersionTLS12)
+		return nil
+	})
+	// Weak suites (3DES, RSA key exchange) sometimes survive only in TLS 1.0/1.1.
+	var legacy10, legacy11 bool
+	g.Go(func() error {
+		res.TLS10Suites, legacy10 = s.enumerateSuites(ctx, t, tls.VersionTLS10)
+		return nil
+	})
+	g.Go(func() error {
+		res.TLS11Suites, legacy11 = s.enumerateSuites(ctx, t, tls.VersionTLS11)
 		return nil
 	})
 	_ = g.Wait()
+	res.LegacySuitesComplete = legacy10 && legacy11
 
 	if len(certs) > 0 {
 		res.Certificate = analyzeCertificate(certs, state, t.host, s.opts.Now(), s.opts.RootCAs)
@@ -221,14 +233,15 @@ func versionConfig(v uint16) *tls.Config {
 	}
 }
 
-// enumerateTLS12Suites offers every remaining suite and removes the one the
-// server picks, until the server refuses. complete is false if a probe errored.
-func (s *Scanner) enumerateTLS12Suites(ctx context.Context, t target) (found []CipherSuite, complete bool) {
-	remaining := allTLS12Suites()
+// enumerateSuites offers, in version v only, every remaining suite valid in
+// it and removes the one the server picks, until the server refuses.
+// complete is false if a probe errored.
+func (s *Scanner) enumerateSuites(ctx context.Context, t target, v uint16) (found []CipherSuite, complete bool) {
+	remaining := suitesFor(v)
 	for len(remaining) > 0 {
-		p := s.handshake(ctx, t, &tls.Config{ //nolint:gosec // G402: TLS 1.2 on purpose, to enumerate its suites
-			MinVersion:       tls.VersionTLS12,
-			MaxVersion:       tls.VersionTLS12,
+		p := s.handshake(ctx, t, &tls.Config{
+			MinVersion:       v,
+			MaxVersion:       v,
 			CipherSuites:     remaining,
 			CurvePreferences: ClassicGroups,
 		})

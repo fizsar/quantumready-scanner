@@ -76,8 +76,8 @@ func ideal() *scanner.Result {
 			suite("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"),
 			suite("TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"),
 		},
-		TLS12SuitesComplete: true,
-		TLS13Suite:          "TLS_AES_128_GCM_SHA256",
+		TLS12SuitesComplete: true, LegacySuitesComplete: true,
+		TLS13Suite: "TLS_AES_128_GCM_SHA256",
 		Certificate: &scanner.Certificate{
 			Subject: "example.com", SANs: []string{"example.com"},
 			Issuer: "YE1", IssuerOrg: []string{"Let's Encrypt"},
@@ -221,6 +221,14 @@ func goldenCases() []golden {
 				r.TLS12Suites = append(r.TLS12Suites, suite("TLS_ECDHE_RSA_WITH_RC4_128_SHA"), suite("TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA"))
 			}),
 			score: 100, grade: "C", cap: "C", current: "high", codes: []string{"SUITE_RC4", "SUITE_3DES"},
+		},
+		{
+			// cloudflare.com, 2026-10-13: 3DES only in TLS 1.0 (found by testssl.sh, missed before).
+			name: "3DES only in TLS 1.0 caps at C", in: apply(func(r *scanner.Result) {
+				r.Versions = versions("TLS 1.0", "TLS 1.1", "TLS 1.2", "TLS 1.3")
+				r.TLS10Suites = []scanner.CipherSuite{suite("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"), suite("TLS_RSA_WITH_3DES_EDE_CBC_SHA")}
+			}),
+			score: 100, grade: "C", cap: "C", current: "high", codes: []string{"SUITE_3DES", "PROTO_LEGACY_TLS"},
 		},
 		{
 			name: "RSA-1024 caps at C and loses the key points", in: apply(func(r *scanner.Result) {
@@ -387,6 +395,36 @@ func TestProbeErrors(t *testing.T) {
 		if (b.ID == "key_exchange" || b.ID == "tls13") && b.Points != 0 {
 			t.Errorf("block %s = %d points from a probe error, want 0", b.ID, b.Points)
 		}
+	}
+}
+
+// Suites only accepted in TLS 1.0/1.1 are judged and labeled with their
+// versions; suites also in TLS 1.2 are not repeated.
+func TestLegacySuites(t *testing.T) {
+	r := apply(func(r *scanner.Result) {
+		r.Versions = versions("TLS 1.0", "TLS 1.1", "TLS 1.2", "TLS 1.3")
+		r.TLS12Suites = append(r.TLS12Suites, suite("TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"))
+		r.TLS10Suites = []scanner.CipherSuite{suite("TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"), suite("TLS_RSA_WITH_3DES_EDE_CBC_SHA")}
+		r.TLS11Suites = []scanner.CipherSuite{suite("TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"), suite("TLS_RSA_WITH_3DES_EDE_CBC_SHA")}
+	})
+	params := map[string]string{}
+	for _, f := range Evaluate(r).Findings {
+		params[f.Code] = f.Params["suites"]
+	}
+	if params["SUITE_3DES"] != "TLS_RSA_WITH_3DES_EDE_CBC_SHA (TLS 1.0, TLS 1.1)" {
+		t.Errorf("SUITE_3DES suites = %q", params["SUITE_3DES"])
+	}
+	if params["SUITE_CBC"] != "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA" {
+		t.Errorf("SUITE_CBC suites = %q, want the TLS 1.2 suite once", params["SUITE_CBC"])
+	}
+
+	r.LegacySuitesComplete = false
+	found := false
+	for _, f := range Evaluate(r).Findings {
+		found = found || f.Code == "SCAN_PARTIAL"
+	}
+	if !found {
+		t.Error("an incomplete TLS 1.0/1.1 enumeration is not reported")
 	}
 }
 

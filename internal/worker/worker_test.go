@@ -67,7 +67,7 @@ func canned(host string, port int, selected string) *scanner.Result {
 		Default:             scanner.Handshake{Status: scanner.Supported, Version: "TLS 1.3", Group: selected},
 		KeyExchange:         scanner.KeyExchange{Selected: selected, SelectedHybrid: hybrid},
 		Versions:            []scanner.VersionProbe{{Version: "TLS 1.3", Status: scanner.Supported}},
-		TLS12SuitesComplete: true,
+		TLS12SuitesComplete: true, LegacySuitesComplete: true,
 		Certificate: &scanner.Certificate{
 			Trusted: true, HostnameMatch: true, KeyAlgorithm: "ECDSA", KeySize: 256, Curve: "P-256",
 			SignatureAlgorithm: "ECDSA-SHA256", ValidityDays: 90, DaysToExpiry: 60, IssuerOrg: []string{"Let's Encrypt"},
