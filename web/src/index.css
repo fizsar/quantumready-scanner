@@ -458,6 +458,26 @@ a.btn:hover {
 .fix strong {
   color: var(--green);
 }
+.no-risks {
+  color: var(--green);
+}
+/* What is done right: after the risks, separated by a rule. */
+.good {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--line);
+}
+.h-good {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--green);
+}
+.good .finding details {
+  border-color: rgba(61, 255, 162, 0.2);
+}
 .report .panel {
   width: 100%;
 }

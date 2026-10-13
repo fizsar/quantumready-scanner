@@ -34,8 +34,16 @@ describe('result page', () => {
       'Firma clásica (ECDSA P-256): riesgo cuántico futuro',
       'Un solo grupo híbrido',
       'Intercambio de claves post-cuántico: X25519MLKEM768',
-    ]) // API order: by severity
+    ]) // risks by severity, then what is done right
     expect(within(quantum).getByText('Añade SecP256r1MLKEM768.', { exact: false })).toBeTruthy() // remediation inside <details>
+
+    // "Correcto" findings are grouped apart, after the risks.
+    const good = within(quantum).getByRole('group', { name: 'Lo que está bien' })
+    expect(within(good).getByText('Intercambio de claves post-cuántico: X25519MLKEM768')).toBeTruthy()
+    expect(within(good).queryByText('Un solo grupo híbrido')).toBeNull()
+    const current = screen.getByRole('region', { name: /Riesgo actual/ })
+    expect(within(current).getByText('Nada que corregir en este eje.')).toBeTruthy()
+    expect(within(within(current).getByRole('group', { name: 'Lo que está bien' })).getByText('Certificado válido')).toBeTruthy()
 
     const breakdown = screen.getByRole('region', { name: 'Desglose de la nota' })
     expect(within(breakdown).getAllByRole('meter')).toHaveLength(5)
@@ -64,7 +72,9 @@ describe('result page', () => {
     renderAt('/scans/abc', 'en')
     expect(await screen.findByRole('heading', { level: 1, name: /already uses hybrid post-quantum encryption/ })).toBeTruthy()
     expect(screen.getByText('95 out of 100 points')).toBeTruthy()
-    expect(screen.getByRole('region', { name: /Quantum risk/ })).toBeTruthy()
+    const quantum = screen.getByRole('region', { name: /Quantum risk/ })
+    expect(within(quantum).getByRole('group', { name: "What's working well" })).toBeTruthy()
+    expect(within(screen.getByRole('region', { name: /Current risk/ })).getByText('Nothing to fix on this axis.')).toBeTruthy()
   })
 
   it('failed: friendly failure with the reason', async () => {

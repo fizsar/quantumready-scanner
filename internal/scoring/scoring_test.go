@@ -428,6 +428,29 @@ func TestLegacySuites(t *testing.T) {
 	}
 }
 
+// Forward secrecy has one name per language, in the breakdown and in the findings.
+func TestForwardSecrecyNaming(t *testing.T) {
+	want := map[string]string{"es": "Secreto hacia adelante (forward secrecy)", "en": "Forward secrecy"}
+	for lang, name := range want {
+		if got := Label("block.forward_secrecy", lang); got != name {
+			t.Errorf("%s block label = %q, want %q", lang, got, name)
+		}
+		if got := Describe("FS_ALL", nil, lang).Title; got != name {
+			t.Errorf("%s FS_ALL title = %q, want %q", lang, got, name)
+		}
+	}
+	for _, code := range []string{"FS_PARTIAL", "FS_NONE"} {
+		if es := Describe(code, nil, "es").Title; !strings.Contains(es, "secreto hacia adelante (forward secrecy)") {
+			t.Errorf("%s es title = %q", code, es)
+		}
+	}
+	for _, lang := range []string{"es", "en"} {
+		if r := Describe("KEX_SINGLE_HYBRID", map[string]string{"group": "X25519MLKEM768"}, lang).Remediation; !strings.Contains(r, "OpenSSL") || !strings.Contains(r, "Caddy") {
+			t.Errorf("%s KEX_SINGLE_HYBRID remediation does not mention server software: %q", lang, r)
+		}
+	}
+}
+
 func TestGradeFor(t *testing.T) {
 	for score, want := range map[int]string{100: "A", 90: "A", 89: "B", 75: "B", 74: "C", 60: "C", 59: "D", 40: "D", 39: "F", 0: "F"} {
 		if got := GradeFor(score); got != want {

@@ -104,6 +104,9 @@ export function Report({ scan, report }: { scan: ScanView; report: ReportData })
 function Axis({ axis, level, findings }: { axis: 'quantum' | 'current'; level: string; findings: Finding[] }) {
   const { t } = useLang()
   const mine = findings.filter((f) => f.axis === axis) // already sorted by severity
+  // Risks (and informational notes) first; what is done right at the end, apart.
+  const risks = mine.filter((f) => f.severity !== 'pass')
+  const good = mine.filter((f) => f.severity === 'pass')
   const id = `axis-${axis}`
   return (
     <section className="panel axis" aria-labelledby={id}>
@@ -111,24 +114,39 @@ function Axis({ axis, level, findings }: { axis: 'quantum' | 'current'; level: s
         {t(`axis.${axis}.title`)} <span className="level">{t('axis.level', { level })}</span>
       </h2>
       <p className="muted small">{t(`axis.${axis}.help`)}</p>
-      <ul className="findings">
-        {mine.map((f) => (
-          <li key={f.code} className={`finding sev-${f.severity}`}>
-            <details>
-              <summary>
-                <span className={`sev sev-tag-${f.severity}`}>{f.severity_label}</span>
-                <span className="finding-title">{f.title}</span>
-              </summary>
-              <p>{f.detail}</p>
-              {f.remediation && (
-                <p className="fix">
-                  <strong>{t('finding.fix')}:</strong> {f.remediation}
-                </p>
-              )}
-            </details>
-          </li>
-        ))}
-      </ul>
+      {risks.length > 0 ? <FindingList findings={risks} /> : <p className="no-risks">{t('axis.noRisks')}</p>}
+      {good.length > 0 && (
+        <div className="good" role="group" aria-labelledby={`${id}-good`}>
+          <h3 id={`${id}-good`} className="h-good">
+            {t('axis.good')}
+          </h3>
+          <FindingList findings={good} />
+        </div>
+      )}
     </section>
+  )
+}
+
+function FindingList({ findings }: { findings: Finding[] }) {
+  const { t } = useLang()
+  return (
+    <ul className="findings">
+      {findings.map((f) => (
+        <li key={f.code} className={`finding sev-${f.severity}`}>
+          <details>
+            <summary>
+              <span className={`sev sev-tag-${f.severity}`}>{f.severity_label}</span>
+              <span className="finding-title">{f.title}</span>
+            </summary>
+            <p>{f.detail}</p>
+            {f.remediation && (
+              <p className="fix">
+                <strong>{t('finding.fix')}:</strong> {f.remediation}
+              </p>
+            )}
+          </details>
+        </li>
+      ))}
+    </ul>
   )
 }

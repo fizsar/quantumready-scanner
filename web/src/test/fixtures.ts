@@ -4,7 +4,7 @@ import type { Report, ScanView } from '../api'
 const blocks = (kex: number, tls: number, fs: number, variety: number, cert: number): Report['blocks'] => [
   { id: 'key_exchange', label: 'Intercambio de claves post-cuántico', points: kex, max: 50 },
   { id: 'tls13', label: 'TLS 1.3', points: tls, max: 15 },
-  { id: 'forward_secrecy', label: 'Forward secrecy', points: fs, max: 10 },
+  { id: 'forward_secrecy', label: 'Secreto hacia adelante (forward secrecy)', points: fs, max: 10 },
   { id: 'hybrid_variety', label: 'Variedad de grupos híbridos', points: variety, max: 5 },
   {
     id: 'certificate', label: 'Certificado y agilidad', points: cert, max: 20,

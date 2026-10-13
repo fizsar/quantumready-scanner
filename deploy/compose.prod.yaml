@@ -83,6 +83,10 @@ services:
       # X-Forwarded-For is only believed from the Caddy network (subnet of the
       # `web` network; deploy.sh and make prod-up fill it in).
       TRUSTED_PROXIES: ${QR_TRUSTED_PROXIES:-}
+      # Scan request limits (defaults: 5/min and 30/day per client, 2 min per target).
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-5}
+      RATE_LIMIT_PER_DAY: ${RATE_LIMIT_PER_DAY:-30}
+      SCAN_TARGET_COOLDOWN: ${SCAN_TARGET_COOLDOWN:-2m}
     ports:
       - "127.0.0.1:8080:8080"
     networks:

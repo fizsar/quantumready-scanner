@@ -89,10 +89,10 @@ var findingTexts = map[string]langTexts{
 	"KEX_SINGLE_HYBRID": {
 		"es": {Title: "Un solo grupo híbrido",
 			Detail:      "Solo se acepta {group}. Es el grupo que usan los navegadores, así que el riesgo es bajo, pero clientes que exijan curvas NIST (entornos FIPS) no podrán negociar un intercambio post-cuántico.",
-			Remediation: "Si tienes clientes en entornos regulados, añade SecP256r1MLKEM768 a la lista de grupos."},
+			Remediation: "Si tienes clientes en entornos regulados, añade SecP256r1MLKEM768 a la lista de grupos. Depende de que el software del servidor lo permita: OpenSSL 3.5+ (y nginx o Apache compilados con él) lo acepta en la lista de grupos (Groups / ssl_ecdh_curve); Caddy 2.11 aún no admite ese nombre en su directiva curves; en un CDN o balanceador, depende de su configuración post-cuántica."},
 		"en": {Title: "A single hybrid group",
 			Detail:      "Only {group} is accepted. It is the group browsers use, so the risk is low, but clients that require NIST curves (FIPS environments) cannot negotiate a post-quantum exchange.",
-			Remediation: "If you serve clients in regulated environments, add SecP256r1MLKEM768 to the group list."},
+			Remediation: "If you serve clients in regulated environments, add SecP256r1MLKEM768 to the group list. It depends on the server software: OpenSSL 3.5+ (and nginx or Apache built with it) accepts it in the group list (Groups / ssl_ecdh_curve); Caddy 2.11 does not accept that name in its curves directive yet; on a CDN or load balancer, it depends on its post-quantum settings."},
 	},
 
 	// --- Protocol ---
@@ -119,11 +119,11 @@ var findingTexts = map[string]langTexts{
 
 	// --- Cipher suites ---
 	"FS_ALL": {
-		"es": {Title: "Secreto perfecto hacia delante (forward secrecy)", Detail: "Todas las conexiones usan un intercambio de claves efímero: aunque la clave privada del servidor se filtrara, no permitiría descifrar conexiones pasadas."},
+		"es": {Title: "Secreto hacia adelante (forward secrecy)", Detail: "Todas las conexiones usan un intercambio de claves efímero: aunque la clave privada del servidor se filtrara, no permitiría descifrar conexiones pasadas."},
 		"en": {Title: "Forward secrecy", Detail: "Every connection uses an ephemeral key exchange: even if the server's private key leaked, it would not decrypt past connections."},
 	},
 	"FS_PARTIAL": {
-		"es": {Title: "Suites sin forward secrecy",
+		"es": {Title: "Suites sin secreto hacia adelante (forward secrecy)",
 			Detail:      "Se aceptan suites con intercambio de claves RSA ({suites}). Quien obtenga la clave privada del servidor podría descifrar el tráfico capturado con ellas.",
 			Remediation: "Elimina las suites TLS_RSA_WITH_* y deja solo las ECDHE."},
 		"en": {Title: "Suites without forward secrecy",
@@ -131,7 +131,7 @@ var findingTexts = map[string]langTexts{
 			Remediation: "Remove the TLS_RSA_WITH_* suites and keep only ECDHE ones."},
 	},
 	"FS_NONE": {
-		"es": {Title: "Ninguna suite con forward secrecy",
+		"es": {Title: "Ninguna suite con secreto hacia adelante (forward secrecy)",
 			Detail:      "Todas las suites aceptadas usan intercambio de claves RSA ({suites}): la filtración de la clave privada del servidor expondría todo el tráfico pasado. Los navegadores actuales ya no ofrecen estas suites.",
 			Remediation: "Configura suites ECDHE con AES-GCM o ChaCha20-Poly1305 y activa TLS 1.3."},
 		"en": {Title: "No suite with forward secrecy",
@@ -253,7 +253,7 @@ var findingTexts = map[string]langTexts{
 var labels = map[string]map[string]string{
 	"block.key_exchange":    {"es": "Intercambio de claves post-cuántico", "en": "Post-quantum key exchange"},
 	"block.tls13":           {"es": "TLS 1.3", "en": "TLS 1.3"},
-	"block.forward_secrecy": {"es": "Forward secrecy", "en": "Forward secrecy"},
+	"block.forward_secrecy": {"es": "Secreto hacia adelante (forward secrecy)", "en": "Forward secrecy"},
 	"block.hybrid_variety":  {"es": "Variedad de grupos híbridos", "en": "Hybrid group variety"},
 	"block.certificate":     {"es": "Certificado y agilidad", "en": "Certificate and agility"},
 	"item.valid":            {"es": "Válido (cadena, nombre, fechas)", "en": "Valid (chain, name, dates)"},

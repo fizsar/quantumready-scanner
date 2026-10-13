@@ -58,6 +58,10 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("TRUSTED_PROXIES: %w", err)
 	}
+	lim, err := loadLimits(os.Getenv)
+	if err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -78,6 +82,8 @@ func run(logger *slog.Logger) error {
 			Scans:          store.NewStore(pool),
 			Allowlist:      allow,
 			TrustedProxies: trusted,
+			Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
+			TargetCooldown: lim.cooldown,
 			Logger:         logger,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
@@ -89,7 +95,8 @@ func run(logger *slog.Logger) error {
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,
-		"allowlist", allow.Len(), "trusted_proxies", len(trusted))
+		"allowlist", allow.Len(), "trusted_proxies", len(trusted),
+		"rate_per_minute", lim.perMinute, "rate_per_day", lim.perDay, "target_cooldown", lim.cooldown.String())
 
 	select {
 	case err := <-errCh:
