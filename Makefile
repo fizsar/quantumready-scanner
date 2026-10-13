@@ -26,12 +26,13 @@ dev: .env web/node_modules ## Start PostgreSQL, the API (:8080), the worker and 
 	npm --prefix web run dev; \
 	wait
 
-test: ## Run Go tests (integration tests too if the dev database is running)
+test: web/node_modules ## Run Go tests (integration tests too if the dev database is running) and web tests
 	@if [ -f .env ] && docker compose ps --status running --services 2>/dev/null | grep -qx db; then \
 		set -a; . ./.env; set +a; export QR_TEST_DATABASE_URL="$$DATABASE_URL"; \
 		echo "make test: dev PostgreSQL is up, running integration tests too"; \
 	fi; \
 	go test -race -count=1 ./...
+	npm --prefix web test
 
 lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint and tsc
 	@command -v golangci-lint >/dev/null || { echo "golangci-lint not found: https://golangci-lint.run/docs/welcome/install/"; exit 1; }
