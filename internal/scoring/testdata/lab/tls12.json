@@ -1,0 +1,473 @@
+{
+ "schema_version": 1,
+ "host": "tls12",
+ "port": 443,
+ "ip": "172.31.213.10",
+ "resolved_ips": [
+  "172.31.213.10"
+ ],
+ "started_at": "2026-10-14T22:04:24.342964064Z",
+ "duration_ms": 44,
+ "default": {
+  "status": "supported",
+  "version": "TLS 1.2",
+  "cipher_suite": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+  "group": "secp256r1",
+  "group_id": 23
+ },
+ "key_exchange": {
+  "offered": [
+   "X25519MLKEM768",
+   "x25519",
+   "secp256r1",
+   "secp384r1"
+  ],
+  "selected": "secp256r1",
+  "selected_hybrid": false,
+  "groups": [
+   {
+    "name": "X25519MLKEM768",
+    "id": 4588,
+    "hybrid": true,
+    "status": "not_supported",
+    "error": "remote error: tls: protocol version not supported"
+   },
+   {
+    "name": "SecP256r1MLKEM768",
+    "id": 4587,
+    "hybrid": true,
+    "status": "not_supported",
+    "error": "remote error: tls: protocol version not supported"
+   },
+   {
+    "name": "SecP384r1MLKEM1024",
+    "id": 4589,
+    "hybrid": true,
+    "status": "not_supported",
+    "error": "remote error: tls: protocol version not supported"
+   },
+   {
+    "name": "x25519",
+    "id": 29,
+    "hybrid": false,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   },
+   {
+    "name": "secp256r1",
+    "id": 23,
+    "hybrid": false,
+    "status": "supported"
+   },
+   {
+    "name": "secp384r1",
+    "id": 24,
+    "hybrid": false,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   },
+   {
+    "name": "secp521r1",
+    "id": 25,
+    "hybrid": false,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   }
+  ]
+ },
+ "versions": [
+  {
+   "version": "TLS 1.0",
+   "id": 769,
+   "status": "not_supported",
+   "error": "remote error: tls: protocol version not supported"
+  },
+  {
+   "version": "TLS 1.1",
+   "id": 770,
+   "status": "not_supported",
+   "error": "remote error: tls: protocol version not supported"
+  },
+  {
+   "version": "TLS 1.2",
+   "id": 771,
+   "status": "supported"
+  },
+  {
+   "version": "TLS 1.3",
+   "id": 772,
+   "status": "not_supported",
+   "error": "remote error: tls: protocol version not supported"
+  }
+ ],
+ "tls12_cipher_suites": [
+  {
+   "name": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+   "id": 49199,
+   "forward_secrecy": true,
+   "aead": true,
+   "insecure": false
+  }
+ ],
+ "tls12_cipher_suites_complete": true,
+ "legacy_cipher_suites_complete": true,
+ "certificate": {
+  "subject": "tlslab.test",
+  "sans": [],
+  "issuer": "tlslab.test",
+  "not_before": "2026-10-14T19:03:32Z",
+  "not_after": "2036-10-11T19:03:32Z",
+  "validity_days": 3650,
+  "days_to_expiry": 3649,
+  "key_algorithm": "RSA",
+  "key_size": 2048,
+  "signature_algorithm": "SHA256-RSA",
+  "trusted": false,
+  "trust_error": "x509: certificate signed by unknown authority",
+  "hostname_match": false,
+  "expired": false,
+  "not_yet_valid": false,
+  "self_signed": true,
+  "ocsp_stapled": false,
+  "scts_embedded": 0,
+  "scts_handshake": 0,
+  "chain": [
+   {
+    "subject": "tlslab.test",
+    "issuer": "tlslab.test",
+    "key_algorithm": "RSA",
+    "key_size": 2048,
+    "signature_algorithm": "SHA256-RSA",
+    "not_after": "2036-10-11T19:03:32Z"
+   }
+  ]
+ },
+ "not_evaluated": [
+  "tls12_server_cipher_preference",
+  "credential_suites",
+  "implementation_vulnerabilities"
+ ],
+ "intensity": "full",
+ "connections": 53,
+ "raw": {
+  "probes": 37,
+  "sslv2": {
+   "status": "not_supported"
+  },
+  "sslv3": {
+   "status": "not_supported",
+   "error": "alert handshake_failure"
+  },
+  "versions": [
+   {
+    "version": "TLS 1.1",
+    "id": 770,
+    "status": "not_supported",
+    "error": "alert protocol_version"
+   },
+   {
+    "version": "TLS 1.0",
+    "id": 769,
+    "status": "not_supported",
+    "error": "alert protocol_version"
+   }
+  ],
+  "suites": [
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_CAMELLIA_128_CBC_SHA",
+    "id": 65,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA",
+    "id": 69,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA",
+    "id": 70,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128,
+    "anonymous": true
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_CAMELLIA_256_CBC_SHA",
+    "id": 132,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA",
+    "id": 136,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA",
+    "id": 137,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256,
+    "anonymous": true
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256",
+    "id": 158,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "gcm",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_CAMELLIA_128_CBC_SHA256",
+    "id": 186,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA256",
+    "id": 190,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA256",
+    "id": 191,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128,
+    "anonymous": true
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_CAMELLIA_256_CBC_SHA256",
+    "id": 192,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA256",
+    "id": 196,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA256",
+    "id": 197,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256,
+    "anonymous": true
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_ARIA_128_GCM_SHA256",
+    "id": 49232,
+    "forward_secrecy": false,
+    "aead": true,
+    "mode": "gcm",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_ARIA_256_GCM_SHA384",
+    "id": 49233,
+    "forward_secrecy": false,
+    "aead": true,
+    "mode": "gcm",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_ARIA_128_GCM_SHA256",
+    "id": 49234,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "gcm",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_ARIA_256_GCM_SHA384",
+    "id": 49235,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "gcm",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_ECDHE_RSA_WITH_ARIA_128_GCM_SHA256",
+    "id": 49248,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "gcm",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_ECDHE_RSA_WITH_ARIA_256_GCM_SHA384",
+    "id": 49249,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "gcm",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_ECDHE_RSA_WITH_CAMELLIA_128_CBC_SHA256",
+    "id": 49270,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_ECDHE_RSA_WITH_CAMELLIA_256_CBC_SHA384",
+    "id": 49271,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_AES_128_CCM",
+    "id": 49308,
+    "forward_secrecy": false,
+    "aead": true,
+    "mode": "ccm",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_AES_256_CCM",
+    "id": 49309,
+    "forward_secrecy": false,
+    "aead": true,
+    "mode": "ccm",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_AES_128_CCM",
+    "id": 49310,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "ccm",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_AES_256_CCM",
+    "id": 49311,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "ccm",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_AES_128_CCM_8",
+    "id": 49312,
+    "forward_secrecy": false,
+    "aead": true,
+    "mode": "ccm8",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_RSA_WITH_AES_256_CCM_8",
+    "id": 49313,
+    "forward_secrecy": false,
+    "aead": true,
+    "mode": "ccm8",
+    "bits": 256
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_AES_128_CCM_8",
+    "id": 49314,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "ccm8",
+    "bits": 128
+   },
+   {
+    "version": "TLS 1.2",
+    "name": "TLS_DHE_RSA_WITH_AES_256_CCM_8",
+    "id": 49315,
+    "forward_secrecy": true,
+    "aead": true,
+    "mode": "ccm8",
+    "bits": 256
+   }
+  ],
+  "suites_complete": true,
+  "tls13_suites": null,
+  "tls13_suites_complete": true,
+  "dh": [
+   {
+    "version": "TLS 1.2",
+    "suite": "TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA",
+    "prime_bits": 1024
+   },
+   {
+    "version": "TLS 1.2",
+    "suite": "TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA",
+    "prime_bits": 2048
+   },
+   {
+    "version": "TLS 1.2",
+    "suite": "TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA",
+    "prime_bits": 3072
+   }
+  ],
+  "tls13_groups": null,
+  "tls13_groups_complete": true,
+  "tls12_curves": [
+   {
+    "name": "brainpoolP256r1",
+    "id": 26,
+    "kind": "brainpool"
+   }
+  ],
+  "tls12_curves_complete": true
+ }
+}

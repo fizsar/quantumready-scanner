@@ -2,15 +2,15 @@
 
 | Servidor | full: conexiones | full: sondas en crudo | full: duración (local) | full: duración (RTT 100 ms) | basic: conexiones | basic: duración (local) | basic: duración (RTT 100 ms) |
 |---|---|---|---|---|---|---|---|
-| `ssl2` | 21 | 6 | 18 ms | 1611 ms | 15 | 4 ms | 1008 ms |
-| `ssl3` | 45 | 30 | 110 ms | 6551 ms | 15 | 32 ms | 1030 ms |
-| `export` | 53 | 38 | 45 ms | 8096 ms | 15 | 4 ms | 1008 ms |
-| `dhe1024` | 31 | 16 | 62 ms | 3684 ms | 15 | 4 ms | 1009 ms |
-| `tls10` | 30 | 11 | 47 ms | 3446 ms | 19 | 26 ms | 1833 ms |
-| `secp224` | 31 | 16 | 44 ms | 3661 ms | 15 | 4 ms | 1010 ms |
-| `tls12` | 53 | 37 | 33 ms | 7888 ms | 16 | 10 ms | 1014 ms |
-| `tls13` | 32 | 17 | 17 ms | 3432 ms | 15 | 8 ms | 1012 ms |
-| `kyber` | 26 | 11 | 9 ms | 2218 ms | 15 | 5 ms | 1010 ms |
+| `ssl2` | 21 | 6 | 16 ms | 1618 ms | 15 | 4 ms | 1013 ms |
+| `ssl3` | 45 | 30 | 145 ms | 6640 ms | 15 | 40 ms | 1042 ms |
+| `export` | 53 | 38 | 52 ms | 8137 ms | 15 | 4 ms | 1011 ms |
+| `dhe1024` | 31 | 16 | 72 ms | 3734 ms | 15 | 5 ms | 1013 ms |
+| `tls10` | 30 | 11 | 81 ms | 3461 ms | 19 | 28 ms | 1852 ms |
+| `secp224` | 31 | 16 | 45 ms | 3709 ms | 15 | 5 ms | 1010 ms |
+| `tls12` | 53 | 37 | 44 ms | 7922 ms | 16 | 9 ms | 1022 ms |
+| `tls13` | 32 | 17 | 19 ms | 3448 ms | 15 | 9 ms | 1019 ms |
+| `kyber` | 26 | 11 | 15 ms | 2226 ms | 15 | 5 ms | 1012 ms |
 
 ## Comparación con testssl.sh
 

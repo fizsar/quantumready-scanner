@@ -1,0 +1,733 @@
+{
+  "id": "eea53058-805a-5606-8635-d864f8a1306f",
+  "host": "export.tlslab.test",
+  "port": 443,
+  "status": "done",
+  "retries": 0,
+  "created_at": "2026-10-15T09:30:00Z",
+  "started_at": "2026-10-15T09:30:00Z",
+  "finished_at": "2026-10-15T09:30:09Z",
+  "lang": "en",
+  "report": {
+    "scoring_version": "2026.2",
+    "score": 20,
+    "grade": "F",
+    "score_grade": "F",
+    "cap": {
+      "grade": "F",
+      "findings": [
+        {
+          "code": "SUITE_NULL",
+          "label": "Unencrypted connections accepted (NULL suites)"
+        },
+        {
+          "code": "SUITE_EXPORT",
+          "label": "EXPORT suites accepted"
+        },
+        {
+          "code": "SUITE_ANON",
+          "label": "Anonymous suites accepted (server not authenticated)"
+        },
+        {
+          "code": "SUITE_DES",
+          "label": "DES cipher (56-bit) accepted"
+        },
+        {
+          "code": "DH_WEAK",
+          "label": "Diffie-Hellman far too weak (512 bits)"
+        }
+      ]
+    },
+    "pqc": false,
+    "quantum_risk": {
+      "code": "critical",
+      "label": "Critical"
+    },
+    "current_risk": {
+      "code": "critical",
+      "label": "Critical"
+    },
+    "blocks": [
+      {
+        "id": "key_exchange",
+        "label": "Post-quantum key exchange",
+        "points": 0,
+        "max": 50
+      },
+      {
+        "id": "tls13",
+        "label": "TLS 1.3",
+        "points": 0,
+        "max": 15
+      },
+      {
+        "id": "forward_secrecy",
+        "label": "Forward secrecy",
+        "points": 0,
+        "max": 10
+      },
+      {
+        "id": "hybrid_variety",
+        "label": "Hybrid group variety",
+        "points": 0,
+        "max": 5
+      },
+      {
+        "id": "certificate",
+        "label": "Certificate and agility",
+        "points": 20,
+        "max": 20,
+        "items": [
+          {
+            "id": "valid",
+            "label": "Valid (chain, name, dates)",
+            "points": 5,
+            "max": 5
+          },
+          {
+            "id": "key",
+            "label": "Key",
+            "points": 5,
+            "max": 5
+          },
+          {
+            "id": "signature",
+            "label": "Signature",
+            "points": 5,
+            "max": 5
+          },
+          {
+            "id": "automation",
+            "label": "Automated renewal",
+            "points": 5,
+            "max": 5
+          }
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "code": "KEX_NO_HYBRID",
+        "axis": "quantum",
+        "axis_label": "Quantum risk",
+        "severity": "critical",
+        "severity_label": "Critical",
+        "category": "key_exchange",
+        "title": "No post-quantum key exchange",
+        "detail": "The server accepts no hybrid ML-KEM group. Key exchange is classical only (ECDHE or RSA), which a quantum computer will be able to break with Shor's algorithm: traffic captured today could be decrypted in the future (\"harvest now, decrypt later\"). This is the most urgent quantum risk because it affects data already in transit.",
+        "remediation": "Enable the hybrid group X25519MLKEM768 in TLS 1.3: OpenSSL 3.5+, BoringSSL, Go 1.24+, Caddy 2.10+, nginx built with OpenSSL 3.5, or your CDN or load balancer's post-quantum option. Keep X25519 as a fallback for older clients."
+      },
+      {
+        "code": "DH_WEAK",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "critical",
+        "severity_label": "Critical",
+        "category": "key_exchange",
+        "title": "Diffie-Hellman far too weak (512 bits)",
+        "detail": "The DHE suites use a group under 1024 bits. The Logjam attack (CVE-2015-4000) can break it in real time and decrypt or tamper with the connection.",
+        "remediation": "Configure a DH group of 2048 bits or more (e.g. ffdhe2048 or ffdhe3072, RFC 7919), or drop the DHE suites and keep ECDHE only."
+      },
+      {
+        "code": "SUITE_ANON",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "critical",
+        "severity_label": "Critical",
+        "category": "cipher_suites",
+        "title": "Anonymous suites accepted (server not authenticated)",
+        "detail": "With these suites the server does not prove its identity: there is no certificate. Anyone on the network can impersonate it and read or change the traffic (man in the middle). Suites: TLS_DH_anon_WITH_RC4_128_MD5, TLS_DH_anon_WITH_DES_CBC_SHA, TLS_DH_anon_WITH_3DES_EDE_CBC_SHA, TLS_DH_anon_WITH_AES_128_CBC_SHA, TLS_DH_anon_WITH_AES_256_CBC_SHA, TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA, TLS_DH_anon_WITH_AES_128_CBC_SHA256, TLS_DH_anon_WITH_AES_256_CBC_SHA256, TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA, TLS_DH_anon_WITH_SEED_CBC_SHA, TLS_DH_anon_WITH_AES_128_GCM_SHA256, TLS_DH_anon_WITH_AES_256_GCM_SHA384, TLS_ECDH_anon_WITH_RC4_128_SHA, TLS_ECDH_anon_WITH_3DES_EDE_CBC_SHA, TLS_ECDH_anon_WITH_AES_128_CBC_SHA, TLS_ECDH_anon_WITH_AES_256_CBC_SHA.",
+        "remediation": "Remove them (in OpenSSL, \"!aNULL\")."
+      },
+      {
+        "code": "SUITE_DES",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "critical",
+        "severity_label": "Critical",
+        "category": "cipher_suites",
+        "title": "DES cipher (56-bit) accepted",
+        "detail": "Single DES uses 56-bit keys, which have been brute-forced since 1998. Suites: TLS_RSA_WITH_DES_CBC_SHA, TLS_DHE_RSA_WITH_DES_CBC_SHA.",
+        "remediation": "Remove the DES suites (in OpenSSL, \"!DES:!LOW\") and use AES-GCM or ChaCha20-Poly1305."
+      },
+      {
+        "code": "SUITE_EXPORT",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "critical",
+        "severity_label": "Critical",
+        "category": "cipher_suites",
+        "title": "EXPORT suites accepted",
+        "detail": "EXPORT suites use 40 or 56-bit keys, deliberately weakened in the 1990s by US export rules. Today they break in minutes and enable the FREAK (CVE-2015-0204) and Logjam (CVE-2015-4000) attacks. Suites: TLS_RSA_EXPORT_WITH_RC4_40_MD5, TLS_RSA_EXPORT_WITH_RC2_CBC_40_MD5, TLS_RSA_EXPORT_WITH_DES40_CBC_SHA, TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA, TLS_DH_anon_EXPORT_WITH_RC4_40_MD5, TLS_DH_anon_EXPORT_WITH_DES40_CBC_SHA.",
+        "remediation": "Remove them (in OpenSSL, \"!EXPORT\") or upgrade the software: current releases no longer include them."
+      },
+      {
+        "code": "SUITE_NULL",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "critical",
+        "severity_label": "Critical",
+        "category": "cipher_suites",
+        "title": "Unencrypted connections accepted (NULL suites)",
+        "detail": "The server accepts suites that encrypt nothing: whatever travels over them can be read as is. An attacker on the network can force them if the client allows them. Suites: TLS_RSA_WITH_NULL_MD5, TLS_RSA_WITH_NULL_SHA, TLS_RSA_WITH_NULL_SHA256, TLS_ECDHE_RSA_WITH_NULL_SHA, TLS_ECDH_anon_WITH_NULL_SHA.",
+        "remediation": "Remove the NULL suites from the configuration (in OpenSSL, add \"!eNULL\" to the cipher list)."
+      },
+      {
+        "code": "TLS13_MISSING",
+        "axis": "quantum",
+        "axis_label": "Quantum risk",
+        "severity": "high",
+        "severity_label": "High",
+        "category": "protocol",
+        "title": "Without TLS 1.3, hybrid ML-KEM key exchange cannot be adopted",
+        "detail": "The server only accepts versions older than TLS 1.3. That may be secure today, but hybrid ML-KEM groups only exist in TLS 1.3: until it is enabled, traffic stays exposed to \"harvest now, decrypt later\" and no group configuration can fix it.",
+        "remediation": "Enable TLS 1.3 (any server with OpenSSL 1.1.1 or later supports it, as do all current browsers), then the X25519MLKEM768 group. Keep TLS 1.2 for older clients."
+      },
+      {
+        "code": "FS_PARTIAL",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "medium",
+        "severity_label": "Medium",
+        "category": "cipher_suites",
+        "title": "Suites without forward secrecy",
+        "detail": "Suites with RSA key exchange are accepted (TLS_RSA_WITH_NULL_MD5, TLS_RSA_WITH_NULL_SHA, TLS_RSA_EXPORT_WITH_RC4_40_MD5, TLS_RSA_EXPORT_WITH_RC2_CBC_40_MD5, TLS_RSA_EXPORT_WITH_DES40_CBC_SHA, TLS_RSA_WITH_DES_CBC_SHA, TLS_DH_anon_EXPORT_WITH_RC4_40_MD5, TLS_DH_anon_WITH_RC4_128_MD5, TLS_DH_anon_EXPORT_WITH_DES40_CBC_SHA, TLS_DH_anon_WITH_DES_CBC_SHA, TLS_DH_anon_WITH_3DES_EDE_CBC_SHA, TLS_DH_anon_WITH_AES_128_CBC_SHA, TLS_DH_anon_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_NULL_SHA256, TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA, TLS_DH_anon_WITH_AES_128_CBC_SHA256, TLS_DH_anon_WITH_AES_256_CBC_SHA256, TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA, TLS_DH_anon_WITH_SEED_CBC_SHA, TLS_DH_anon_WITH_AES_128_GCM_SHA256, TLS_DH_anon_WITH_AES_256_GCM_SHA384, TLS_ECDH_anon_WITH_NULL_SHA, TLS_ECDH_anon_WITH_RC4_128_SHA, TLS_ECDH_anon_WITH_3DES_EDE_CBC_SHA, TLS_ECDH_anon_WITH_AES_128_CBC_SHA, TLS_ECDH_anon_WITH_AES_256_CBC_SHA). Whoever obtains the server's private key could decrypt traffic captured with them.",
+        "remediation": "Remove the TLS_RSA_WITH_* suites and keep only ECDHE ones."
+      },
+      {
+        "code": "PROTO_LEGACY_TLS",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "medium",
+        "severity_label": "Medium",
+        "category": "protocol",
+        "title": "Obsolete versions enabled: TLS 1.0, TLS 1.1",
+        "detail": "TLS 1.0 and 1.1 are deprecated (RFC 8996): they only allow weak constructions and browsers no longer use them. Keeping them enabled widens the attack surface for no benefit.",
+        "remediation": "Disable TLS 1.0 and 1.1 and keep only TLS 1.2 and 1.3."
+      },
+      {
+        "code": "CERT_CLASSICAL_SIGNATURE",
+        "axis": "quantum",
+        "axis_label": "Quantum risk",
+        "severity": "low",
+        "severity_label": "Low",
+        "category": "certificate",
+        "title": "Classical signature (ECDSA P-256): future quantum risk",
+        "detail": "The server proves its identity with ECDSA P-256, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before. There are no post-quantum (ML-DSA) certificates on the public web yet. It does not affect the grade.",
+        "remediation": "Nothing to do yet. Keep renewal automated so you can switch to ML-DSA or hybrid certificates as soon as authorities issue them."
+      },
+      {
+        "code": "CERT_CT",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "info",
+        "severity_label": "Info",
+        "category": "certificate",
+        "title": "Certificate Transparency",
+        "detail": "The certificate carries SCTs: 2 embedded by the authority and 0 delivered in the handshake. Informational."
+      },
+      {
+        "code": "CERT_AUTOMATED_ACME",
+        "axis": "quantum",
+        "axis_label": "Quantum risk",
+        "severity": "pass",
+        "severity_label": "Pass",
+        "category": "certificate",
+        "title": "Automated renewal (Let's Encrypt)",
+        "detail": "The certificate is issued by Let's Encrypt, an authority that works through ACME (automatic renewal; 90-day validity). Switching to post-quantum certificates should be just another update."
+      },
+      {
+        "code": "CERT_VALID",
+        "axis": "current",
+        "axis_label": "Current risk",
+        "severity": "pass",
+        "severity_label": "Pass",
+        "category": "certificate",
+        "title": "Valid certificate",
+        "detail": "The chain is trusted, matches the name and is current (issuer: Let's Encrypt; expires in 46 days)."
+      }
+    ],
+    "not_evaluated": [
+      {
+        "code": "tls12_server_cipher_preference",
+        "label": "Server cipher suite preference"
+      },
+      {
+        "code": "credential_suites",
+        "label": "PSK, SRP, Kerberos and GOST suites (they need credentials or algorithms a scanner does not have)"
+      },
+      {
+        "code": "implementation_vulnerabilities",
+        "label": "Implementation vulnerabilities (Heartbleed, ROBOT…)"
+      }
+    ],
+    "result": {
+      "schema_version": 1,
+      "host": "export.tlslab.test",
+      "port": 443,
+      "ip": "172.31.213.2",
+      "resolved_ips": [
+        "172.31.213.2"
+      ],
+      "started_at": "2026-10-14T22:04:00.102921342Z",
+      "duration_ms": 52,
+      "default": {
+        "status": "not_supported",
+        "error": "remote error: tls: handshake failure"
+      },
+      "key_exchange": {
+        "offered": [
+          "X25519MLKEM768",
+          "x25519",
+          "secp256r1",
+          "secp384r1"
+        ],
+        "selected_hybrid": false,
+        "groups": [
+          {
+            "name": "X25519MLKEM768",
+            "id": 4588,
+            "hybrid": true,
+            "status": "not_supported",
+            "error": "remote error: tls: handshake failure"
+          },
+          {
+            "name": "SecP256r1MLKEM768",
+            "id": 4587,
+            "hybrid": true,
+            "status": "not_supported",
+            "error": "remote error: tls: handshake failure"
+          },
+          {
+            "name": "SecP384r1MLKEM1024",
+            "id": 4589,
+            "hybrid": true,
+            "status": "not_supported",
+            "error": "remote error: tls: handshake failure"
+          },
+          {
+            "name": "x25519",
+            "id": 29,
+            "hybrid": false,
+            "status": "not_supported",
+            "error": "remote error: tls: handshake failure"
+          },
+          {
+            "name": "secp256r1",
+            "id": 23,
+            "hybrid": false,
+            "status": "not_supported",
+            "error": "remote error: tls: handshake failure"
+          },
+          {
+            "name": "secp384r1",
+            "id": 24,
+            "hybrid": false,
+            "status": "not_supported",
+            "error": "remote error: tls: handshake failure"
+          },
+          {
+            "name": "secp521r1",
+            "id": 25,
+            "hybrid": false,
+            "status": "not_supported",
+            "error": "remote error: tls: handshake failure"
+          }
+        ]
+      },
+      "versions": [
+        {
+          "version": "TLS 1.0",
+          "id": 769,
+          "status": "not_supported",
+          "error": "remote error: tls: handshake failure"
+        },
+        {
+          "version": "TLS 1.1",
+          "id": 770,
+          "status": "not_supported",
+          "error": "remote error: tls: handshake failure"
+        },
+        {
+          "version": "TLS 1.2",
+          "id": 771,
+          "status": "not_supported",
+          "error": "remote error: tls: handshake failure"
+        },
+        {
+          "version": "TLS 1.3",
+          "id": 772,
+          "status": "not_supported",
+          "error": "remote error: tls: handshake failure"
+        }
+      ],
+      "tls12_cipher_suites": null,
+      "tls12_cipher_suites_complete": true,
+      "legacy_cipher_suites_complete": true,
+      "certificate": {
+        "subject": "export.tlslab.test",
+        "sans": [
+          "export.tlslab.test"
+        ],
+        "issuer": "YE1",
+        "issuer_org": [
+          "Let's Encrypt"
+        ],
+        "not_before": "2026-09-01T00:00:00Z",
+        "not_after": "2026-11-30T00:00:00Z",
+        "validity_days": 90,
+        "days_to_expiry": 46,
+        "key_algorithm": "ECDSA",
+        "key_size": 256,
+        "curve": "P-256",
+        "signature_algorithm": "ECDSA-SHA384",
+        "trusted": true,
+        "hostname_match": true,
+        "expired": false,
+        "not_yet_valid": false,
+        "self_signed": false,
+        "ocsp_stapled": false,
+        "scts_embedded": 2,
+        "scts_handshake": 0,
+        "chain": null
+      },
+      "not_evaluated": [
+        "tls12_server_cipher_preference",
+        "credential_suites",
+        "implementation_vulnerabilities"
+      ],
+      "intensity": "full",
+      "connections": 53,
+      "raw": {
+        "probes": 38,
+        "sslv2": {
+          "status": "not_supported",
+          "error": "EOF"
+        },
+        "sslv3": {
+          "status": "not_supported",
+          "error": "alert handshake_failure"
+        },
+        "versions": [
+          {
+            "version": "TLS 1.2",
+            "id": 771,
+            "status": "supported"
+          },
+          {
+            "version": "TLS 1.1",
+            "id": 770,
+            "status": "supported"
+          },
+          {
+            "version": "TLS 1.0",
+            "id": 769,
+            "status": "supported"
+          }
+        ],
+        "suites": [
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_RSA_WITH_NULL_MD5",
+            "id": 1,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "none",
+            "bits": 0
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_RSA_WITH_NULL_SHA",
+            "id": 2,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "none",
+            "bits": 0
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_RSA_EXPORT_WITH_RC4_40_MD5",
+            "id": 3,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "stream",
+            "bits": 40,
+            "export": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_RSA_EXPORT_WITH_RC2_CBC_40_MD5",
+            "id": 6,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 40,
+            "export": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_RSA_EXPORT_WITH_DES40_CBC_SHA",
+            "id": 8,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 40,
+            "export": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_RSA_WITH_DES_CBC_SHA",
+            "id": 9,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 56
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+            "id": 20,
+            "forward_secrecy": true,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 40,
+            "export": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DHE_RSA_WITH_DES_CBC_SHA",
+            "id": 21,
+            "forward_secrecy": true,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 56
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_EXPORT_WITH_RC4_40_MD5",
+            "id": 23,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "stream",
+            "bits": 40,
+            "export": true,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_RC4_128_MD5",
+            "id": 24,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "stream",
+            "bits": 128,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_EXPORT_WITH_DES40_CBC_SHA",
+            "id": 25,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 40,
+            "export": true,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_DES_CBC_SHA",
+            "id": 26,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 56,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_3DES_EDE_CBC_SHA",
+            "id": 27,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 112,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_AES_128_CBC_SHA",
+            "id": 52,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 128,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_AES_256_CBC_SHA",
+            "id": 58,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 256,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_RSA_WITH_NULL_SHA256",
+            "id": 59,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "none",
+            "bits": 0
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA",
+            "id": 70,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 128,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_AES_128_CBC_SHA256",
+            "id": 108,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 128,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_AES_256_CBC_SHA256",
+            "id": 109,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 256,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA",
+            "id": 137,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 256,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_SEED_CBC_SHA",
+            "id": 155,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 128,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_AES_128_GCM_SHA256",
+            "id": 166,
+            "forward_secrecy": false,
+            "aead": true,
+            "mode": "gcm",
+            "bits": 128,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_DH_anon_WITH_AES_256_GCM_SHA384",
+            "id": 167,
+            "forward_secrecy": false,
+            "aead": true,
+            "mode": "gcm",
+            "bits": 256,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_ECDHE_RSA_WITH_NULL_SHA",
+            "id": 49168,
+            "forward_secrecy": true,
+            "aead": false,
+            "mode": "none",
+            "bits": 0
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_ECDH_anon_WITH_NULL_SHA",
+            "id": 49173,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "none",
+            "bits": 0,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_ECDH_anon_WITH_RC4_128_SHA",
+            "id": 49174,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "stream",
+            "bits": 128,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_ECDH_anon_WITH_3DES_EDE_CBC_SHA",
+            "id": 49175,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 112,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_ECDH_anon_WITH_AES_128_CBC_SHA",
+            "id": 49176,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 128,
+            "anonymous": true
+          },
+          {
+            "version": "TLS 1.2",
+            "name": "TLS_ECDH_anon_WITH_AES_256_CBC_SHA",
+            "id": 49177,
+            "forward_secrecy": false,
+            "aead": false,
+            "mode": "cbc",
+            "bits": 256,
+            "anonymous": true
+          }
+        ],
+        "suites_complete": true,
+        "tls13_suites": null,
+        "tls13_suites_complete": true,
+        "dh": [
+          {
+            "version": "TLS 1.2",
+            "suite": "TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+            "prime_bits": 512
+          }
+        ],
+        "tls13_groups": null,
+        "tls13_groups_complete": true,
+        "tls12_curves": null,
+        "tls12_curves_complete": true
+      }
+    }
+  }
+}

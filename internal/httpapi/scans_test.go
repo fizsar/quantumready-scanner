@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/fizsar/quantumready-saas/internal/scanner"
+	"github.com/fizsar/quantumready-saas/internal/scoring"
 	"github.com/fizsar/quantumready-saas/internal/store"
 	"github.com/fizsar/quantumready-saas/internal/testdb"
 	"github.com/fizsar/quantumready-saas/internal/worker"
@@ -247,7 +248,7 @@ func TestGetScanReport(t *testing.T) {
 			t.Fatalf("view = %+v", got)
 		}
 		if r.Grade != "A" || r.Score != 95 || !r.PQC || r.SelectedGroup != "X25519MLKEM768" || r.TLSVersion != "TLS 1.3" ||
-			r.ScoringVersion != "2026.1" || len(r.Blocks) != 5 || len(r.Findings) == 0 || len(r.NotEvaluated) == 0 || len(r.Result) == 0 {
+			r.ScoringVersion != scoring.Version || len(r.Blocks) != 5 || len(r.Findings) == 0 || len(r.NotEvaluated) == 0 || len(r.Result) == 0 {
 			t.Fatalf("report = %+v", r)
 		}
 		for _, f := range r.Findings {

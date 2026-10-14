@@ -246,10 +246,19 @@ func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
 		CurrentRisk: labeled{s.CurrentRisk, scoring.Label("severity."+s.CurrentRisk, lang)},
 		Result:      sc.Result,
 	}
+	// Finding parameters by code: some titles use them, e.g. "({bits} bits)".
+	params := make(map[string]map[string]string, len(rows))
+	for _, f := range rows {
+		var p map[string]string
+		if err := json.Unmarshal(f.Params, &p); err != nil {
+			return nil, err
+		}
+		params[f.Code] = p
+	}
 	if s.Cap != nil {
 		rep.Cap = &capView{Grade: s.Cap.Grade}
 		for _, c := range s.Cap.Codes {
-			rep.Cap.Codes = append(rep.Cap.Codes, labeled{c, scoring.Describe(c, nil, lang).Title})
+			rep.Cap.Codes = append(rep.Cap.Codes, labeled{c, scoring.Describe(c, params[c], lang).Title})
 		}
 	}
 	for _, b := range s.Blocks {

@@ -16,7 +16,7 @@ make tlslab-scan ARGS="-facts tls13"   # cmd/qrscan -lab dentro del laboratorio
 
 ## Aislamiento
 
-- **Ningún puerto publicado**: nada escucha en el host (ni en 0.0.0.0, ni en la IP de WSL, ni en 127.0.0.1).
+- **Ningún puerto publicado**: nada escucha en el host (ni en 0.0.0.0, ni en la IP principal del host (la de WSL en local), ni en 127.0.0.1).
 - Una sola red Docker **`internal`** (`qr-tlslab`, 172.31.213.0/24): sin salida a Internet ni entrada desde fuera.
 - Los clientes (testssl.sh y, desde el 2.7.3, el escáner) se ejecutan en contenedores conectados a esa red (`lab.sh run`).
 - `make tlslab-up` lo comprueba cada vez y falla si algo no se cumple: puertos publicados, redes, red interna, sockets nuevos en el host, conexiones a la IP de WSL, a 127.0.0.1 y a 0.0.0.0, y salida a Internet desde el laboratorio.

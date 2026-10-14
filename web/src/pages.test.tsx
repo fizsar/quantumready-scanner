@@ -101,6 +101,26 @@ describe('result page', () => {
   })
 })
 
+// Real TLS lab scans scored with model 2026.2, as the API returns them
+// (internal/httpapi TestLabFixtures writes test/lab/*.json).
+describe('result page with lab scans (model 2026.2)', () => {
+  it.each([
+    ['export', 'es', /acepta conexiones que no cifran nada/, 'F', '20 de 100 puntos', /Diffie-Hellman demasiado débil \(512 bits\)/],
+    ['export', 'en', /accepts connections that encrypt nothing/, 'F', '20 out of 100 points', /Diffie-Hellman far too weak \(512 bits\)/],
+    ['kyber', 'es', /versión experimental del cifrado post-cuántico/, 'D', '45 de 100 puntos', /Solo PQC experimental: X25519Kyber768Draft00/],
+    ['kyber', 'en', /experimental version of post-quantum encryption/, 'D', '45 out of 100 points', /Experimental PQC only: X25519Kyber768Draft00/],
+  ] as const)('%s (%s)', async (server, lang, verdict, grade, score, finding) => {
+    const view = (await import(`./test/lab/${server}.${lang}.json`)).default
+    stubFetch(() => json(view))
+    renderAt('/scans/abc', lang)
+    expect(await screen.findByRole('heading', { level: 1, name: verdict })).toBeTruthy()
+    expect(screen.getByText(`${lang === 'es' ? 'Nota' : 'Grade'}: ${grade}`)).toBeTruthy()
+    expect(screen.getByText(score)).toBeTruthy()
+    expect(screen.getAllByText(finding).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/\{[a-z]+\}/)).toBeNull() // no unfilled placeholder anywhere
+  })
+})
+
 describe('home page', () => {
   it('lists the allowed domains from the API and starts a scan', async () => {
     const fetch = stubFetch((url, init) => {

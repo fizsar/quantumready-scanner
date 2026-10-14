@@ -506,6 +506,12 @@ func TestCatalog(t *testing.T) {
 		apply(func(r *scanner.Result) { r.Certificate = nil }),
 	}
 	inputs := extra
+	for _, r := range labResults(t) { // model 2026.2: raw probe findings
+		inputs = append(inputs, r)
+	}
+	for _, r := range rawExtras() {
+		inputs = append(inputs, r)
+	}
 	for _, tc := range cases {
 		inputs = append(inputs, tc.in)
 	}

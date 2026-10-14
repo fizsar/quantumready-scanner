@@ -4,14 +4,16 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/fizsar/quantumready-saas/internal/scanner"
+	"github.com/fizsar/quantumready-saas/internal/scanner/rawtls"
 )
 
 // Version identifies the scoring model. Any change to weights, thresholds,
 // caps or the rules that emit findings must bump it (see docs/scoring.md):
 // stored results keep the version they were scored with.
-const Version = "2026.1"
+const Version = "2026.2"
 
 // Severity of a finding. Pass marks something done right.
 type Severity string
@@ -156,6 +158,9 @@ func Evaluate(r *scanner.Result) Result {
 	e.certificate()
 	e.protocols()
 	e.suites()
+	e.dh()
+	e.groups()
+	e.experimentalPQC()
 	e.symmetric()
 	e.coverage()
 	return e.result()
@@ -211,8 +216,21 @@ func (e *evaluator) version(name string) scanner.Status {
 	return ""
 }
 
+// supports reports a version seen by crypto/tls or, with intensity full, by
+// the raw probes (which also see versions whose suites Go cannot offer).
 func (e *evaluator) supports(version string) bool {
-	return e.version(version) == scanner.Supported || e.r.Default.Version == version
+	if e.version(version) == scanner.Supported || e.r.Default.Version == version {
+		return true
+	}
+	if raw := e.r.Raw; raw != nil {
+		for _, v := range raw.Versions {
+			if v.Version == version && v.Status == scanner.Supported {
+				return true
+			}
+		}
+		return version == "TLS 1.3" && len(raw.TLS13Suites) > 0
+	}
+	return false
 }
 
 // keyExchange: harvest now, decrypt later. What matters is what a real client
@@ -262,19 +280,20 @@ func (e *evaluator) forwardSecrecy() {
 		}
 		return
 	}
+	tls12 := e.tls12Suites()
 	var noFS []string
-	for _, s := range e.r.TLS12Suites {
+	for _, s := range tls12 {
 		if !s.ForwardSecrecy {
 			noFS = append(noFS, s.Name)
 		}
 	}
 	switch {
-	case len(e.r.TLS12Suites) == 0:
+	case len(tls12) == 0:
 		e.block("forward_secrecy", 0, PointsFS) // nothing observed: coverage() reports it
 	case len(noFS) == 0:
 		e.block("forward_secrecy", PointsFS, PointsFS)
 		e.add("FS_ALL", AxisCurrent, Pass, CatCipherSuites, nil)
-	case len(noFS) == len(e.r.TLS12Suites) && !e.supports("TLS 1.3"):
+	case len(noFS) == len(tls12) && !e.supports("TLS 1.3"):
 		e.block("forward_secrecy", 0, PointsFS)
 		e.add("FS_NONE", AxisCurrent, High, CatCipherSuites, map[string]string{"suites": strings.Join(noFS, ", ")})
 		e.capAt("C", "FS_NONE")
@@ -284,11 +303,18 @@ func (e *evaluator) forwardSecrecy() {
 	}
 }
 
-// variety: more than one hybrid group (e.g. SecP256r1MLKEM768 for FIPS clients).
+// variety: more than one standard PQC group (e.g. SecP256r1MLKEM768 for FIPS
+// clients). Since 2026.2, pure ML-KEM (FIPS 203, seen by the raw probes)
+// counts here, but never in the key exchange block: browsers do not offer it.
 func (e *evaluator) variety() {
 	hybrids := e.hybridSupported()
+	pure := e.rawGroups(rawtls.GroupPureMLKEM)
+	standard := append(append([]string{}, hybrids...), pure...)
 	switch {
-	case len(hybrids) > 1:
+	case len(standard) > 1 && len(pure) > 0:
+		e.block("hybrid_variety", PointsVariety, PointsVariety)
+		e.add("KEX_MULTIPLE_PQC", AxisQuantum, Pass, CatKeyExchange, map[string]string{"groups": strings.Join(standard, ", ")})
+	case len(standard) > 1:
 		e.block("hybrid_variety", PointsVariety, PointsVariety)
 		e.add("KEX_MULTIPLE_HYBRIDS", AxisQuantum, Pass, CatKeyExchange, map[string]string{"groups": strings.Join(hybrids, ", ")})
 	case len(hybrids) == 1:
@@ -296,6 +322,97 @@ func (e *evaluator) variety() {
 		e.add("KEX_SINGLE_HYBRID", AxisQuantum, Low, CatKeyExchange, map[string]string{"group": hybrids[0]})
 	default:
 		e.block("hybrid_variety", 0, PointsVariety)
+	}
+	if len(pure) > 0 {
+		e.add("KEX_PURE_MLKEM", AxisQuantum, Info, CatKeyExchange, map[string]string{"groups": strings.Join(pure, ", ")})
+	}
+}
+
+// rawGroups are the TLS 1.3 groups of the given kinds found by the raw probes.
+func (e *evaluator) rawGroups(kinds ...rawtls.GroupKind) []string {
+	if e.r.Raw == nil {
+		return nil
+	}
+	var out []string
+	for _, g := range e.r.Raw.TLS13Groups {
+		if slices.Contains(kinds, rawtls.GroupKind(g.Kind)) {
+			out = append(out, g.Name)
+		}
+	}
+	return out
+}
+
+// experimentalPQC: pre-standard Kyber or draft hybrids. Browsers no longer
+// offer them (Chrome dropped Kyber in 2024), so they protect nobody and earn
+// no points; alone they mean a PQC migration started and got stuck.
+func (e *evaluator) experimentalPQC() {
+	exp := e.rawGroups(rawtls.GroupKyberDraft, rawtls.GroupHybridDraft)
+	if len(exp) == 0 {
+		return
+	}
+	params := map[string]string{"groups": strings.Join(exp, ", ")}
+	if len(e.hybridSupported()) > 0 {
+		e.add("KEX_EXPERIMENTAL_PQC_EXTRA", AxisQuantum, Info, CatKeyExchange, params)
+		return
+	}
+	e.add("KEX_EXPERIMENTAL_PQC_ONLY", AxisQuantum, Medium, CatKeyExchange, params)
+}
+
+// dh: finite-field DH group size from ServerKeyExchange (Logjam).
+func (e *evaluator) dh() {
+	raw := e.r.Raw
+	if raw == nil || len(raw.DH) == 0 {
+		return
+	}
+	var bits []string
+	for _, d := range raw.DH {
+		if b := strconv.Itoa(d.PrimeBits); !slices.Contains(bits, b) {
+			bits = append(bits, b)
+		}
+	}
+	params := map[string]string{"bits": strings.Join(bits, ", ")}
+	switch smallest := raw.DH[0].PrimeBits; { // sorted, smallest first
+	case smallest < 1024:
+		e.add("DH_WEAK", AxisCurrent, Critical, CatKeyExchange, params)
+		e.capAt("F", "DH_WEAK")
+	case smallest < 2048:
+		e.add("DH_SMALL", AxisCurrent, High, CatKeyExchange, params)
+		e.capAt("C", "DH_SMALL")
+	default:
+		e.add("DH_OK", AxisCurrent, Pass, CatKeyExchange, params)
+	}
+}
+
+// groups: classical groups beyond the usual ones. Weak curves are reported
+// without a cap: browsers never offer them.
+func (e *evaluator) groups() {
+	raw := e.r.Raw
+	if raw == nil {
+		return
+	}
+	var weak, extra []string
+	for _, g := range raw.TLS12Curves {
+		switch rawtls.GroupKind(g.Kind) {
+		case rawtls.GroupECDHEWeak, rawtls.GroupBinary:
+			weak = append(weak, g.Name)
+		default:
+			extra = append(extra, g.Name+" (TLS 1.2)")
+		}
+	}
+	if raw.ExplicitCurve {
+		weak = append(weak, "explicit")
+	}
+	for _, g := range raw.TLS13Groups {
+		switch rawtls.GroupKind(g.Kind) {
+		case rawtls.GroupFFDHE, rawtls.GroupBrainpool, rawtls.GroupECDHE, rawtls.GroupOther:
+			extra = append(extra, g.Name)
+		}
+	}
+	if len(weak) > 0 {
+		e.add("GROUP_WEAK_CURVES", AxisCurrent, Low, CatKeyExchange, map[string]string{"groups": strings.Join(weak, ", ")})
+	}
+	if len(extra) > 0 {
+		e.add("GROUPS_EXTRA", AxisCurrent, Info, CatKeyExchange, map[string]string{"groups": strings.Join(extra, ", ")})
 	}
 }
 
@@ -408,7 +525,7 @@ func automation(c *scanner.Certificate) (bool, string) {
 func (e *evaluator) protocols() {
 	var legacy []string
 	for _, v := range []string{"TLS 1.0", "TLS 1.1"} {
-		if e.version(v) == scanner.Supported {
+		if e.supports(v) {
 			legacy = append(legacy, v)
 		}
 	}
@@ -416,24 +533,60 @@ func (e *evaluator) protocols() {
 		e.add("PROTO_LEGACY_TLS", AxisCurrent, Medium, CatProtocol, map[string]string{"versions": strings.Join(legacy, ", ")})
 		e.capAt("B", "PROTO_LEGACY_TLS")
 	}
+	raw := e.r.Raw
+	if raw == nil {
+		return
+	}
+	if raw.SSLv2.Status == scanner.Supported { // DROWN; prohibited by RFC 6176
+		e.add("PROTO_SSL2", AxisCurrent, Critical, CatProtocol, map[string]string{"ciphers": strings.Join(raw.SSLv2.Ciphers, ", ")})
+		e.capAt("F", "PROTO_SSL2")
+	}
+	if raw.SSLv3.Status == scanner.Supported { // POODLE; prohibited by RFC 7568
+		e.add("PROTO_SSL3", AxisCurrent, High, CatProtocol, nil)
+		e.capAt("C", "PROTO_SSL3")
+	}
 }
 
-// allSuites returns the suites accepted in any version up to TLS 1.2, once
-// each. Suites missing from TLS 1.2 are labeled with the versions that accept
-// them, e.g. "TLS_RSA_WITH_3DES_EDE_CBC_SHA (TLS 1.0)".
+// rawSuites are the suites the raw probes found in version (intensity full).
+func (e *evaluator) rawSuites(version string) []scanner.CipherSuite {
+	if e.r.Raw == nil {
+		return nil
+	}
+	var out []scanner.CipherSuite
+	for _, s := range e.r.Raw.Suites {
+		if s.Version == version {
+			out = append(out, scanner.CipherSuite{Name: s.Name, ID: s.ID, ForwardSecrecy: s.ForwardSecrecy, AEAD: s.AEAD})
+		}
+	}
+	return out
+}
+
+// tls12Suites are the TLS 1.2 suites found by crypto/tls and the raw probes.
+func (e *evaluator) tls12Suites() []scanner.CipherSuite {
+	return append(append([]scanner.CipherSuite{}, e.r.TLS12Suites...), e.rawSuites("TLS 1.2")...)
+}
+
+// allSuites returns the suites accepted in any version up to TLS 1.2 (and
+// SSLv3), once each. Suites missing from TLS 1.2 are labeled with the
+// versions that accept them, e.g. "TLS_RSA_WITH_3DES_EDE_CBC_SHA (TLS 1.0)".
 func (e *evaluator) allSuites() []scanner.CipherSuite {
+	tls12 := e.tls12Suites()
 	in12 := map[string]bool{}
-	for _, s := range e.r.TLS12Suites {
+	for _, s := range tls12 {
 		in12[s.Name] = true
 	}
-	out := append([]scanner.CipherSuite{}, e.r.TLS12Suites...)
+	out := append([]scanner.CipherSuite{}, tls12...)
 	var order []string
 	legacy := map[string][]string{}
 	byName := map[string]scanner.CipherSuite{}
 	for _, v := range []struct {
 		name   string
 		suites []scanner.CipherSuite
-	}{{"TLS 1.0", e.r.TLS10Suites}, {"TLS 1.1", e.r.TLS11Suites}} {
+	}{
+		{"TLS 1.0", append(append([]scanner.CipherSuite{}, e.r.TLS10Suites...), e.rawSuites("TLS 1.0")...)},
+		{"TLS 1.1", append(append([]scanner.CipherSuite{}, e.r.TLS11Suites...), e.rawSuites("TLS 1.1")...)},
+		{"SSLv3", e.rawSuites("SSLv3")},
+	} {
 		for _, s := range v.suites {
 			if in12[s.Name] {
 				continue
@@ -453,29 +606,93 @@ func (e *evaluator) allSuites() []scanner.CipherSuite {
 	return out
 }
 
+// suitesByName indexes the IANA registry by name.
+var suitesByName = sync.OnceValue(func() map[string]rawtls.Suite {
+	m := map[string]rawtls.Suite{}
+	for _, s := range rawtls.Suites() {
+		m[s.Name] = s
+	}
+	return m
+})
+
+// suiteInfo returns the registry attributes of an accepted suite. Scans carry
+// IDs; the name (without the "(TLS 1.0)" label) is the fallback.
+func suiteInfo(s scanner.CipherSuite) rawtls.Suite {
+	name, _, _ := strings.Cut(s.Name, " (")
+	if info, ok := rawtls.SuiteByID(s.ID); ok && info.Name == name {
+		return info
+	}
+	return suitesByName()[name]
+}
+
+// suites judges every accepted suite once, by its worst property (attributes
+// from the IANA registry in rawtls): no encryption, EXPORT, anonymous, single
+// DES, RC4, 3DES, CBC, then CCM_8. TLS 1.3 suites come from the raw probes.
 func (e *evaluator) suites() {
-	var rc4, des, cbc []string
+	var null, export, anon, des, rc4, des3, cbc, ccm8, integrity, modern, tls13 []string
 	for _, s := range e.allSuites() {
+		info := suiteInfo(s)
 		switch {
-		case strings.Contains(s.Name, "_RC4_"):
+		case info.Mode == rawtls.ModeNone:
+			null = append(null, s.Name)
+		case info.Export:
+			export = append(export, s.Name)
+		case info.Anonymous():
+			anon = append(anon, s.Name)
+		case info.Mode == rawtls.ModeStream:
 			rc4 = append(rc4, s.Name)
-		case strings.Contains(s.Name, "_3DES_"):
+		case info.Cipher == "3DES_EDE_CBC":
+			des3 = append(des3, s.Name)
+		case info.Bits > 0 && info.Bits < 112:
 			des = append(des, s.Name)
-		case !s.AEAD:
+		case info.Mode == rawtls.ModeCBC:
 			cbc = append(cbc, s.Name)
+		case info.Mode == rawtls.ModeCCM8:
+			ccm8 = append(ccm8, s.Name)
 		}
 	}
-	if len(rc4) > 0 {
-		e.add("SUITE_RC4", AxisCurrent, High, CatCipherSuites, map[string]string{"suites": strings.Join(rc4, ", ")})
-		e.capAt("C", "SUITE_RC4")
+	if raw := e.r.Raw; raw != nil {
+		for _, s := range raw.TLS13Suites {
+			info := suiteInfo(scanner.CipherSuite{Name: s.Name, ID: s.ID})
+			tls13 = append(tls13, s.Name)
+			switch {
+			case info.Mode == rawtls.ModeNone:
+				integrity = append(integrity, s.Name)
+			case info.Mode == rawtls.ModeCCM8:
+				ccm8 = append(ccm8, s.Name+" (TLS 1.3)")
+			case strings.HasPrefix(info.Cipher, "AEGIS") || strings.HasPrefix(info.Cipher, "ASCON"):
+				modern = append(modern, s.Name)
+			}
+		}
 	}
-	if len(des) > 0 {
-		e.add("SUITE_3DES", AxisCurrent, High, CatCipherSuites, map[string]string{"suites": strings.Join(des, ", ")})
-		e.capAt("C", "SUITE_3DES")
+	type rule struct {
+		code   string
+		sev    Severity
+		cap    string
+		suites []string
 	}
-	if len(cbc) > 0 {
-		e.add("SUITE_CBC", AxisCurrent, Low, CatCipherSuites, map[string]string{"suites": strings.Join(cbc, ", ")})
-		e.capAt("B", "SUITE_CBC")
+	for _, r := range []rule{
+		{"SUITE_NULL", Critical, "F", null},
+		{"SUITE_INTEGRITY_ONLY", Critical, "F", integrity},
+		{"SUITE_EXPORT", Critical, "F", export},
+		{"SUITE_ANON", Critical, "F", anon},
+		{"SUITE_DES", Critical, "F", des},
+		{"SUITE_RC4", High, "C", rc4},
+		{"SUITE_3DES", High, "C", des3},
+		{"SUITE_CBC", Low, "B", cbc},
+		{"SUITE_CCM8", Low, "", ccm8},
+		{"SUITE_MODERN_AEAD", Info, "", modern},
+	} {
+		if len(r.suites) == 0 {
+			continue
+		}
+		e.add(r.code, AxisCurrent, r.sev, CatCipherSuites, map[string]string{"suites": strings.Join(r.suites, ", ")})
+		if r.cap != "" {
+			e.capAt(r.cap, r.code)
+		}
+	}
+	if len(tls13) > 0 && len(integrity) == 0 && len(ccm8) == 0 {
+		e.add("TLS13_SUITES_AEAD", AxisCurrent, Pass, CatCipherSuites, map[string]string{"suites": strings.Join(tls13, ", ")})
 	}
 }
 
@@ -510,6 +727,16 @@ func (e *evaluator) coverage() {
 	}
 	if !e.r.LegacySuitesComplete {
 		failed++
+	}
+	if raw := e.r.Raw; raw != nil {
+		for _, incomplete := range []bool{
+			raw.SSLv2.Status == scanner.ProbeFailed, raw.SSLv3.Status == scanner.ProbeFailed,
+			!raw.SuitesComplete, !raw.TLS13SuitesComplete, !raw.TLS13GroupsComplete, !raw.TLS12CurvesComplete,
+		} {
+			if incomplete {
+				failed++
+			}
+		}
 	}
 	if failed > 0 {
 		e.add("SCAN_PARTIAL", AxisCurrent, Info, CatScan, map[string]string{"count": strconv.Itoa(failed)})

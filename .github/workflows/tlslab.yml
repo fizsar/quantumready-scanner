@@ -1,0 +1,76 @@
+name: TLS lab
+
+# Integration tests of the scanner against the deliberately weak servers of
+# test/tlslab, compared with the testssl.sh reference. Slow (image builds),
+# so only on demand and when the scanner or the lab change.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "internal/scanner/**"
+      - "test/tlslab/**"
+      - ".github/workflows/tlslab.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tlslab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lab:
+    name: Scanner vs testssl.sh (TLS lab)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # The lab network has no Internet: the test container uses this cache.
+      - name: Download Go modules
+        run: go mod download
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build OpenSSL 1.0.2u server image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: test/tlslab/openssl102
+          tags: qr-tlslab/openssl102:1.0.2u
+          load: true
+          push: false
+          cache-from: type=gha,scope=tlslab-openssl102
+          cache-to: type=gha,mode=max,scope=tlslab-openssl102
+      - name: Build OpenSSL 3.5.9 server image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: test/tlslab/openssl35
+          tags: qr-tlslab/openssl35:3.5.9
+          load: true
+          push: false
+          cache-from: type=gha,scope=tlslab-openssl35
+          cache-to: type=gha,mode=max,scope=tlslab-openssl35
+      - name: Build Go 1.23 Kyber server image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: test/tlslab/kyber
+          tags: qr-tlslab/kyber:go1.23.12
+          load: true
+          push: false
+          cache-from: type=gha,scope=tlslab-kyber
+          cache-to: type=gha,mode=max,scope=tlslab-kyber
+      - name: Start the lab and check its isolation
+        env:
+          TLSLAB_NO_BUILD: "1"
+        run: make tlslab-up
+      - name: Integration tests (compared with testssl.sh)
+        run: make tlslab-test
+      - name: Comparison table
+        if: always()
+        run: cat test/tlslab/results/COMPARISON.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Remove the lab
+        if: always()
+        run: make tlslab-down

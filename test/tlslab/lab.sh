@@ -21,7 +21,8 @@ GO_IMAGE=golang:1.27.2@sha256:820153096fda4de6ac1b7194d12e416b7dd8f4e9a33d17e034
 compose() { docker compose -f "$here/compose.yaml" "$@"; }
 # Listening sockets on the host: "proto local-address:port".
 listeners() { ss -Hltun | awk '{print $1, $5}' | sort -u; }
-wsl_ip() { ip -4 -o addr show dev eth0 | awk '{print $4}' | cut -d/ -f1; }
+# The host's main address (the WSL address under WSL, the VM's on a CI runner).
+host_ip() { ip -4 route get 1.1.1.1 | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}'; }
 
 fails=0
 ok() { echo "  ok    $*"; }
@@ -54,8 +55,8 @@ check() {
 		bad "network $NET is not internal"
 	fi
 
-	echo "== host listeners (0.0.0.0, [::], * and the WSL address $(wsl_ip))"
-	listeners | grep -E " (0\.0\.0\.0|\[::\]|\*|$(wsl_ip | sed 's/\./\\./g')):" | sed 's/^/        /' || echo "        (none)"
+	echo "== host listeners (0.0.0.0, [::], * and the host address $(host_ip))"
+	listeners | grep -E " (0\.0\.0\.0|\[::\]|\*|$(host_ip | sed 's/\./\\./g')):" | sed 's/^/        /' || echo "        (none)"
 	if [ -n "$before" ]; then
 		local new
 		new=$(comm -13 <(echo "$before") <(listeners))
@@ -65,7 +66,7 @@ check() {
 			bad "new listening sockets: $new"
 		fi
 	fi
-	for ip in "$(wsl_ip)" 127.0.0.1 0.0.0.0; do
+	for ip in "$(host_ip)" 127.0.0.1 0.0.0.0; do
 		if timeout 2 bash -c "exec 3<>/dev/tcp/$ip/443" 2>/dev/null; then
 			bad "something accepts connections on $ip:443"
 		else
@@ -91,7 +92,8 @@ check() {
 case "${1:-}" in
 up)
 	before=$(listeners)
-	compose build -q
+	# TLSLAB_NO_BUILD=1: the images are already built (the CI builds them with a cache).
+	[ -n "${TLSLAB_NO_BUILD:-}" ] || compose build -q
 	compose up -d --wait --quiet-pull
 	check "$before"
 	;;

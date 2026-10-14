@@ -1,0 +1,380 @@
+{
+ "schema_version": 1,
+ "host": "ssl3",
+ "port": 443,
+ "ip": "172.31.213.8",
+ "resolved_ips": [
+  "172.31.213.8"
+ ],
+ "started_at": "2026-10-14T22:03:52.232181005Z",
+ "duration_ms": 145,
+ "default": {
+  "status": "not_supported",
+  "error": "tls: server selected unsupported protocol version 300"
+ },
+ "key_exchange": {
+  "offered": [
+   "X25519MLKEM768",
+   "x25519",
+   "secp256r1",
+   "secp384r1"
+  ],
+  "selected_hybrid": false,
+  "groups": [
+   {
+    "name": "X25519MLKEM768",
+    "id": 4588,
+    "hybrid": true,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   },
+   {
+    "name": "SecP256r1MLKEM768",
+    "id": 4587,
+    "hybrid": true,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   },
+   {
+    "name": "SecP384r1MLKEM1024",
+    "id": 4589,
+    "hybrid": true,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   },
+   {
+    "name": "x25519",
+    "id": 29,
+    "hybrid": false,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   },
+   {
+    "name": "secp256r1",
+    "id": 23,
+    "hybrid": false,
+    "status": "not_supported",
+    "error": "tls: server selected unsupported protocol version 300"
+   },
+   {
+    "name": "secp384r1",
+    "id": 24,
+    "hybrid": false,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   },
+   {
+    "name": "secp521r1",
+    "id": 25,
+    "hybrid": false,
+    "status": "not_supported",
+    "error": "remote error: tls: handshake failure"
+   }
+  ]
+ },
+ "versions": [
+  {
+   "version": "TLS 1.0",
+   "id": 769,
+   "status": "not_supported",
+   "error": "tls: server selected unsupported protocol version 300"
+  },
+  {
+   "version": "TLS 1.1",
+   "id": 770,
+   "status": "not_supported",
+   "error": "tls: server selected unsupported protocol version 300"
+  },
+  {
+   "version": "TLS 1.2",
+   "id": 771,
+   "status": "not_supported",
+   "error": "tls: server selected unsupported protocol version 300"
+  },
+  {
+   "version": "TLS 1.3",
+   "id": 772,
+   "status": "not_supported",
+   "error": "remote error: tls: handshake failure"
+  }
+ ],
+ "tls12_cipher_suites": null,
+ "tls12_cipher_suites_complete": true,
+ "legacy_cipher_suites_complete": true,
+ "not_evaluated": [
+  "tls12_server_cipher_preference",
+  "legacy_groups",
+  "credential_suites",
+  "implementation_vulnerabilities"
+ ],
+ "intensity": "full",
+ "connections": 45,
+ "raw": {
+  "probes": 30,
+  "sslv2": {
+   "status": "not_supported",
+   "error": "EOF"
+  },
+  "sslv3": {
+   "status": "supported",
+   "ciphers": [
+    "TLS_RSA_EXPORT_WITH_RC4_40_MD5"
+   ]
+  },
+  "versions": [
+   {
+    "version": "TLS 1.2",
+    "id": 771,
+    "status": "not_supported",
+    "error": "server answered SSLv3"
+   },
+   {
+    "version": "TLS 1.1",
+    "id": 770,
+    "status": "not_supported",
+    "error": "server answered SSLv3"
+   },
+   {
+    "version": "TLS 1.0",
+    "id": 769,
+    "status": "not_supported",
+    "error": "server answered SSLv3"
+   }
+  ],
+  "suites": [
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_EXPORT_WITH_RC4_40_MD5",
+    "id": 3,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "stream",
+    "bits": 40,
+    "export": true
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_RC4_128_MD5",
+    "id": 4,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "stream",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_RC4_128_SHA",
+    "id": 5,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "stream",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_EXPORT_WITH_RC2_CBC_40_MD5",
+    "id": 6,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 40,
+    "export": true
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_IDEA_CBC_SHA",
+    "id": 7,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_EXPORT_WITH_DES40_CBC_SHA",
+    "id": 8,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 40,
+    "export": true
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_DES_CBC_SHA",
+    "id": 9,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 56
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_3DES_EDE_CBC_SHA",
+    "id": 10,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 112
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_DHE_RSA_WITH_DES_CBC_SHA",
+    "id": 21,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 56
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA",
+    "id": 22,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 112
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_AES_128_CBC_SHA",
+    "id": 47,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_DHE_RSA_WITH_AES_128_CBC_SHA",
+    "id": 51,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_AES_256_CBC_SHA",
+    "id": 53,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_DHE_RSA_WITH_AES_256_CBC_SHA",
+    "id": 57,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_CAMELLIA_128_CBC_SHA",
+    "id": 65,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA",
+    "id": 69,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_CAMELLIA_256_CBC_SHA",
+    "id": 132,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA",
+    "id": 136,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_RSA_WITH_SEED_CBC_SHA",
+    "id": 150,
+    "forward_secrecy": false,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_DHE_RSA_WITH_SEED_CBC_SHA",
+    "id": 154,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_ECDHE_RSA_WITH_RC4_128_SHA",
+    "id": 49169,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "stream",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA",
+    "id": 49170,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 112
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
+    "id": 49171,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 128
+   },
+   {
+    "version": "SSLv3",
+    "name": "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
+    "id": 49172,
+    "forward_secrecy": true,
+    "aead": false,
+    "mode": "cbc",
+    "bits": 256
+   }
+  ],
+  "suites_complete": true,
+  "tls13_suites": null,
+  "tls13_suites_complete": true,
+  "dh": [
+   {
+    "version": "SSLv3",
+    "suite": "TLS_DHE_RSA_WITH_DES_CBC_SHA",
+    "prime_bits": 1024
+   }
+  ],
+  "tls13_groups": null,
+  "tls13_groups_complete": true,
+  "tls12_curves": null,
+  "tls12_curves_complete": false
+ }
+}
