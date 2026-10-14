@@ -56,6 +56,8 @@ Otras limitaciones: no se reproduce byte a byte el ClientHello de un navegador (
 
 **Cómo cubrirlo**: sondas de *ClientHello en crudo* con `golang.org/x/crypto/cryptobyte`: se construye el ClientHello a mano, se envía y se lee **solo** el ServerHello (o la alerta), sin completar el handshake. Es la técnica de testssl.sh para comprobar soporte. Unas 300–500 líneas con tests. Se decidirá en el hito 2.7 a partir de la comparación con testssl.sh (2.6). Se descarta empaquetar OpenSSL o testssl.sh en el worker (shell en la imagen y mucha más superficie de ataque).
 
+**Estado (hito 2.7)**: la librería ya existe, `internal/scanner/rawtls` (2.7.1), todavía sin integrar en el escáner (2.7.3). Construye ClientHello SSLv2, SSLv3 y TLS 1.0–1.3 con `cryptobyte` a partir de los registros de IANA incrustados (suites y grupos, `rawtls/iana/`) y lee como mucho 64 KiB por sonda: ServerHello, HelloRetryRequest o alerta y, si se pide, el resto del primer vuelo hasta el ServerKeyExchange (tamaño del primo DH, curva ECDHE). Nunca envía nada después del ClientHello. Lo que no se puede interpretar es un error tipado (`ErrMalformed`, `ErrUnoffered`, `ErrLimit`), nunca "no soportado". Tests contra un servidor `crypto/tls` real (sobre `net.Pipe`), casos malformados escritos a mano y fuzzing nativo de Go (`make fuzz`; 10 s por parser en la CI).
+
 ## Ajustes de GODEBUG
 
 `cmd/qrscan` y `cmd/worker` declaran `//go:debug tlssha1=1` y `//go:debug rsa1024min=0` para que `crypto/tls` complete handshakes con servidores muy antiguos (firmas SHA-1 en TLS 1.2, RSA de menos de 1024 bits) y se puedan analizar. El escáner solo observa esas conexiones y nunca confía en ellas. Los tests de la librería se ejecutan sin esos ajustes.

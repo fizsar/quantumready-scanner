@@ -53,6 +53,9 @@ jobs:
                   and ((.Test | test("Postgres$")) or (.Package | test("internal/(store|worker)$"))))
                  | "\(.Action) \(.Package | sub(".*/quantumready-saas/"; "")) \(.Test)"' go-test.json \
             | tee -a "$GITHUB_STEP_SUMMARY"
+      # Short run on every push; longer runs locally with make fuzz.
+      - name: Fuzz the raw TLS parsers (10 s each)
+        run: make fuzz FUZZTIME=10s
       - name: Compose security policy
         run: make check-compose
       - name: sqlc generated code is up to date

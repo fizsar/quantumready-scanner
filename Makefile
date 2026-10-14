@@ -11,7 +11,7 @@ PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
 # Pinned by digest; bump tag and digest together (CI uses the same image).
 SQLC_IMAGE := sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537
 
-.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify
+.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -33,6 +33,13 @@ test: web/node_modules ## Run Go tests (integration tests too if the dev databas
 	fi; \
 	go test -race -count=1 ./...
 	npm --prefix web test
+
+FUZZTIME ?= 1m
+FUZZ_TARGETS := FuzzReadResponse FuzzParseServerHello FuzzParseServerKeyExchange FuzzReadSSLv2Response
+fuzz: ## Fuzz the raw TLS parsers (FUZZTIME per target, default 1m)
+	@for t in $(FUZZ_TARGETS); do \
+		echo "== $$t"; go test -run='^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) ./internal/scanner/rawtls || exit 1; \
+	done
 
 lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint and tsc
 	@command -v golangci-lint >/dev/null || { echo "golangci-lint not found: https://golangci-lint.run/docs/welcome/install/"; exit 1; }
