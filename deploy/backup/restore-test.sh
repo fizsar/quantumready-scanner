@@ -20,12 +20,12 @@ cleanup() {
 	rm -rf "$work"
 }
 on_error() {
-	local rc=$? line=$1
-	echo "restore test FAILED (exit $rc, line $line)" >&2
-	hc "${HC_RESTORE_PING_URL:-}" /fail "restore test failed: exit $rc at line $line"
+	local rc=$? where="${2##*/}:$1"
+	echo "restore test FAILED (exit $rc at $where)" >&2
+	hc "${HC_RESTORE_PING_URL:-}" /fail "restore test failed: exit $rc at $where"
 	exit "$rc"
 }
-trap 'on_error $LINENO' ERR
+trap 'on_error $LINENO "${BASH_SOURCE[0]}"' ERR # file and line of the failing command (common.sh too)
 trap cleanup EXIT
 
 hc "${HC_RESTORE_PING_URL:-}" /start

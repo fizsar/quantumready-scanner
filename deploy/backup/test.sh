@@ -138,6 +138,12 @@ if bash "$here/restore-test.sh" >/dev/null 2>"$fx/err"; then bad "restore-test d
 	check "restore-test detects a mismatch" grep -q '"scans" : 999' "$fx/err"
 fi
 check "pings: restore fail" [ "$(pings /restore/fail)" = 1 ]
+check "fail ping names the file and line (restore-test.sh)" grep -Eq '^/restore/fail restore test failed: exit [0-9]+ at restore-test\.sh:[0-9]+$' "$fx/pings.log"
+# A failure inside common.sh (restic, missing repository) names common.sh.
+mkdir "$fx/empty-repo"
+if RESTIC_REPOSITORY=$fx/empty-repo bash "$here/restore-test.sh" >/dev/null 2>&1; then bad "restore-test with a missing repository"; else
+	check "fail ping names common.sh for a restic failure" grep -Eq '^/restore/fail restore test failed: exit [0-9]+ at common\.sh:[0-9]+$' "$fx/pings.log"
+fi
 
 echo "--- failed dump"
 before=$(snapshots)
@@ -148,6 +154,7 @@ fi
 check "no new dump, no .partial left" [ "$(qr_dumps .dump)/$(qr_dumps .partial)" = 2/0 ]
 check "no new snapshot" [ "$(snapshots)" = "$before" ]
 check "pings: backup fail" [ "$(pings /backup/fail)" = 1 ]
+check "fail ping names the file and line (backup.sh)" grep -Eq '^/backup/fail backup failed: exit [0-9]+ at backup\.sh:[0-9]+$' "$fx/pings.log"
 
 echo
 if [ "$fails" = 0 ]; then echo "backup tests: all passed"; else
