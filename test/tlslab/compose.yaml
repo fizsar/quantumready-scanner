@@ -1,0 +1,77 @@
+# TLS test lab (milestone 2.7.2): deliberately weak servers to validate the raw
+# ClientHello probes and compare with testssl.sh. Run it only through
+# test/tlslab/lab.sh (make tlslab-up / tlslab-down / tlslab-testssl).
+#
+# Isolation, checked by lab.sh after every start:
+# - no service publishes a port: nothing listens on the host (0.0.0.0, the WSL
+#   address or 127.0.0.1);
+# - the only network is "internal": no route to the Internet either way;
+# - clients (testssl.sh, the scanner) run in containers on this network.
+name: qr-tlslab
+
+x-server: &server
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  mem_limit: 64m
+  pids_limit: 32
+  networks: [lab]
+  restart: "no"
+
+x-openssl102: &openssl102
+  <<: *server
+  image: qr-tlslab/openssl102:1.0.2u
+  build: openssl102
+
+x-openssl35: &openssl35
+  <<: *server
+  image: qr-tlslab/openssl35:3.5.9
+  build: openssl35
+
+services:
+  # OpenSSL 1.0.2u
+  ssl2: # SSLv2 only, every SSLv2 cipher (DROWN)
+    <<: *openssl102
+    command: ["-ssl2", "-cipher", "ALL:EXPORT:LOW"]
+  ssl3: # SSLv3 only (POODLE), DHE with a 1024-bit group
+    <<: *openssl102
+    command: ["-ssl3", "-cipher", "ALL:!aNULL:!eNULL", "-dhparam", "/lab/dh1024.pem"]
+  export: # TLS 1.0–1.2: EXPORT, single DES, NULL and anonymous suites; DHE 512
+    <<: *openssl102
+    command: ["-no_ssl2", "-no_ssl3", "-cipher", "EXPORT:LOW:eNULL:aNULL", "-dhparam", "/lab/dh512.pem"]
+  dhe1024: # TLS 1.2 only, DHE suites (AES, Camellia, SEED) with a 1024-bit group
+    <<: *openssl102
+    command: ["-no_ssl2", "-no_ssl3", "-no_tls1", "-no_tls1_1", "-cipher", "kEDH:!EXPORT:!LOW:!aNULL", "-dhparam", "/lab/dh1024.pem"]
+  tls10: # TLS 1.0 only: 3DES, RC4, IDEA, SEED, Camellia with RSA key exchange
+    <<: *openssl102
+    command: ["-tls1", "-cipher", "kRSA:!EXPORT:!LOW:!eNULL"]
+  secp224: # TLS 1.2 ECDHE on secp224r1 only
+    <<: *openssl102
+    command: ["-no_ssl2", "-no_ssl3", "-no_tls1", "-no_tls1_1", "-named_curve", "secp224r1", "-cipher", "kEECDH:!aNULL:!eNULL"]
+
+  # OpenSSL 3.5.9
+  # CCM_8 (64-bit tag) needs security level 0 in OpenSSL 3.
+  tls13: # TLS 1.3 only: all five suites; ML-KEM (hybrid and pure), ffdhe, brainpool
+    <<: *openssl35
+    command: ["-tls1_3", "-cipher", "DEFAULT:@SECLEVEL=0",
+      "-ciphersuites", "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_CCM_SHA256:TLS_AES_128_CCM_8_SHA256",
+      "-groups", "X25519MLKEM768:MLKEM768:MLKEM1024:x25519:secp256r1:ffdhe2048:ffdhe3072:brainpoolP256r1tls13"]
+  tls12: # TLS 1.2 only: Camellia, ARIA, CCM, CCM_8, DHE 2048, brainpool curve
+    <<: *openssl35
+    command: ["-tls1_2",
+      "-cipher", "CAMELLIA:ARIA:AESCCM:AESCCM8:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:@SECLEVEL=0",
+      "-groups", "brainpoolP256r1:secp256r1"]
+
+  # Go 1.23
+  kyber: # TLS 1.3, X25519Kyber768Draft00 (pre-standard) and x25519; no ML-KEM
+    <<: *server
+    image: qr-tlslab/kyber:go1.23.12
+    build: kyber
+
+networks:
+  lab:
+    name: qr-tlslab
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.213.0/24

@@ -1,0 +1,345 @@
+{
+          "clientProblem1" : [
+                            {
+                                "id"           : "engine_problem",
+                                "severity"     : "WARN",
+                                "finding"      : "No engine or GOST support via engine with your /home/testssl/bin/openssl.Linux.x86_64"
+                           }
+          ],
+          "Invocation"  : "testssl.sh --quiet --color 0 --warnings off --jsonfile-pretty /out/tls10.json --logfile /out/tls10.log -p -E -f -S -P tls10:443",
+          "at"          : "92c0bbc36d01:/home/testssl/bin/openssl.Linux.x86_64",
+          "version"     : "3.2.4 ",
+          "openssl"     : "OpenSSL 1.0.2-bad from Fri Mar 28 16:54:51 2025",
+          "startTime"   : "1792004928",
+          "scanResult"  : [
+          {
+                    "targetHost"      : "tls10",
+                    "ip"              : "172.31.213.5",
+                    "port"            : "443",
+                    "rDNS"            : "qr-tlslab-tls10-1.qr-tlslab.",
+                    "service"         : "Couldn't determine service, skipping all HTTP checks",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+                            {
+                                "id"           : "SSLv2",
+                                "severity"     : "OK",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "SSLv3",
+                                "severity"     : "OK",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "TLS1",
+                                "severity"     : "LOW",
+                                "finding"      : "offered (deprecated)"
+                           },{
+                                "id"           : "TLS1_1",
+                                "severity"     : "CRITICAL",
+                                "finding"      : "TLSv1.1 is not offered, and downgraded to a weaker protocol"
+                           },{
+                                "id"           : "TLS1_2",
+                                "severity"     : "MEDIUM",
+                                "finding"      : "not offered and downgraded to a weaker protocol"
+                           },{
+                                "id"           : "TLS1_3",
+                                "severity"     : "INFO",
+                                "finding"      : "not offered + downgraded to weaker protocol"
+                           },{
+                                "id"           : "NPN",
+                                "severity"     : "INFO",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "ALPN",
+                                "severity"     : "INFO",
+                                "finding"      : "not offered"
+                           }
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+                            {
+                                "id"           : "cipher_order-tls1",
+                                "severity"     : "HIGH",
+                                "finding"      : "NOT a cipher order configured"
+                           },{
+                                "id"           : "cipher-tls1_x35",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x35     AES256-SHA                        RSA        AES         256      TLS_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x84",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x84     CAMELLIA256-SHA                   RSA        Camellia    256      TLS_RSA_WITH_CAMELLIA_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x2f",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x2f     AES128-SHA                        RSA        AES         128      TLS_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x96",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x96     SEED-SHA                          RSA        SEED        128      TLS_RSA_WITH_SEED_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x41",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x41     CAMELLIA128-SHA                   RSA        Camellia    128      TLS_RSA_WITH_CAMELLIA_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x07",
+                                "severity"     : "MEDIUM",
+                                "finding"      : "TLSv1   x07     IDEA-CBC-SHA                      RSA        IDEA        128      TLS_RSA_WITH_IDEA_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x05",
+                                "severity"     : "HIGH",
+                                "finding"      : "TLSv1   x05     RC4-SHA                           RSA        RC4         128      TLS_RSA_WITH_RC4_128_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x04",
+                                "severity"     : "HIGH",
+                                "finding"      : "TLSv1   x04     RC4-MD5                           RSA        RC4         128      TLS_RSA_WITH_RC4_128_MD5"
+                           },{
+                                "id"           : "cipher-tls1_x0a",
+                                "severity"     : "MEDIUM",
+                                "finding"      : "TLSv1   x0a     DES-CBC3-SHA                      RSA        3DES        168      TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+                           },{
+                                "id"           : "supportedciphers_TLSv1",
+                                "severity"     : "INFO",
+                                "finding"      : "AES256-SHA CAMELLIA256-SHA AES128-SHA SEED-SHA CAMELLIA128-SHA IDEA-CBC-SHA RC4-SHA RC4-MD5 DES-CBC3-SHA"
+                           },{
+                                "id"           : "cipher_order",
+                                "severity"     : "HIGH",
+                                "finding"      : "NOT a server cipher order configured"
+                           }
+                    ],
+                    "fs"                : [
+                            {
+                                "id"           : "FS",
+                                "severity"     : "MEDIUM",
+                                "finding"      : "No ciphers supporting Forward Secrecy offered"
+                           }
+                    ],
+                    "serverDefaults"    : [
+                            {
+                                "id"           : "TLS_extensions",
+                                "severity"     : "INFO",
+                                "finding"      : "'heartbeat/#15' 'session ticket/#35' 'renegotiation info/#65281'"
+                           },{
+                                "id"           : "TLS_session_ticket",
+                                "severity"     : "INFO",
+                                "finding"      : "valid for 7200 seconds only (<daily)"
+                           },{
+                                "id"           : "SSL_sessionID_support",
+                                "severity"     : "INFO",
+                                "finding"      : "yes"
+                           },{
+                                "id"           : "sessionresumption_ticket",
+                                "severity"     : "INFO",
+                                "finding"      : "supported"
+                           },{
+                                "id"           : "sessionresumption_ID",
+                                "severity"     : "INFO",
+                                "finding"      : "supported"
+                           },{
+                                "id"           : "TLS_timestamp",
+                                "severity"     : "INFO",
+                                "finding"      : "random"
+                           },{
+                                "id"           : "cert_compression",
+                                "severity"     : "INFO",
+                                "finding"      : "N/A"
+                           },{
+                                "id"           : "clientAuth",
+                                "severity"     : "INFO",
+                                "finding"      : "none"
+                           },{
+                                "id"           : "cert_numbers",
+                                "severity"     : "INFO",
+                                "finding"      : "1"
+                           },{
+                                "id"           : "cert_signatureAlgorithm",
+                                "severity"     : "OK",
+                                "finding"      : "SHA256 with RSA"
+                           },{
+                                "id"           : "cert_keySize",
+                                "severity"     : "INFO",
+                                "finding"      : "RSA 2048 bits (exponent is 65537)"
+                           },{
+                                "id"           : "cert_keyUsage",
+                                "severity"     : "INFO",
+                                "finding"      : "No server key usage information"
+                           },{
+                                "id"           : "cert_extKeyUsage",
+                                "severity"     : "INFO",
+                                "finding"      : "No server extended key usage information"
+                           },{
+                                "id"           : "cert_serialNumber",
+                                "severity"     : "INFO",
+                                "finding"      : "980898F7D5E91A3A"
+                           },{
+                                "id"           : "cert_serialNumberLen",
+                                "severity"     : "INFO",
+                                "finding"      : "8"
+                           },{
+                                "id"           : "cert_fingerprintSHA1",
+                                "severity"     : "INFO",
+                                "finding"      : "7E4E8D8996F55227D39647F5CAB196AAE8F51054"
+                           },{
+                                "id"           : "cert_fingerprintSHA256",
+                                "severity"     : "INFO",
+                                "finding"      : "C24A0643734A3404E62B244EB3D15B484114358A8E7DD57DDB6F7429E90F9AE4"
+                           },{
+                                "id"           : "cert",
+                                "severity"     : "INFO",
+                                "finding"      : "-----BEGIN CERTIFICATE-----\nMIIC/zCCAeegAwIBAgIJAJgImPfV6Ro6MA0GCSqGSIb3DQEBCwUAMBYxFDASBgNVBAMMC3Rsc2xhYi50ZXN0MB4XDTI2MTAxNDE5MDUwNloXDTM2MTAxMTE5MDUwNlowFjEUMBIGA1UEAwwLdGxzbGFiLnRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDYWMF4BT+VINz8YzjF+ZZE7+F7CsjwCXutKhuQUzBxxKa8gCSoynqihBfE5QYoqPdKOamYybr/648sssqj07w744lMnqnHvhdNbqVv/R90sja+WYdpTtOdBy3Clbtxb06yu/r7Joi7e85KBZD1+955ipdfUymPSCKm8HoWn1AhFEXjf420ZyNmL98BAkF/CL8GK6d3hr/YGdLPGS3qRpZQ/4qQHfMm0t64iNg6D0/WQQFKXWjdhZ6joqnMedV0NYJ6+qhgDHkfVuereEW5NHpzqnHjlbLaaVm9RXOsdxcFxvQWPelis95BkGWxJW6zIp6pXDb+XHYVmWm5CNhYVWoXAgMBAAGjUDBOMB0GA1UdDgQWBBQE+lryRkQtCo1SVOUVEKSm6ESuqjAfBgNVHSMEGDAWgBQE+lryRkQtCo1SVOUVEKSm6ESuqjAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCTSpsxLkCAa1H2cT9rM7Xr8QzY5TkfYnmnEo3BJITmoC67B6f8aAPvSl3xsOeGzHtb7PoG2ImbNEQR7nPHcOWlB+MCPPYsmlL+8ba6bHsHCmdZBnqSTDhZ/EFVh3QN7GdpZiVH6gAi0ISIAoq0CYl8J6EHpbuoPiAZm7/oRCfk3/Og4pUGvQfn+tY+4t0kNTErbc93AHfXbGmGntmY6KvU3n/WD4Kig6SJ+B9c+M878irUI5AO9HxX2/hqxz6rMpGEOO9dWBFib6uiDmSrSK5uXb9uBOCGAZmGsSNgsCgXBvh9QsijG8ezuyDioZ/F8tXVxm2/VNTMu3xlW7J6dKEw\n-----END CERTIFICATE-----"
+                           },{
+                                "id"           : "cert_commonName",
+                                "severity"     : "OK",
+                                "finding"      : "tlslab.test"
+                           },{
+                                "id"           : "cert_commonName_wo_SNI",
+                                "severity"     : "INFO",
+                                "finding"      : "tlslab.test"
+                           },{
+                                "id"           : "cert_subjectAltName",
+                                "severity"     : "MEDIUM",
+                                "finding"      : "Providing no SAN is deprecated"
+                           },{
+                                "id"           : "cert_trust",
+                                "severity"     : "HIGH",
+                                "finding"      : "certificate does not match supplied URI (same w/o SNI)"
+                           },{
+                                "id"           : "cert_chain_of_trust",
+                                "severity"     : "CRITICAL",
+                                "finding"      : "failed (self signed)."
+                           },{
+                                "id"           : "cert_certificatePolicies_EV",
+                                "severity"     : "INFO",
+                                "finding"      : "no"
+                           },{
+                                "id"           : "cert_expirationStatus",
+                                "severity"     : "OK",
+                                "finding"      : "3649 >= 60 days"
+                           },{
+                                "id"           : "cert_notBefore",
+                                "severity"     : "INFO",
+                                "finding"      : "2026-10-14 19:05"
+                           },{
+                                "id"           : "cert_notAfter",
+                                "severity"     : "OK",
+                                "finding"      : "2036-10-11 19:05"
+                           },{
+                                "id"           : "cert_extlifeSpan",
+                                "severity"     : "HIGH",
+                                "finding"      : "3650 days"
+                           },{
+                                "id"           : "cert_eTLS",
+                                "severity"     : "INFO",
+                                "finding"      : "not present"
+                           },{
+                                "id"           : "cert_crlDistributionPoints",
+                                "severity"     : "INFO",
+                                "finding"      : "--"
+                           },{
+                                "id"           : "cert_ocspURL",
+                                "severity"     : "INFO",
+                                "finding"      : "--"
+                           },{
+                                "id"           : "cert_revocation",
+                                "severity"     : "HIGH",
+                                "finding"      : "Neither CRL nor OCSP URI provided"
+                           },{
+                                "id"           : "OCSP_stapling",
+                                "severity"     : "INFO",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "cert_mustStapleExtension",
+                                "severity"     : "INFO",
+                                "finding"      : "--"
+                           },{
+                                "id"           : "DNS_CAArecord",
+                                "severity"     : "LOW",
+                                "finding"      : "--"
+                           },{
+                                "id"           : "certificate_transparency",
+                                "severity"     : "INFO",
+                                "finding"      : "N/A"
+                           },{
+                                "id"           : "certs_countServer",
+                                "severity"     : "INFO",
+                                "finding"      : "1"
+                           },{
+                                "id"           : "certs_list_ordering_problem",
+                                "severity"     : "INFO",
+                                "finding"      : "no"
+                           },{
+                                "id"           : "cert_caIssuers",
+                                "severity"     : "INFO",
+                                "finding"      : "tlslab.test"
+                           },{
+                                "id"           : "intermediate_cert_badOCSP",
+                                "severity"     : "OK",
+                                "finding"      : "intermediate certificate(s) is/are ok"
+                           }
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+                            {
+                                "id"           : "cipher-tls1_x35",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x35     AES256-SHA                        RSA        AES         256      TLS_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x84",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x84     CAMELLIA256-SHA                   RSA        Camellia    256      TLS_RSA_WITH_CAMELLIA_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x2f",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x2f     AES128-SHA                        RSA        AES         128      TLS_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x96",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x96     SEED-SHA                          RSA        SEED        128      TLS_RSA_WITH_SEED_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x41",
+                                "severity"     : "LOW",
+                                "finding"      : "TLSv1   x41     CAMELLIA128-SHA                   RSA        Camellia    128      TLS_RSA_WITH_CAMELLIA_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x07",
+                                "severity"     : "MEDIUM",
+                                "finding"      : "TLSv1   x07     IDEA-CBC-SHA                      RSA        IDEA        128      TLS_RSA_WITH_IDEA_CBC_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x05",
+                                "severity"     : "HIGH",
+                                "finding"      : "TLSv1   x05     RC4-SHA                           RSA        RC4         128      TLS_RSA_WITH_RC4_128_SHA"
+                           },{
+                                "id"           : "cipher-tls1_x04",
+                                "severity"     : "HIGH",
+                                "finding"      : "TLSv1   x04     RC4-MD5                           RSA        RC4         128      TLS_RSA_WITH_RC4_128_MD5"
+                           },{
+                                "id"           : "cipher-tls1_x0a",
+                                "severity"     : "MEDIUM",
+                                "finding"      : "TLSv1   x0a     DES-CBC3-SHA                      RSA        3DES        168      TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+                           },{
+                                "id"           : "supportedciphers_TLSv1",
+                                "severity"     : "INFO",
+                                "finding"      : "AES256-SHA CAMELLIA256-SHA AES128-SHA SEED-SHA CAMELLIA128-SHA IDEA-CBC-SHA RC4-SHA RC4-MD5 DES-CBC3-SHA"
+                           }
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ],
+                    "scanTime"  : 18
+}

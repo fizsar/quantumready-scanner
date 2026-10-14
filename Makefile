@@ -11,7 +11,7 @@ PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
 # Pinned by digest; bump tag and digest together (CI uses the same image).
 SQLC_IMAGE := sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537
 
-.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz
+.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -86,3 +86,15 @@ deploy: ## Deploy to the VPS: make deploy TAG=sha-xxxxxxx (or TAG=latest)
 web/node_modules: web/package-lock.json
 	npm --prefix web ci --no-fund --no-audit
 	@touch $@
+
+tlslab-up: ## Start the TLS test lab (weak servers, internal network only) and check its isolation
+	bash test/tlslab/lab.sh up
+
+tlslab-check: ## Check the TLS test lab isolation again
+	bash test/tlslab/lab.sh check
+
+tlslab-testssl: ## Reference run of testssl.sh against every lab server (test/tlslab/reference)
+	bash test/tlslab/lab.sh testssl
+
+tlslab-down: ## Remove the TLS test lab and check nothing is left (TLSLAB_RMI=1 also removes its images)
+	bash test/tlslab/lab.sh down
