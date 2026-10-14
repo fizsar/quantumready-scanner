@@ -11,7 +11,7 @@ PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
 # Pinned by digest; bump tag and digest together (CI uses the same image).
 SQLC_IMAGE := sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537
 
-.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down
+.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down tlslab-test tlslab-scan
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -98,3 +98,9 @@ tlslab-testssl: ## Reference run of testssl.sh against every lab server (test/tl
 
 tlslab-down: ## Remove the TLS test lab and check nothing is left (TLSLAB_RMI=1 also removes its images)
 	bash test/tlslab/lab.sh down
+
+tlslab-test: ## Integration tests of the scanner against the TLS lab, compared with testssl.sh (needs make tlslab-up)
+	bash test/tlslab/lab.sh gotest
+
+tlslab-scan: ## qrscan -lab inside the TLS lab: make tlslab-scan ARGS="-facts tls13"
+	bash test/tlslab/lab.sh scan $(ARGS)

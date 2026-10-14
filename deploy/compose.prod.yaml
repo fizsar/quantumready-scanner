@@ -119,6 +119,9 @@ services:
     environment:
       DATABASE_URL: *database-url
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      # full = raw ClientHello probes too. Only while SCAN_ALLOWLIST holds our
+      # own domains; in phase 3, full only for verified domains (CLAUDE.md).
+      SCAN_INTENSITY: ${SCAN_INTENSITY:-full}
     tmpfs:
       - /tmp # heartbeat file for the healthcheck
     networks: [backend, egress]

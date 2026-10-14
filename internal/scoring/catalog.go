@@ -280,5 +280,6 @@ var labels = map[string]map[string]string{
 	"noteval.tls12_server_cipher_preference":             {"es": "Orden de preferencia de suites del servidor", "en": "Server cipher suite preference"},
 	"noteval.legacy_groups":                              {"es": "Grupos antiguos (ffdhe, brainpool…)", "en": "Legacy groups (ffdhe, brainpool…)"},
 	"noteval.non_standard_pqc_groups":                    {"es": "Grupos post-cuánticos no estándar", "en": "Non-standard post-quantum groups"},
+	"noteval.credential_suites":                          {"es": "Suites PSK, SRP, Kerberos y GOST (requieren credenciales o algoritmos que un escáner no tiene)", "en": "PSK, SRP, Kerberos and GOST suites (they need credentials or algorithms a scanner does not have)"},
 	"noteval.implementation_vulnerabilities":             {"es": "Vulnerabilidades de implementación (Heartbleed, ROBOT…)", "en": "Implementation vulnerabilities (Heartbleed, ROBOT…)"},
 }

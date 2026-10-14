@@ -4,6 +4,11 @@
 //	go run ./cmd/qrscan quantumready.fizsar.com
 //	go run ./cmd/qrscan -lang en -facts example.com
 //	go run ./cmd/qrscan -json -port 8443 example.com
+//	go run ./cmd/qrscan -intensity basic example.com
+//
+// -lab is for the TLS test lab only (test/tlslab, make tlslab-scan): it
+// replaces the anti-SSRF policy with one that accepts ONLY loopback and RFC
+// 1918 addresses. It exists only here, never in the production binaries.
 //
 // The godebug settings let crypto/tls complete handshakes with very old
 // servers (SHA-1 signatures in TLS 1.2, RSA keys under 1024 bits) so they can
@@ -31,8 +36,10 @@ func main() {
 	lang := flag.String("lang", "es", "language of the report: es or en")
 	facts := flag.Bool("facts", false, "also print the raw scan facts")
 	asJSON := flag.Bool("json", false, "print scan and scoring as JSON")
+	intensity := flag.String("intensity", "full", "basic (crypto/tls only) or full (also raw ClientHello probes)")
+	lab := flag.Bool("lab", false, "TLS test lab only: scan loopback and RFC 1918 addresses, nothing else")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: qrscan [-port N] [-lang es|en] [-facts] [-json] host")
+		fmt.Fprintln(os.Stderr, "usage: qrscan [-port N] [-lang es|en] [-facts] [-json] [-intensity basic|full] [-lab] host")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -41,7 +48,16 @@ func main() {
 		os.Exit(2)
 	}
 
-	r, err := scanner.New(scanner.Options{}).Scan(context.Background(), flag.Arg(0), *port)
+	in, err := scanner.ParseIntensity(*intensity)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "qrscan:", err)
+		os.Exit(2)
+	}
+	opts := scanner.Options{Intensity: in}
+	if *lab {
+		opts.AddrPolicy = labPolicy
+	}
+	r, err := scanner.New(opts).Scan(context.Background(), flag.Arg(0), *port)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "qrscan:", err)
 		os.Exit(1)
@@ -128,6 +144,31 @@ func printFacts(r *scanner.Result) {
 	fmt.Printf("TLS 1.2 suites (complete=%v):\n", r.TLS12SuitesComplete)
 	for _, s := range r.TLS12Suites {
 		fmt.Printf("  %-48s fs=%v aead=%v insecure=%v\n", s.Name, s.ForwardSecrecy, s.AEAD, s.Insecure)
+	}
+	if raw := r.Raw; raw != nil {
+		fmt.Printf("raw probes: %d (budget exhausted %v), connections in total: %d\n", raw.Probes, raw.BudgetExhausted, r.Connections)
+		fmt.Printf("  SSLv2 %s %v · SSLv3 %s %v\n", raw.SSLv2.Status, raw.SSLv2.Ciphers, raw.SSLv3.Status, raw.SSLv3.Ciphers)
+		fmt.Printf("  suites beyond crypto/tls (complete=%v):\n", raw.SuitesComplete)
+		for _, s := range raw.Suites {
+			fmt.Printf("    %-8s %-48s fs=%v mode=%s bits=%d export=%v anon=%v\n", s.Version, s.Name, s.ForwardSecrecy, s.Mode, s.Bits, s.Export, s.Anonymous)
+		}
+		fmt.Printf("  TLS 1.3 suites (complete=%v):", raw.TLS13SuitesComplete)
+		for _, s := range raw.TLS13Suites {
+			fmt.Printf(" %s", s.Name)
+		}
+		fmt.Println()
+		for _, d := range raw.DH {
+			fmt.Printf("  DH %d bits (%s, %s)\n", d.PrimeBits, d.Version, d.Suite)
+		}
+		fmt.Printf("  TLS 1.3 groups (complete=%v):", raw.TLS13GroupsComplete)
+		for _, g := range raw.TLS13Groups {
+			fmt.Printf(" %s[%s]", g.Name, g.Kind)
+		}
+		fmt.Printf("\n  TLS 1.2 curves (complete=%v, explicit=%v):", raw.TLS12CurvesComplete, raw.ExplicitCurve)
+		for _, g := range raw.TLS12Curves {
+			fmt.Printf(" %s", g.Name)
+		}
+		fmt.Println()
 	}
 	if c := r.Certificate; c != nil {
 		fmt.Printf("certificate: %s, issuer %q %v, %s %d %s, sig %s\n", c.Subject, c.Issuer, c.IssuerOrg, c.KeyAlgorithm, c.KeySize, c.Curve, c.SignatureAlgorithm)

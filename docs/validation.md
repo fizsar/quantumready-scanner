@@ -56,6 +56,56 @@ El escáner solo enumeraba las suites de TLS 1.2. Cloudflare acepta 3DES **solo 
 
 **Más adelante, no ahora.** Hoy solo se escanean dominios de una lista cerrada, bien configurados, y la comparación no ha mostrado ninguna diferencia de nota atribuible a lo que Go no puede ver. Sí merecerá la pena **antes de abrir el escáner a dominios de clientes** (Fase 3, dominios verificados): en servidores corporativos antiguos son habituales SSLv3, DHE y suites CBC-SHA384, y entonces "no evaluado" dejaría de ser marginal. Propuesta: hito 2.7 al final de la Fase 2 o al inicio de la Fase 3, limitado a SSLv3, DHE y la lista completa de TLS 1.3, con una nueva comparación con testssl.sh contra un servidor de pruebas deliberadamente antiguo (no contra terceros).
 
+## Hito 2.7.3: sondas en crudo frente a testssl.sh (laboratorio)
+
+**Fecha**: 14/10/2026. **Dónde**: solo el laboratorio aislado `test/tlslab` (9 servidores deliberadamente vulnerables, red Docker interna, sin puertos publicados; ver su README). **Nunca contra terceros.** **Herramientas**: testssl.sh 3.2.4 (misma imagen fijada que arriba, `-p -E -f -S -P`; referencia en `test/tlslab/reference/`) y el escáner con intensidad `full` (`make tlslab-test`). La comparación es automática: el test de integración lee el JSON de testssl.sh, compara protocolos, suites, tamaños de DH y grupos (curvas, KEMs y ffdhe) y falla si testssl.sh ve algo que nosotros no, salvo las diferencias explicadas abajo.
+
+| Servidor | Protocolos | Suites | DH | Grupos | Resultado |
+|---|---|---|---|---|---|
+| `ssl2` (OpenSSL 1.0.2u) | SSLv2 | 4 cifrados SSLv2 | — | — | igual |
+| `ssl3` | SSLv3 | 24 | 1024 | testssl.sh ve secp256r1 en SSLv3; nosotros no | **vemos menos** (abajo) |
+| `export` | TLS 1.0, 1.1, 1.2 | 29 (EXPORT, DES, NULL, anónimas) | 512 | — | igual |
+| `dhe1024` | TLS 1.2 | 10 | 1024 | — | igual |
+| `tls10` | TLS 1.0 | 9 (RC4, 3DES, IDEA, SEED, Camellia) | — | — | igual |
+| `secp224` | TLS 1.2 | 8 | — | secp224r1 | igual |
+| `tls12` (OpenSSL 3.5.9) | TLS 1.2 | 30 (Camellia, ARIA, CCM, CCM_8…) | 2048 (3 grupos) | brainpoolP256r1, secp256r1 | igual |
+| `tls13` | TLS 1.3 | las 5, CCM_8 incluida | — | 8: X25519MLKEM768, MLKEM768, MLKEM1024, x25519, secp256r1, ffdhe2048, ffdhe3072, brainpoolP256r1tls13 | igual |
+| `kyber` (Go 1.23.12) | TLS 1.3 | 3 | — | testssl.sh: ninguno; nosotros: **X25519Kyber768Draft00** y x25519 | **vemos más** |
+
+Detalle por aspecto: `test/tlslab/results/COMPARISON.md` (se regenera con `make tlslab-test`).
+
+### Donde vemos más que testssl.sh
+
+- **El borrador de Kyber (`X25519Kyber768Draft00`, 0x6399)**. testssl.sh 3.2.4 informa "No KEMs offered" en el servidor Go 1.23, y ni siquiera lista x25519 (en servidores solo TLS 1.3 cambia a la OpenSSL del sistema y no sondea esos grupos). Nosotros lo encontramos con un ClientHello con `key_share` vacío: el servidor responde con un HelloRetryRequest que nombra el grupo. Es justo el caso "PQC experimental, no estándar" que la Fase 3 debe distinguir del ML-KEM estándar.
+- Por diseño, también detectamos los grupos de TLS 1.3 sin generar claves (ffdhe, ML-KEM puro, brainpool), lo que permite sondear grupos que ninguna librería cliente implementa.
+
+### Donde vemos menos (o distinto)
+
+- **Curvas ECDHE que solo existen en SSLv3** (`ssl3`: secp256r1). Un cliente SSLv3 no envía `supported_groups`, así que no las sondeamos; el resultado lo marca como **no evaluado** (`legacy_groups`), no como "no soportado". Sin efecto en la nota: SSLv3 ya limita a C.
+- **Suites por versión por debajo de TLS 1.2**: para ahorrar conexiones, en TLS 1.1, 1.0 y SSLv3 solo buscamos las suites que no aparecieron en una versión superior (sí detectamos qué versiones están activas). El conjunto total de suites coincide con el de testssl.sh en todos los servidores; lo que no listamos es la repetición de la misma suite en varias versiones.
+- **Orden de preferencia del servidor**: sigue "no evaluado" (decisión del plan del 2.7).
+- **Vulnerabilidades de implementación** (Heartbleed, ROBOT…): fuera del alcance; tampoco se pidieron a testssl.sh.
+
+### Mediciones y tiempo máximo por escaneo
+
+Cada servidor, con intensidad `full` y `basic`, en local y con una latencia simulada de 100 ms de RTT (el dialer espera 2 RTT por conexión: TCP y el primer intercambio; solo en tests).
+
+| Servidor | full: conexiones | full: sondas en crudo | full: local | full: RTT 100 ms | basic: conexiones | basic: local | basic: RTT 100 ms |
+|---|---|---|---|---|---|---|---|
+| `ssl2` | 21 | 6 | 18 ms | 1,6 s | 15 | 4 ms | 1,0 s |
+| `ssl3` | 45 | 30 | 110 ms | 6,6 s | 15 | 32 ms | 1,0 s |
+| `export` | 53 | 38 | 45 ms | 8,1 s | 15 | 4 ms | 1,0 s |
+| `dhe1024` | 31 | 16 | 62 ms | 3,7 s | 15 | 4 ms | 1,0 s |
+| `tls10` | 30 | 11 | 47 ms | 3,4 s | 19 | 26 ms | 1,8 s |
+| `secp224` | 31 | 16 | 44 ms | 3,7 s | 15 | 4 ms | 1,0 s |
+| `tls12` | 53 | 37 | 33 ms | 7,9 s | 16 | 10 ms | 1,0 s |
+| `tls13` | 32 | 17 | 17 ms | 3,4 s | 15 | 8 ms | 1,0 s |
+| `kyber` | 26 | 11 | 9 ms | 2,2 s | 15 | 5 ms | 1,0 s |
+
+**Decisión: se mantienen 60 s por escaneo.** El peor caso del laboratorio (`export`, 38 sondas en crudo, 53 conexiones) tarda 8,1 s con 100 ms de RTT; la duración crece de forma lineal con el RTT (la cadena más larga es secuencial: cada suite encontrada exige una conexión nueva), así que incluso con 300 ms de RTT (otro continente) serían unos 25 s, y el presupuesto de 48 sondas en crudo acota el peor caso de cualquier servidor. 90 s solo protegerían frente a servidores que tardan segundos en cada handshake, y para eso ya está el límite de 5 s por conexión: lo que no termine se marca como error y "no evaluado", nunca como "no soportado". Ningún servidor agotó el presupuesto. Para un servidor moderno real (Go/Caddy, como fizsar.com) calculo unas 10–12 sondas en crudo, en línea con el `kyber` del laboratorio; se medirá en el 2.7.5.
+
+**Intensidad `basic` idéntica a la anterior**: `internal/scanner/testdata/basic_golden.json` se generó con el escáner anterior al 2.7.3 (commit `5631b85`) y un test comprueba que `basic` da exactamente el mismo JSON, salvo los campos nuevos opcionales (`intensity`, `connections`).
+
 ---
 
 ## English
@@ -67,3 +117,5 @@ El escáner solo enumeraba las suites de TLS 1.2. Cloudflare acepta 3DES **solo 
 **cloudflare.com**: versions, PQC, curves match. TLS 1.2: testssl finds 20 suites, we find 17; the 3 missing (CBC-SHA384/SHA256 variants) are not implemented by Go (documented limitation, no grade impact since CBC already caps at B). Certificates: Cloudflare serves an RSA and an ECDSA certificate; we score the one a current client receives (difference of criterion). **Bug found and fixed**: 3DES is accepted only in TLS 1.0, and we enumerated suites in TLS 1.2 only, so the 3DES cap (C) was missed: the scan said 85 · B, the fixed model gives C. The scanner now enumerates TLS 1.0/1.1 too (tested with a server offering 3DES only to TLS 1.0 clients), scoring checks RC4/3DES/CBC across all versions and labels legacy-only suites with their version. Model stays 2026.1 (rules unchanged; no stored production scores). cloudflare.com was not re-scanned (single run agreed).
 
 **Milestone 2.7 (raw ClientHello probes)**: later, not now. No grade difference came from what Go cannot see, and none of the three domains offers SSLv3 or DHE. Do it before opening the scanner to customer domains (phase 3), scoped to SSLv3, DHE and the full TLS 1.3 list, validated against a deliberately old test server rather than third parties.
+
+**Milestone 2.7.3 (raw ClientHello probes vs testssl.sh, lab only)**: nine deliberately weak servers in the isolated `test/tlslab` (internal Docker network, no published ports; never third parties). `make tlslab-test` scans each one with intensity full and compares protocols, suites, DH sizes and groups with the testssl.sh 3.2.4 reference automatically, failing if testssl.sh sees anything we do not (except the explained cases). Everything matches, including SSLv2 (4 ciphers), SSLv3 (24 suites, DH 1024), EXPORT/DES/NULL/anonymous suites and DH 512, DHE 1024 and 2048, Camellia/ARIA/CCM/CCM_8, secp224r1, brainpool, the five TLS 1.3 suites and ML-KEM (pure and hybrid), ffdhe and brainpool TLS 1.3 groups. **We see more**: the pre-standard Kyber draft (and x25519) on the Go 1.23 server, which testssl.sh reports as "No KEMs offered"; we find it with an empty key_share and the server's HelloRetryRequest. **We see less**: ECDHE curves that exist only in SSLv3 (an SSLv3 client sends no supported_groups), reported as "not evaluated" with no grade effect (SSLv3 already caps at C); below TLS 1.2 we only list suites not seen in a higher version (the total set matches; versions are detected). Server cipher order and implementation vulnerabilities stay out of scope. **Scan timeout stays at 60 s**: the worst lab case takes 8.1 s at a simulated 100 ms RTT (53 connections, 38 raw probes), growing linearly with RTT (about 25 s at 300 ms) and bounded by the 48-probe budget; slow handshakes are already capped at 5 s each. **Intensity basic is unchanged**: a golden file written by the pre-2.7.3 scanner (commit `5631b85`) pins its JSON, except for the new optional fields.

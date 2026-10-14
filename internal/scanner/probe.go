@@ -54,6 +54,9 @@ func (s *Scanner) handshake(ctx context.Context, t target, cfg *tls.Config) prob
 	ctx, cancel := context.WithTimeout(ctx, s.opts.HandshakeTimeout)
 	defer cancel()
 
+	if t.conns != nil {
+		t.conns.Add(1)
+	}
 	conn, err := s.dial(ctx, t.addr)
 	if err != nil {
 		return probe{status: ProbeFailed, err: fmt.Errorf("connect: %w", err)}

@@ -22,7 +22,7 @@ def summarize(path):
     for e in entries:
         by_id.setdefault(e.get("id"), []).append(e.get("finding", ""))
     protocols = [name for key, name in PROTOCOLS
-                 if any(f and not f.startswith("not offered") for f in by_id.get(key, []))]  # SSLv2: "vulnerable with 4 ciphers"
+                 if any(f.startswith(("offered", "vulnerable")) for f in by_id.get(key, []))]  # SSLv2: "vulnerable with 4 ciphers"
     ciphers = {}
     dh_bits = set()
     for key, findings in by_id.items():

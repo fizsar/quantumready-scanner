@@ -12,7 +12,7 @@ import (
 
 var allNotEvaluated = []string{
 	scanner.NotEvalSSL, scanner.NotEvalDHESuites, scanner.NotEvalOtherSuites, scanner.NotEvalTLS13Suites,
-	scanner.NotEvalServerPreference, scanner.NotEvalLegacyGroups, scanner.NotEvalNonStandardPQC, scanner.NotEvalImplementationBug,
+	scanner.NotEvalServerPreference, scanner.NotEvalLegacyGroups, scanner.NotEvalNonStandardPQC, scanner.NotEvalImplementationBug, scanner.NotEvalCredentialSuites,
 }
 
 func groups(statuses map[string]scanner.Status) []scanner.GroupProbe {

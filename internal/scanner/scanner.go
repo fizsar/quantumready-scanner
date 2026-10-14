@@ -39,6 +39,11 @@ type Options struct {
 	ScanTimeout          time.Duration // whole scan; default 60s
 	PerTargetConcurrency int           // parallel handshakes per scan; default 4
 	GlobalConcurrency    int           // parallel handshakes across scans; default 16
+	// Intensity: IntensityBasic (default) or IntensityFull (adds the raw
+	// ClientHello probes of internal/scanner/rawtls).
+	Intensity Intensity
+	// RawProbeBudget caps the raw probe connections of one scan; default 48.
+	RawProbeBudget int
 
 	Resolver   Resolver               // default net.DefaultResolver
 	AddrPolicy func(netip.Addr) error // default CheckAddr (anti-SSRF)
@@ -53,6 +58,11 @@ type Scanner struct {
 	sem  chan struct{}
 
 	active, maxActive atomic.Int32 // concurrent handshakes (observed by tests)
+
+	// simulatedRTT delays every connection by two round trips (TCP and the
+	// first exchange) to measure scan durations over a slow network. Tests
+	// only; always zero in production.
+	simulatedRTT time.Duration
 }
 
 // New returns a Scanner with opts, filling in defaults.
@@ -68,6 +78,12 @@ func New(opts Options) *Scanner {
 	}
 	if opts.GlobalConcurrency <= 0 {
 		opts.GlobalConcurrency = 16
+	}
+	if opts.Intensity == "" {
+		opts.Intensity = IntensityBasic
+	}
+	if opts.RawProbeBudget <= 0 {
+		opts.RawProbeBudget = 48
 	}
 	if opts.Resolver == nil {
 		opts.Resolver = net.DefaultResolver
@@ -85,9 +101,10 @@ func New(opts Options) *Scanner {
 func (s *Scanner) ScanTimeout() time.Duration { return s.opts.ScanTimeout }
 
 type target struct {
-	host string // normalized name or IP literal
-	sni  string // "" for IP literals
-	addr netip.AddrPort
+	host  string // normalized name or IP literal
+	sni   string // "" for IP literals
+	addr  netip.AddrPort
+	conns *atomic.Int32 // connections opened by this scan
 }
 
 // Scan probes host:port (port 0 means 443). It returns an error only when no
@@ -114,7 +131,7 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	if err != nil {
 		return nil, err
 	}
-	t := target{host: name, sni: name, addr: netip.AddrPortFrom(ip, uint16(port))}
+	t := target{host: name, sni: name, addr: netip.AddrPortFrom(ip, uint16(port)), conns: new(atomic.Int32)}
 	if literal.IsValid() {
 		t.sni = ""
 	}
@@ -128,6 +145,7 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 		TLS12SuitesComplete:  true,
 		LegacySuitesComplete: true,
 		NotEvaluated:         notEvaluated,
+		Intensity:            s.opts.Intensity,
 	}
 	for _, a := range all {
 		res.ResolvedIPs = append(res.ResolvedIPs, a.String())
@@ -199,10 +217,14 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	})
 	_ = g.Wait()
 	res.LegacySuitesComplete = legacy10 && legacy11
+	if s.opts.Intensity == IntensityFull {
+		s.runRaw(ctx, t, res)
+	}
 
 	if len(certs) > 0 {
 		res.Certificate = analyzeCertificate(certs, state, t.host, s.opts.Now(), s.opts.RootCAs)
 	}
+	res.Connections = int(t.conns.Load())
 	res.DurationMS = s.opts.Now().Sub(start).Milliseconds()
 	return res, nil
 }

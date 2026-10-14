@@ -6,6 +6,8 @@
 #   lab.sh check     check isolation again
 #   lab.sh testssl [SERVER…]   reference run of testssl.sh against the lab servers (default: all)
 #   lab.sh down      remove everything and check nothing is left (make tlslab-down)
+#   lab.sh gotest    integration tests of the scanner against the lab (make tlslab-test)
+#   lab.sh scan ARGS…        cmd/qrscan -lab ARGS… inside the lab (make tlslab-scan ARGS="-facts tls13")
 #   lab.sh run IMAGE ARGS…   run a client container on the lab network
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -14,6 +16,7 @@ NET=qr-tlslab
 RUNNER_LABEL=qr-tlslab=runner
 TESTSSL_IMAGE=ghcr.io/testssl/testssl.sh:3.2@sha256:51918b1e954df0acee8c08d3ad5ce306710e4fefe49ed0e0f92728ecf9e7ff34
 PROBE_IMAGE=qr-tlslab/openssl35:3.5.9
+GO_IMAGE=golang:1.27.2@sha256:820153096fda4de6ac1b7194d12e416b7dd8f4e9a33d17e0345b111b945162d8
 
 compose() { docker compose -f "$here/compose.yaml" "$@"; }
 # Listening sockets on the host: "proto local-address:port".
@@ -128,8 +131,28 @@ run)
 	shift
 	run "$@"
 	;;
+gotest | scan)
+	# Go in a container on the lab network, with the repository read-only and
+	# the host module cache (the lab has no Internet). gotest runs the
+	# integration tests (-tags tlslab); scan runs cmd/qrscan -lab.
+	docker network inspect "$NET" >/dev/null 2>&1 || { echo "lab is not running: make tlslab-up"; exit 1; }
+	repo=$(cd "$here/../.." && pwd)
+	results=$here/results
+	modcache=${GOMODCACHE:-$(go env GOMODCACHE 2>/dev/null || echo "$HOME/go/pkg/mod")}
+	mkdir -p "$results"
+	# shellcheck disable=SC2054 # the commas are --tmpfs mount options
+	gorun=(run --user "$(id -u):$(id -g)" -v "$repo:/src:ro" -v "$modcache:/go/pkg/mod:ro" -v "$results:/out"
+		--tmpfs /tmp:rw,exec,size=2g -e HOME=/tmp -e GOCACHE=/tmp/gocache -e GOTOOLCHAIN=local -e GOFLAGS=-buildvcs=false
+		-e QR_TLSLAB_OUT=/out -w /src "$GO_IMAGE")
+	if [ "$1" = gotest ]; then
+		"${gorun[@]}" go test -tags tlslab -count=1 -run TestLab -v ./internal/scanner/
+	else
+		shift
+		"${gorun[@]}" go run ./cmd/qrscan -lab "$@"
+	fi
+	;;
 *)
-	sed -n '2,10p' "$0"
+	sed -n '2,12p' "$0"
 	exit 2
 	;;
 esac

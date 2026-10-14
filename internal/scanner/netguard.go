@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // ErrBlockedAddress is returned when a target is, or resolves to, an address
@@ -142,6 +143,15 @@ func (s *Scanner) resolve(ctx context.Context, host string, literal netip.Addr) 
 // DNS answer cannot redirect us: DNS rebinding) and re-checks the policy on the
 // socket itself before connecting.
 func (s *Scanner) dial(ctx context.Context, addr netip.AddrPort) (net.Conn, error) {
+	if s.simulatedRTT > 0 {
+		t := time.NewTimer(2 * s.simulatedRTT)
+		select {
+		case <-t.C:
+		case <-ctx.Done():
+			t.Stop()
+			return nil, ctx.Err()
+		}
+	}
 	d := net.Dialer{
 		Timeout: s.opts.HandshakeTimeout,
 		Control: func(_, address string, _ syscall.RawConn) error {

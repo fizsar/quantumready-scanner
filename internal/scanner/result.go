@@ -1,6 +1,9 @@
 package scanner
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // SchemaVersion identifies the JSON layout of Result. Bump it on breaking
 // changes: results are stored as JSON and scored later.
@@ -54,8 +57,115 @@ type Result struct {
 
 	Certificate *Certificate `json:"certificate,omitempty"`
 
-	// NotEvaluated lists the checks crypto/tls cannot perform (see docs/scanner.md).
+	// NotEvaluated lists the checks this scan could not perform (see docs/scanner.md).
 	NotEvaluated []string `json:"not_evaluated"`
+
+	// Fields added in milestone 2.7.3; all optional, so results stored
+	// before keep their meaning (SchemaVersion is unchanged).
+
+	// Intensity is "basic" (crypto/tls handshakes only) or "full" (also raw
+	// ClientHello probes, see Raw).
+	Intensity Intensity `json:"intensity,omitempty"`
+	// Connections is the number of TCP connections the scan opened.
+	Connections int `json:"connections,omitempty"`
+	// Raw holds what the raw ClientHello probes found (intensity full).
+	Raw *RawResult `json:"raw,omitempty"`
+}
+
+// RawResult is what the raw ClientHello probes (internal/scanner/rawtls)
+// observed: what crypto/tls cannot offer. A "complete" flag is false when an
+// enumeration stopped on an error or on the probe budget.
+type RawResult struct {
+	Probes          int  `json:"probes"` // raw connections used
+	BudgetExhausted bool `json:"budget_exhausted,omitempty"`
+
+	SSLv2 RawProtocol `json:"sslv2"`
+	SSLv3 RawProtocol `json:"sslv3"`
+
+	// Versions: TLS 1.2, 1.1 and 1.0 as seen by the raw probes, for the
+	// versions crypto/tls did not find (it cannot offer their suites).
+	Versions []VersionProbe `json:"versions,omitempty"`
+
+	// Suites lists, per version (TLS 1.2, then 1.1, 1.0 and, only if the
+	// server speaks it, SSLv3), the accepted suites not already found by
+	// crypto/tls in that version nor by the raw probes in a higher version.
+	Suites         []RawSuite `json:"suites"`
+	SuitesComplete bool       `json:"suites_complete"`
+
+	// TLS13Suites is every TLS 1.3 suite accepted (crypto/tls only sees the
+	// negotiated one).
+	TLS13Suites         []RawSuite `json:"tls13_suites"`
+	TLS13SuitesComplete bool       `json:"tls13_suites_complete"`
+
+	// DH lists the finite-field DH groups seen in ServerKeyExchange.
+	DH []DHParams `json:"dh,omitempty"`
+
+	// TLS13Groups are TLS 1.3 groups crypto/tls does not probe (ffdhe,
+	// brainpool, x448, pure ML-KEM, draft hybrids, pre-standard Kyber…),
+	// found through HelloRetryRequest.
+	TLS13Groups         []RawGroup `json:"tls13_groups"`
+	TLS13GroupsComplete bool       `json:"tls13_groups_complete"`
+	// TLS12Curves are ECDHE curves crypto/tls does not probe (secp224r1,
+	// brainpool, binary curves…), found through ServerKeyExchange.
+	TLS12Curves         []RawGroup `json:"tls12_curves"`
+	TLS12CurvesComplete bool       `json:"tls12_curves_complete"`
+	ExplicitCurve       bool       `json:"explicit_curve,omitempty"` // EC parameters sent explicitly
+}
+
+// RawProtocol is the result of offering SSLv2 or SSLv3.
+type RawProtocol struct {
+	Status Status `json:"status"`
+	// Ciphers: for SSLv2 the cipher kinds the server listed, for SSLv3 the
+	// suite it picked.
+	Ciphers []string `json:"ciphers,omitempty"`
+	Error   string   `json:"error,omitempty"`
+}
+
+// RawSuite is a suite accepted in a raw probe, with the attributes scoring needs.
+type RawSuite struct {
+	Version        string `json:"version"`
+	Name           string `json:"name"`
+	ID             uint16 `json:"id"`
+	ForwardSecrecy bool   `json:"forward_secrecy"`
+	AEAD           bool   `json:"aead"`
+	Mode           string `json:"mode"` // none, stream, cbc, gcm, ccm, ccm8, chacha20_poly1305, aead, other
+	Bits           int    `json:"bits"` // symmetric strength (3DES 112, NULL 0)
+	Export         bool   `json:"export,omitempty"`
+	Anonymous      bool   `json:"anonymous,omitempty"`
+}
+
+// DHParams is a finite-field DH group observed in a ServerKeyExchange.
+type DHParams struct {
+	Version   string `json:"version"`
+	Suite     string `json:"suite"`
+	PrimeBits int    `json:"prime_bits"`
+}
+
+// RawGroup is a key exchange group found by a raw probe.
+type RawGroup struct {
+	Name string `json:"name"`
+	ID   uint16 `json:"id"`
+	Kind string `json:"kind"` // see rawtls.GroupKind
+}
+
+// Intensity selects which probes a scan runs.
+type Intensity string
+
+const (
+	// IntensityBasic runs only crypto/tls handshakes (as before milestone 2.7).
+	IntensityBasic Intensity = "basic"
+	// IntensityFull adds the raw ClientHello probes. In phase 3 it is meant
+	// for verified domains only.
+	IntensityFull Intensity = "full"
+)
+
+// ParseIntensity validates an intensity name.
+func ParseIntensity(s string) (Intensity, error) {
+	switch Intensity(s) {
+	case IntensityBasic, IntensityFull:
+		return Intensity(s), nil
+	}
+	return "", fmt.Errorf("scanner: intensity %q: want basic or full", s)
 }
 
 // Handshake summarizes one full handshake.
@@ -162,6 +272,11 @@ const (
 	NotEvalImplementationBug = "implementation_vulnerabilities"
 )
 
+// NotEvalCredentialSuites (intensity full): PSK, SRP, Kerberos and GOST
+// suites need credentials or algorithms a scanner does not have.
+const NotEvalCredentialSuites = "credential_suites" //nolint:gosec // a code name, not a credential
+
+// notEvaluated is the list for intensity basic (unchanged since milestone 2.1).
 var notEvaluated = []string{
 	NotEvalSSL,
 	NotEvalDHESuites,
@@ -171,4 +286,27 @@ var notEvaluated = []string{
 	NotEvalLegacyGroups,
 	NotEvalNonStandardPQC,
 	NotEvalImplementationBug,
+}
+
+// notEvaluatedFull is what intensity full still cannot check, plus whatever
+// raw enumeration did not complete.
+func notEvaluatedFull(r *RawResult) []string {
+	var out []string
+	if r.SSLv2.Status == ProbeFailed || r.SSLv3.Status == ProbeFailed {
+		out = append(out, NotEvalSSL)
+	}
+	if !r.SuitesComplete {
+		out = append(out, NotEvalDHESuites, NotEvalOtherSuites)
+	}
+	if !r.TLS13SuitesComplete {
+		out = append(out, NotEvalTLS13Suites)
+	}
+	out = append(out, NotEvalServerPreference)
+	if !r.TLS13GroupsComplete || !r.TLS12CurvesComplete {
+		out = append(out, NotEvalLegacyGroups)
+	}
+	if !r.TLS13GroupsComplete {
+		out = append(out, NotEvalNonStandardPQC)
+	}
+	return append(out, NotEvalCredentialSuites, NotEvalImplementationBug)
 }
