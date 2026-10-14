@@ -17,7 +17,7 @@ Cada eje muestra su severidad más alta (`quantum_risk`, `current_risk`). Los ha
 |---|---|---|
 | Intercambio de claves | **50** / 30 / 0 | 50 si con la oferta de un navegador actual el servidor **elige** un híbrido ML-KEM; 30 si lo **soporta** pero no lo elige (el tráfico real sigue siendo clásico); 0 si no lo soporta |
 | TLS 1.3 | 15 | Los grupos híbridos solo existen en TLS 1.3 |
-| Forward secrecy | 10 | Todas las suites de TLS 1.2 con intercambio efímero (ECDHE), o solo TLS 1.3 |
+| Forward secrecy | 10 | Todas las suites aceptadas, en cualquier versión activa (TLS 1.0–1.2 y SSLv3), con intercambio efímero (ECDHE o DHE), o solo TLS 1.3. Hasta 2026.1 solo se miraba TLS 1.2 |
 | Variedad de híbridos | 5 | Más de un grupo híbrido (p. ej. `SecP256r1MLKEM768` para clientes FIPS) |
 | Certificado y agilidad | 20 | 5 válido (cadena de confianza, nombre, fechas) · 5 clave (RSA ≥ 2048, ECDSA ≥ 256, Ed25519) · 5 firma (SHA-256 o superior) · 5 renovación automatizada (ver abajo) |
 
@@ -31,7 +31,7 @@ Letra por nota: **A** ≥ 90 · **B** ≥ 75 · **C** ≥ 60 · **D** ≥ 40 · 
 
 ### Suelo: la F es para lo roto
 
-Si **no hay ningún tope F ni C** (nada roto ni débil: certificado válido, sin RC4/3DES, con forward secrecy, clave y firma correctas), la nota mínima es **40**, el fondo de la D. El desglose lo muestra como un ajuste explícito (`floor_points`, "Suelo: nada roto ni débil"). Un tope B (TLS 1.0/1.1, CBC) no quita el suelo: es mejorable, no roto. Así, TLS clásico bien hecho nunca es F, sea cual sea su certificado o si le falta TLS 1.3.
+Si **no hay ningún tope F** (nada roto), la nota mínima es **40**, el fondo de la D. El desglose lo muestra como un ajuste explícito (`floor_points`, "Suelo: nada roto"). **Solo un tope F anula el suelo** (desde 2026.2; en 2026.1 también lo anulaba el tope C): con un tope C (débil: RC4, 3DES, sin forward secrecy, clave o firma débiles, SSLv3, DH de 1024 bits) la nota se queda en 40 o más y el tope deja la letra en **D o C**; con un tope B (mejorable: TLS 1.0/1.1, CBC), entre D y B. Así se respeta "F = roto, C = débil": TLS clásico sin nada roto nunca es F, sea cual sea su certificado o si le falta TLS 1.3.
 
 Por qué un suelo y no más puntos para TLS 1.2: con los pesos aprobados, dar puntos a TLS 1.2 dejaba un servidor solo TLS 1.2 con certificado comercial en 35 (F), y subirlo más exigía igualar TLS 1.2 con TLS 1.3. El suelo cumple la regla "F = roto" sin tocar los pesos.
 
@@ -54,7 +54,7 @@ La letra final es la **peor** entre la de la nota y el tope más severo:
 | **C** | Clave RSA < 2048 (o ECDSA < 256), firma SHA-1/MD5, RC4 o 3DES aceptados, ninguna suite con forward secrecy · *desde 2026.2*: SSLv3, DH de 1024 a 2047 bits |
 | **B** | TLS 1.0 o 1.1 activos, suites CBC |
 
-Ejemplo: un sitio con PQC y todo perfecto pero con el certificado caducado tiene nota 95 y letra **F**. Los topes F y C anulan además el suelo de 40.
+Ejemplo: un sitio con PQC y todo perfecto pero con el certificado caducado tiene nota 95 y letra **F**. El tope F anula además el suelo de 40; el C no (ver "Suelo").
 
 ## Modelo 2026.2: lo que ven las sondas en crudo
 
@@ -88,7 +88,10 @@ Con intensidad `full` (`docs/scanner.md`), el escáner ve lo que `crypto/tls` no
 
 ### Qué cambia respecto a 2026.1
 
-- **Solo cambia algo si el escaneo tiene sondas en crudo** (intensidad `full`). Un escaneo `basic`, o uno guardado antes del 2.7.3, da con 2026.2 exactamente la misma nota, letra y hallazgos que con 2026.1 (lo comprueba `TestBasicScansScoreAsBefore`); solo cambia la etiqueta de versión.
+- **Dos cambios afectan a cualquier escaneo**, también a los `basic`:
+  - **Suelo**: solo lo anula un tope F. Un servidor débil (tope C) que antes caía por debajo de 40 (letra F) ahora queda en **40 · D**. Ninguna nota baja por esto.
+  - **Forward secrecy en todas las versiones**: una suite sin intercambio efímero aceptada en TLS 1.0 o 1.1 (no solo en 1.2) cuesta ahora los 10 puntos (`FS_PARTIAL`), y un servidor solo TLS 1.0 con RSA recibe `FS_NONE` (tope C). Las suites anónimas cuentan como efímeras: su problema (sin autenticación) tiene su propio tope F.
+- **Los hallazgos nuevos** solo aparecen con sondas en crudo (intensidad `full`): sin ellas no se emite ninguno (lo comprueba `TestBasicScansScoreAsBefore`).
 - Con sondas en crudo, una nota **puede bajar** (nuevos topes, suites sin forward secrecy que `crypto/tls` no veía, versiones antiguas activas que solo ven las sondas en crudo) o **subir 5 puntos** (ML-KEM puro en la variedad).
 - Las notas guardadas no se recalculan: cada escaneo conserva su `scoring_version`. Los 6 escaneos de producción siguen en 2026.1; los nuevos llevarán 2026.2.
 - Nuestros dominios (Caddy, TLS de Go) no tienen nada de lo nuevo: siguen en **A · 95** con intensidad `full` y 2026.2 (comprobado con `qrscan`, `docs/validation.md`).
@@ -119,11 +122,11 @@ Model version **2026.1**. `internal/scoring` turns a scan into a **post-quantum 
 
 **Two risk axes**: *quantum* (key exchange without PQC = harvest now, decrypt later, the urgent part; classical certificate signatures = **future** risk, since a signature only has to hold during the handshake) and *current* (weaknesses exploitable today). Each axis reports its worst severity; `pass` and `info` are not risks.
 
-**Score**: key exchange **50** if a browser-like offer gets a hybrid ML-KEM group, 30 if it is supported but not preferred, 0 otherwise · TLS 1.3 **15** · forward secrecy on every TLS 1.2 suite (or TLS 1.3 only) **10** · more than one hybrid group **5** · certificate **20** (5 valid, 5 key RSA ≥ 2048 / ECDSA ≥ 256 / Ed25519, 5 signature SHA-256+, 5 automated renewal). Grades: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F < 40.
+**Score**: key exchange **50** if a browser-like offer gets a hybrid ML-KEM group, 30 if it is supported but not preferred, 0 otherwise · TLS 1.3 **15** · forward secrecy on every accepted suite in every active version up to TLS 1.2 (or TLS 1.3 only) **10** · more than one hybrid group **5** · certificate **20** (5 valid, 5 key RSA ≥ 2048 / ECDSA ≥ 256 / Ed25519, 5 signature SHA-256+, 5 automated renewal). Grades: A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F < 40.
 
 **Why**: a well-configured classical server (TLS 1.3, forward secrecy, commercial RSA-2048 certificate) scores 40 (D), or 45 with an automated certificate; F is for broken setups. The initial 55/35 + 15 proposal left that server at 35 (F), hence 50/30 and a 20-point certificate block. Supported-but-not-preferred ML-KEM scores 75 (B).
 
-**Floor**: with no F or C cap (nothing broken or weak), the score is at least **40** (bottom of D), shown as `floor_points`. A B cap (TLS 1.0/1.1, CBC) keeps the floor. So a well-configured TLS 1.2-only server gets 40 (D) whatever its certificate, plus the high quantum-axis finding "Without TLS 1.3, hybrid ML-KEM key exchange cannot be adopted" (`TLS13_MISSING`). A floor rather than points for TLS 1.2, because with the approved weights extra TLS 1.2 points still left a commercial-certificate TLS 1.2 server at 35 (F).
+**Floor**: with no F cap (nothing broken), the score is at least **40** (bottom of D), shown as `floor_points`. Only an F cap cancels it (since 2026.2; in 2026.1 a C cap did too): a weak server (C cap) stays at 40 or more and ends in D or C; a B cap (TLS 1.0/1.1, CBC) keeps the floor. So a well-configured TLS 1.2-only server gets 40 (D) whatever its certificate, plus the high quantum-axis finding "Without TLS 1.3, hybrid ML-KEM key exchange cannot be adopted" (`TLS13_MISSING`). A floor rather than points for TLS 1.2, because with the approved weights extra TLS 1.2 points still left a commercial-certificate TLS 1.2 server at 35 (F).
 
 **Automated renewal**: validity ≤ 47 days, or issued by an ACME-first CA (Let's Encrypt, Google Trust Services, ZeroSSL). "≤ 100 days" would stop differentiating as the CA/B Forum caps validity at 200 days (March 2026), 100 (2027) and 47 (2029); the 47-day rule must be revisited in 2029.
 
@@ -135,4 +138,4 @@ Model version **2026.1**. `internal/scoring` turns a scan into a **post-quantum 
 
 **Versioning**: every result carries `scoring_version`. Changing weights, thresholds, caps or finding rules **requires bumping `scoring.Version`** (`YYYY.N`); rewording a text does not. The column to store it arrives with the `scans` table (milestone 2.3).
 
-**Model 2026.2 (milestone 2.7.4)**: with intensity full the scanner also sees SSLv2/SSLv3, every IANA suite, DH group sizes, the full TLS 1.3 list and uncommon groups, judged with the same rule (F broken, C weak, B improvable). New caps, each with its reference: **F** for SSLv2 (RFC 6176, DROWN CVE-2016-0800), NULL suites, TLS 1.3 integrity-only suites (RFC 9150: meant for industrial/IoT networks where data is not secret; on a public website traffic would travel in clear), EXPORT (FREAK CVE-2015-0204, Logjam CVE-2015-4000), anonymous suites (no server authentication), single DES (brute-forced since 1998, RFC 5469) and DH groups under 1024 bits (Logjam); **C** for SSLv3 (RFC 7568, POODLE CVE-2014-3566) and DH groups of 1024–2047 bits (nation-state reach per the Logjam study; NIST SP 800-131A requires 2048+). Low, no cap: CCM_8 (64-bit tag) and weak or binary curves (browsers never offer them). Informational: AEGIS and Ascon (modern AEADs, never a penalty), ffdhe/brainpool/x448, sound TLS 1.3 suites. Pure ML-KEM (FIPS 203, CNSA 2.0) counts towards **variety** (+5 with more than one standard PQC group) but not towards the key exchange block, since browsers do not offer it. Pre-standard Kyber or draft hybrids alone (`KEX_EXPERIMENTAL_PQC_ONLY`, medium) earn no points: browsers dropped them, so they protect nobody. **Without raw results** (intensity basic, or scans stored before 2.7.3) 2026.2 gives exactly the 2026.1 score, grade and findings (tested); stored scores are never recomputed. Our own domains stay at A · 95.
+**Model 2026.2 (milestone 2.7.4)**: with intensity full the scanner also sees SSLv2/SSLv3, every IANA suite, DH group sizes, the full TLS 1.3 list and uncommon groups, judged with the same rule (F broken, C weak, B improvable). New caps, each with its reference: **F** for SSLv2 (RFC 6176, DROWN CVE-2016-0800), NULL suites, TLS 1.3 integrity-only suites (RFC 9150: meant for industrial/IoT networks where data is not secret; on a public website traffic would travel in clear), EXPORT (FREAK CVE-2015-0204, Logjam CVE-2015-4000), anonymous suites (no server authentication), single DES (brute-forced since 1998, RFC 5469) and DH groups under 1024 bits (Logjam); **C** for SSLv3 (RFC 7568, POODLE CVE-2014-3566) and DH groups of 1024–2047 bits (nation-state reach per the Logjam study; NIST SP 800-131A requires 2048+). Low, no cap: CCM_8 (64-bit tag) and weak or binary curves (browsers never offer them). Informational: AEGIS and Ascon (modern AEADs, never a penalty), ffdhe/brainpool/x448, sound TLS 1.3 suites. Pure ML-KEM (FIPS 203, CNSA 2.0) counts towards **variety** (+5 with more than one standard PQC group) but not towards the key exchange block, since browsers do not offer it. Pre-standard Kyber or draft hybrids alone (`KEX_EXPERIMENTAL_PQC_ONLY`, medium) earn no points: browsers dropped them, so they protect nobody. Two changes apply to every scan, basic included: only an F cap cancels the floor (a weak, C-capped server under 40 now gets 40 · D instead of F), and forward secrecy is judged over every active version (TLS 1.0–1.2 and SSLv3), so a TLS 1.0-only RSA server gets `FS_NONE`; anonymous suites count as ephemeral (their lack of authentication has its own F cap). The new findings need raw results (tested). Stored scores are never recomputed. Our own domains stay at A · 95.

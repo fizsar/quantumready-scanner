@@ -186,11 +186,11 @@ func goldenCases() []golden {
 			score: 40, grade: "D", floor: 10, cap: "B", codes: []string{"SUITE_CBC"},
 		},
 		{
-			name: "TLS 1.2 only with RC4 -> no floor, F",
+			name: "TLS 1.2 only with RC4 -> floor kept (weak, not broken), D",
 			in: apply(noPQC, tls12Only, func(r *scanner.Result) {
 				r.TLS12Suites = append(r.TLS12Suites, suite("TLS_ECDHE_ECDSA_WITH_RC4_128_SHA"))
 			}),
-			score: 30, grade: "F", cap: "C", codes: []string{"SUITE_RC4"},
+			score: 40, grade: "D", floor: 10, cap: "C", codes: []string{"SUITE_RC4"},
 		},
 		{
 			name: "expired certificate caps at F", in: apply(func(r *scanner.Result) {
@@ -228,7 +228,8 @@ func goldenCases() []golden {
 				r.Versions = versions("TLS 1.0", "TLS 1.1", "TLS 1.2", "TLS 1.3")
 				r.TLS10Suites = []scanner.CipherSuite{suite("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"), suite("TLS_RSA_WITH_3DES_EDE_CBC_SHA")}
 			}),
-			score: 100, grade: "C", cap: "C", current: "high", codes: []string{"SUITE_3DES", "PROTO_LEGACY_TLS"},
+			// The TLS 1.0 RSA suite also costs the forward secrecy block (2026.2).
+			score: 90, grade: "C", cap: "C", current: "high", codes: []string{"SUITE_3DES", "PROTO_LEGACY_TLS", "FS_PARTIAL"},
 		},
 		{
 			name: "RSA-1024 caps at C and loses the key points", in: apply(func(r *scanner.Result) {
@@ -247,7 +248,7 @@ func goldenCases() []golden {
 			score: 90, grade: "A", current: "medium", codes: []string{"FS_PARTIAL"}, notCodes: []string{"FS_ALL", "FS_NONE"},
 		},
 		{
-			name: "RSA key exchange only, no TLS 1.3 -> F",
+			name: "RSA key exchange only, no TLS 1.3 -> floor kept (weak, not broken), D",
 			in: apply(noPQC, commercialRSA, func(r *scanner.Result) {
 				r.Default = scanner.Handshake{Status: scanner.NotSupported}
 				r.KeyExchange.Selected = ""
@@ -255,7 +256,18 @@ func goldenCases() []golden {
 				r.Versions, r.TLS13Suite = versions("TLS 1.2"), ""
 				r.TLS12Suites = []scanner.CipherSuite{suite("TLS_RSA_WITH_AES_128_GCM_SHA256")}
 			}),
-			score: 15, grade: "F", cap: "C", codes: []string{"FS_NONE", "TLS13_MISSING", "KEX_NO_HYBRID"},
+			score: 40, grade: "D", floor: 25, cap: "C", codes: []string{"FS_NONE", "TLS13_MISSING", "KEX_NO_HYBRID"},
+		},
+		{
+			name: "TLS 1.0 only with RSA key exchange: no forward secrecy in any version",
+			in: apply(noPQC, func(r *scanner.Result) {
+				r.Default = scanner.Handshake{Status: scanner.NotSupported}
+				r.KeyExchange.Selected = ""
+				r.KeyExchange.Groups = groups(nil)
+				r.Versions, r.TLS13Suite, r.TLS12Suites = versions("TLS 1.0"), "", nil
+				r.TLS10Suites = []scanner.CipherSuite{suite("TLS_RSA_WITH_AES_128_CBC_SHA")}
+			}),
+			score: 40, grade: "D", floor: 20, cap: "C", codes: []string{"FS_NONE", "PROTO_LEGACY_TLS", "SUITE_CBC"}, notCodes: []string{"FS_ALL"},
 		},
 		{
 			name: "TLS 1.3 only has forward secrecy by design", in: apply(func(r *scanner.Result) {

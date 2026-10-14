@@ -67,8 +67,8 @@ const dict = {
     'finding.more': 'Ver detalles',
     'breakdown.title': 'Desglose de la nota',
     'breakdown.points': '{points} de {max}',
-    'breakdown.floor': 'Ajuste: nada roto ni débil (mínimo D)',
-    'breakdown.floorHelp': 'Una configuración clásica sin fallos nunca baja de 40 puntos.',
+    'breakdown.floor': 'Ajuste: nada roto (mínimo D)',
+    'breakdown.floorHelp': 'Una configuración clásica sin nada roto nunca baja de 40 puntos.',
     'noteval.title': 'No evaluado',
     'noteval.lead':
       'Estas comprobaciones quedan fuera del alcance del escáner actual. No suman ni restan puntos; no significan que tu web falle en ellas.',
@@ -138,8 +138,8 @@ const dict = {
     'finding.more': 'Show details',
     'breakdown.title': 'Score breakdown',
     'breakdown.points': '{points} of {max}',
-    'breakdown.floor': 'Adjustment: nothing broken or weak (minimum D)',
-    'breakdown.floorHelp': 'A classical setup without flaws never drops below 40 points.',
+    'breakdown.floor': 'Adjustment: nothing broken (minimum D)',
+    'breakdown.floorHelp': 'A classical setup with nothing broken never drops below 40 points.',
     'noteval.title': 'Not evaluated',
     'noteval.lead':
       'These checks are outside the current scanner. They never add or remove points and do not mean your website fails them.',

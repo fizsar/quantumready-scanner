@@ -191,7 +191,7 @@
         "severity_label": "Medium",
         "category": "cipher_suites",
         "title": "Suites without forward secrecy",
-        "detail": "Suites with RSA key exchange are accepted (TLS_RSA_WITH_NULL_MD5, TLS_RSA_WITH_NULL_SHA, TLS_RSA_EXPORT_WITH_RC4_40_MD5, TLS_RSA_EXPORT_WITH_RC2_CBC_40_MD5, TLS_RSA_EXPORT_WITH_DES40_CBC_SHA, TLS_RSA_WITH_DES_CBC_SHA, TLS_DH_anon_EXPORT_WITH_RC4_40_MD5, TLS_DH_anon_WITH_RC4_128_MD5, TLS_DH_anon_EXPORT_WITH_DES40_CBC_SHA, TLS_DH_anon_WITH_DES_CBC_SHA, TLS_DH_anon_WITH_3DES_EDE_CBC_SHA, TLS_DH_anon_WITH_AES_128_CBC_SHA, TLS_DH_anon_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_NULL_SHA256, TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA, TLS_DH_anon_WITH_AES_128_CBC_SHA256, TLS_DH_anon_WITH_AES_256_CBC_SHA256, TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA, TLS_DH_anon_WITH_SEED_CBC_SHA, TLS_DH_anon_WITH_AES_128_GCM_SHA256, TLS_DH_anon_WITH_AES_256_GCM_SHA384, TLS_ECDH_anon_WITH_NULL_SHA, TLS_ECDH_anon_WITH_RC4_128_SHA, TLS_ECDH_anon_WITH_3DES_EDE_CBC_SHA, TLS_ECDH_anon_WITH_AES_128_CBC_SHA, TLS_ECDH_anon_WITH_AES_256_CBC_SHA). Whoever obtains the server's private key could decrypt traffic captured with them.",
+        "detail": "Suites without an ephemeral key exchange, with RSA or static DH, are accepted (TLS_RSA_WITH_NULL_MD5, TLS_RSA_WITH_NULL_SHA, TLS_RSA_EXPORT_WITH_RC4_40_MD5, TLS_RSA_EXPORT_WITH_RC2_CBC_40_MD5, TLS_RSA_EXPORT_WITH_DES40_CBC_SHA, TLS_RSA_WITH_DES_CBC_SHA, TLS_RSA_WITH_NULL_SHA256). Whoever obtains the server's private key could decrypt traffic captured with them.",
         "remediation": "Remove the TLS_RSA_WITH_* suites and keep only ECDHE ones."
       },
       {

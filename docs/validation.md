@@ -68,7 +68,7 @@ El escáner solo enumeraba las suites de TLS 1.2. Cloudflare acepta 3DES **solo 
 | `dhe1024` | TLS 1.2 | 10 | 1024 | — | igual |
 | `tls10` | TLS 1.0 | 9 (RC4, 3DES, IDEA, SEED, Camellia) | — | — | igual |
 | `secp224` | TLS 1.2 | 8 | — | secp224r1 | igual |
-| `tls12` (OpenSSL 3.5.9) | TLS 1.2 | 30 (Camellia, ARIA, CCM, CCM_8…) | 2048 (3 grupos) | brainpoolP256r1, secp256r1 | igual |
+| `tls12` (OpenSSL 3.5.9) | TLS 1.2 | 26 (Camellia, ARIA, CCM, CCM_8; sin anónimas desde el 15/10/2026) | 2048 | brainpoolP256r1, secp256r1 | igual |
 | `tls13` | TLS 1.3 | las 5, CCM_8 incluida | — | 8: X25519MLKEM768, MLKEM768, MLKEM1024, x25519, secp256r1, ffdhe2048, ffdhe3072, brainpoolP256r1tls13 | igual |
 | `kyber` (Go 1.23.12) | TLS 1.3 | 3 | — | testssl.sh: ninguno; nosotros: **X25519Kyber768Draft00** y x25519 | **vemos más** |
 
@@ -98,7 +98,7 @@ Cada servidor, con intensidad `full` y `basic`, en local y con una latencia simu
 | `dhe1024` | 31 | 16 | 62 ms | 3,7 s | 15 | 4 ms | 1,0 s |
 | `tls10` | 30 | 11 | 47 ms | 3,4 s | 19 | 26 ms | 1,8 s |
 | `secp224` | 31 | 16 | 44 ms | 3,7 s | 15 | 4 ms | 1,0 s |
-| `tls12` | 53 | 37 | 33 ms | 7,9 s | 16 | 10 ms | 1,0 s |
+| `tls12` | 49 | 33 | 29 ms | 7,1 s | 16 | 6 ms | 1,0 s |
 | `tls13` | 32 | 17 | 17 ms | 3,4 s | 15 | 8 ms | 1,0 s |
 | `kyber` | 26 | 11 | 9 ms | 2,2 s | 15 | 5 ms | 1,0 s |
 

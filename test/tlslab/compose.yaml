@@ -56,10 +56,10 @@ services:
     command: ["-tls1_3", "-cipher", "DEFAULT:@SECLEVEL=0",
       "-ciphersuites", "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_CCM_SHA256:TLS_AES_128_CCM_8_SHA256",
       "-groups", "X25519MLKEM768:MLKEM768:MLKEM1024:x25519:secp256r1:ffdhe2048:ffdhe3072:brainpoolP256r1tls13"]
-  tls12: # TLS 1.2 only: Camellia, ARIA, CCM, CCM_8, DHE 2048, brainpool curve
+  tls12: # TLS 1.2 only: Camellia, ARIA, CCM, CCM_8, DHE 2048, brainpool curve (no anonymous suites: export covers them)
     <<: *openssl35
     command: ["-tls1_2",
-      "-cipher", "CAMELLIA:ARIA:AESCCM:AESCCM8:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:@SECLEVEL=0",
+      "-cipher", "CAMELLIA:ARIA:AESCCM:AESCCM8:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:!aNULL:@SECLEVEL=0",
       "-groups", "brainpoolP256r1:secp256r1"]
 
   # Go 1.23

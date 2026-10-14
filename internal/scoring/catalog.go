@@ -124,18 +124,18 @@ var findingTexts = map[string]langTexts{
 	},
 	"FS_PARTIAL": {
 		"es": {Title: "Suites sin secreto hacia adelante (forward secrecy)",
-			Detail:      "Se aceptan suites con intercambio de claves RSA ({suites}). Quien obtenga la clave privada del servidor podría descifrar el tráfico capturado con ellas.",
+			Detail:      "Se aceptan suites sin intercambio de claves efímero, con RSA o DH estático ({suites}). Quien obtenga la clave privada del servidor podría descifrar el tráfico capturado con ellas.",
 			Remediation: "Elimina las suites TLS_RSA_WITH_* y deja solo las ECDHE."},
 		"en": {Title: "Suites without forward secrecy",
-			Detail:      "Suites with RSA key exchange are accepted ({suites}). Whoever obtains the server's private key could decrypt traffic captured with them.",
+			Detail:      "Suites without an ephemeral key exchange, with RSA or static DH, are accepted ({suites}). Whoever obtains the server's private key could decrypt traffic captured with them.",
 			Remediation: "Remove the TLS_RSA_WITH_* suites and keep only ECDHE ones."},
 	},
 	"FS_NONE": {
 		"es": {Title: "Ninguna suite con secreto hacia adelante (forward secrecy)",
-			Detail:      "Todas las suites aceptadas usan intercambio de claves RSA ({suites}): la filtración de la clave privada del servidor expondría todo el tráfico pasado. Los navegadores actuales ya no ofrecen estas suites.",
+			Detail:      "Ninguna suite aceptada usa un intercambio de claves efímero; todas usan RSA o DH estático ({suites}): la filtración de la clave privada del servidor expondría todo el tráfico pasado. Los navegadores actuales ya no ofrecen estas suites.",
 			Remediation: "Configura suites ECDHE con AES-GCM o ChaCha20-Poly1305 y activa TLS 1.3."},
 		"en": {Title: "No suite with forward secrecy",
-			Detail:      "Every accepted suite uses RSA key exchange ({suites}): a leak of the server's private key would expose all past traffic. Current browsers no longer offer these suites.",
+			Detail:      "No accepted suite uses an ephemeral key exchange; they all use RSA or static DH ({suites}): a leak of the server's private key would expose all past traffic. Current browsers no longer offer these suites.",
 			Remediation: "Configure ECDHE suites with AES-GCM or ChaCha20-Poly1305 and enable TLS 1.3."},
 	},
 	"SUITE_RC4": {
@@ -401,7 +401,7 @@ var labels = map[string]map[string]string{
 	"item.key":              {"es": "Clave", "en": "Key"},
 	"item.signature":        {"es": "Firma", "en": "Signature"},
 	"item.automation":       {"es": "Renovación automatizada", "en": "Automated renewal"},
-	"adjust.floor":          {"es": "Suelo: nada roto ni débil (mínimo D)", "en": "Floor: nothing broken or weak (minimum D)"},
+	"adjust.floor":          {"es": "Suelo: nada roto (mínimo D)", "en": "Floor: nothing broken (minimum D)"},
 
 	"axis.quantum": {"es": "Riesgo cuántico", "en": "Quantum risk"},
 	"axis.current": {"es": "Riesgo actual", "en": "Current risk"},

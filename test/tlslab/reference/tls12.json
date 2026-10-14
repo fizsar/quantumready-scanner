@@ -7,14 +7,14 @@
                            }
           ],
           "Invocation"  : "testssl.sh --quiet --color 0 --warnings off --jsonfile-pretty /out/tls12.json --logfile /out/tls12.log -p -E -f -S -P tls12:443",
-          "at"          : "537ecf0676d7:/home/testssl/bin/openssl.Linux.x86_64",
+          "at"          : "005d73e1d602:/home/testssl/bin/openssl.Linux.x86_64",
           "version"     : "3.2.4 ",
           "openssl"     : "OpenSSL 1.0.2-bad from Fri Mar 28 16:54:51 2025",
-          "startTime"   : "1792005084",
+          "startTime"   : "1792017426",
           "scanResult"  : [
           {
                     "targetHost"      : "tls12",
-                    "ip"              : "172.31.213.10",
+                    "ip"              : "172.31.213.7",
                     "port"            : "443",
                     "rDNS"            : "qr-tlslab-tls12-1.qr-tlslab.",
                     "service"         : "HTTP",
@@ -69,7 +69,7 @@
                     "serverPreferences" : [
                             {
                                 "id"           : "cipher_order-tls1_2",
-                                "severity"     : "CRITICAL",
+                                "severity"     : "LOW",
                                 "finding"      : "NOT a cipher order configured"
                            },{
                                 "id"           : "cipher-tls1_2_xc0a3",
@@ -91,14 +91,6 @@
                                 "id"           : "cipher-tls1_2_x88",
                                 "severity"     : "LOW",
                                 "finding"      : "TLSv1.2   x88     DHE-RSA-CAMELLIA256-SHA           DH 2048    Camellia    256      TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA"
-                           },{
-                                "id"           : "cipher-tls1_2_xc5",
-                                "severity"     : "CRITICAL",
-                                "finding"      : "TLSv1.2   xc5     ADH-CAMELLIA256-SHA256            DH 3072    Camellia    256      TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA256"
-                           },{
-                                "id"           : "cipher-tls1_2_x89",
-                                "severity"     : "CRITICAL",
-                                "finding"      : "TLSv1.2   x89     ADH-CAMELLIA256-SHA               DH 3072    Camellia    256      TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA"
                            },{
                                 "id"           : "cipher-tls1_2_xc0a1",
                                 "severity"     : "OK",
@@ -164,14 +156,6 @@
                                 "severity"     : "LOW",
                                 "finding"      : "TLSv1.2   x45     DHE-RSA-CAMELLIA128-SHA           DH 2048    Camellia    128      TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA"
                            },{
-                                "id"           : "cipher-tls1_2_xbf",
-                                "severity"     : "CRITICAL",
-                                "finding"      : "TLSv1.2   xbf     ADH-CAMELLIA128-SHA256            DH 1024    Camellia    128      TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA256"
-                           },{
-                                "id"           : "cipher-tls1_2_x46",
-                                "severity"     : "CRITICAL",
-                                "finding"      : "TLSv1.2   x46     ADH-CAMELLIA128-SHA               DH 1024    Camellia    128      TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA"
-                           },{
                                 "id"           : "cipher-tls1_2_xba",
                                 "severity"     : "LOW",
                                 "finding"      : "TLSv1.2   xba     CAMELLIA128-SHA256                RSA        Camellia    128      TLS_RSA_WITH_CAMELLIA_128_CBC_SHA256"
@@ -194,10 +178,10 @@
                            },{
                                 "id"           : "supportedciphers_TLSv1_2",
                                 "severity"     : "INFO",
-                                "finding"      : "DHE-RSA-AES256-CCM8 DHE-RSA-AES256-CCM ECDHE-RSA-CAMELLIA256-SHA384 DHE-RSA-CAMELLIA256-SHA256 DHE-RSA-CAMELLIA256-SHA ADH-CAMELLIA256-SHA256 ADH-CAMELLIA256-SHA AES256-CCM8 AES256-CCM CAMELLIA256-SHA256 CAMELLIA256-SHA ARIA256-GCM-SHA384 DHE-RSA-ARIA256-GCM-SHA384 ECDHE-ARIA256-GCM-SHA384 ECDHE-RSA-AES128-GCM-SHA256 DHE-RSA-AES128-GCM-SHA256 DHE-RSA-AES128-CCM8 DHE-RSA-AES128-CCM AES128-CCM8 AES128-CCM ECDHE-RSA-CAMELLIA128-SHA256 DHE-RSA-CAMELLIA128-SHA256 DHE-RSA-CAMELLIA128-SHA ADH-CAMELLIA128-SHA256 ADH-CAMELLIA128-SHA CAMELLIA128-SHA256 CAMELLIA128-SHA ARIA128-GCM-SHA256 DHE-RSA-ARIA128-GCM-SHA256 ECDHE-ARIA128-GCM-SHA256"
+                                "finding"      : "DHE-RSA-AES256-CCM8 DHE-RSA-AES256-CCM ECDHE-RSA-CAMELLIA256-SHA384 DHE-RSA-CAMELLIA256-SHA256 DHE-RSA-CAMELLIA256-SHA AES256-CCM8 AES256-CCM CAMELLIA256-SHA256 CAMELLIA256-SHA ARIA256-GCM-SHA384 DHE-RSA-ARIA256-GCM-SHA384 ECDHE-ARIA256-GCM-SHA384 ECDHE-RSA-AES128-GCM-SHA256 DHE-RSA-AES128-GCM-SHA256 DHE-RSA-AES128-CCM8 DHE-RSA-AES128-CCM AES128-CCM8 AES128-CCM ECDHE-RSA-CAMELLIA128-SHA256 DHE-RSA-CAMELLIA128-SHA256 DHE-RSA-CAMELLIA128-SHA CAMELLIA128-SHA256 CAMELLIA128-SHA ARIA128-GCM-SHA256 DHE-RSA-ARIA128-GCM-SHA256 ECDHE-ARIA128-GCM-SHA256"
                            },{
                                 "id"           : "cipher_order",
-                                "severity"     : "CRITICAL",
+                                "severity"     : "LOW",
                                 "finding"      : "NOT a server cipher order configured"
                            }
                     ],
@@ -416,14 +400,6 @@
                                 "severity"     : "LOW",
                                 "finding"      : "TLSv1.2   x88     DHE-RSA-CAMELLIA256-SHA           DH 2048    Camellia    256      TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA"
                            },{
-                                "id"           : "cipher-tls1_2_xc5",
-                                "severity"     : "CRITICAL",
-                                "finding"      : "TLSv1.2   xc5     ADH-CAMELLIA256-SHA256            DH 3072    Camellia    256      TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA256"
-                           },{
-                                "id"           : "cipher-tls1_2_x89",
-                                "severity"     : "CRITICAL",
-                                "finding"      : "TLSv1.2   x89     ADH-CAMELLIA256-SHA               DH 3072    Camellia    256      TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA"
-                           },{
                                 "id"           : "cipher-tls1_2_xc0a1",
                                 "severity"     : "OK",
                                 "finding"      : "TLSv1.2   xc0a1   AES256-CCM8                       RSA        AESCCM8     256      TLS_RSA_WITH_AES_256_CCM_8"
@@ -488,14 +464,6 @@
                                 "severity"     : "LOW",
                                 "finding"      : "TLSv1.2   x45     DHE-RSA-CAMELLIA128-SHA           DH 2048    Camellia    128      TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA"
                            },{
-                                "id"           : "cipher-tls1_2_xbf",
-                                "severity"     : "CRITICAL",
-                                "finding"      : "TLSv1.2   xbf     ADH-CAMELLIA128-SHA256            DH 1024    Camellia    128      TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA256"
-                           },{
-                                "id"           : "cipher-tls1_2_x46",
-                                "severity"     : "CRITICAL",
-                                "finding"      : "TLSv1.2   x46     ADH-CAMELLIA128-SHA               DH 1024    Camellia    128      TLS_DH_anon_WITH_CAMELLIA_128_CBC_SHA"
-                           },{
                                 "id"           : "cipher-tls1_2_xba",
                                 "severity"     : "LOW",
                                 "finding"      : "TLSv1.2   xba     CAMELLIA128-SHA256                RSA        Camellia    128      TLS_RSA_WITH_CAMELLIA_128_CBC_SHA256"
@@ -518,7 +486,7 @@
                            },{
                                 "id"           : "supportedciphers_TLSv1_2",
                                 "severity"     : "INFO",
-                                "finding"      : "DHE-RSA-AES256-CCM8 DHE-RSA-AES256-CCM ECDHE-RSA-CAMELLIA256-SHA384 DHE-RSA-CAMELLIA256-SHA256 DHE-RSA-CAMELLIA256-SHA ADH-CAMELLIA256-SHA256 ADH-CAMELLIA256-SHA AES256-CCM8 AES256-CCM CAMELLIA256-SHA256 CAMELLIA256-SHA ARIA256-GCM-SHA384 DHE-RSA-ARIA256-GCM-SHA384 ECDHE-ARIA256-GCM-SHA384 ECDHE-RSA-AES128-GCM-SHA256 DHE-RSA-AES128-GCM-SHA256 DHE-RSA-AES128-CCM8 DHE-RSA-AES128-CCM AES128-CCM8 AES128-CCM ECDHE-RSA-CAMELLIA128-SHA256 DHE-RSA-CAMELLIA128-SHA256 DHE-RSA-CAMELLIA128-SHA ADH-CAMELLIA128-SHA256 ADH-CAMELLIA128-SHA CAMELLIA128-SHA256 CAMELLIA128-SHA ARIA128-GCM-SHA256 DHE-RSA-ARIA128-GCM-SHA256 ECDHE-ARIA128-GCM-SHA256"
+                                "finding"      : "DHE-RSA-AES256-CCM8 DHE-RSA-AES256-CCM ECDHE-RSA-CAMELLIA256-SHA384 DHE-RSA-CAMELLIA256-SHA256 DHE-RSA-CAMELLIA256-SHA AES256-CCM8 AES256-CCM CAMELLIA256-SHA256 CAMELLIA256-SHA ARIA256-GCM-SHA384 DHE-RSA-ARIA256-GCM-SHA384 ECDHE-ARIA256-GCM-SHA384 ECDHE-RSA-AES128-GCM-SHA256 DHE-RSA-AES128-GCM-SHA256 DHE-RSA-AES128-CCM8 DHE-RSA-AES128-CCM AES128-CCM8 AES128-CCM ECDHE-RSA-CAMELLIA128-SHA256 DHE-RSA-CAMELLIA128-SHA256 DHE-RSA-CAMELLIA128-SHA CAMELLIA128-SHA256 CAMELLIA128-SHA ARIA128-GCM-SHA256 DHE-RSA-ARIA128-GCM-SHA256 ECDHE-ARIA128-GCM-SHA256"
                            }
                     ],
                     "browserSimulations": [
@@ -529,5 +497,5 @@
                     ]
           }
           ],
-                    "scanTime"  : 46
+                    "scanTime"  : 61
 }

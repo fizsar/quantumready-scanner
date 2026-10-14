@@ -64,7 +64,7 @@ describe('result page', () => {
     expect(screen.getByText('Nota: D')).toBeTruthy()
     expect(screen.getByText('PQC: no')).toBeTruthy()
     const breakdown = screen.getByRole('region', { name: 'Desglose de la nota' })
-    expect(within(breakdown).getByText(/Ajuste: nada roto ni débil/)).toBeTruthy()
+    expect(within(breakdown).getByText(/Ajuste: nada roto \(mínimo D\)/)).toBeTruthy()
     expect(within(breakdown).getByText('+10')).toBeTruthy()
   })
 

@@ -90,8 +90,8 @@ type Result struct {
 	ScoringVersion string `json:"scoring_version"`
 	Score          int    `json:"score"`       // 0–100: sum of the blocks plus FloorPoints
 	ScoreGrade     string `json:"score_grade"` // letter from Score alone
-	// FloorPoints lifts the score to FloorScore when nothing is broken or weak
-	// (no F or C cap): classical TLS done right is never an F.
+	// FloorPoints lifts the score to FloorScore when nothing is broken (no F
+	// cap): F is reserved for broken setups, weak ones (C cap) end in D or C.
 	FloorPoints int    `json:"floor_points,omitempty"`
 	Grade       string `json:"grade"` // final letter: the worse of ScoreGrade and Cap
 	Cap         *Cap   `json:"cap,omitempty"`
@@ -119,8 +119,8 @@ const (
 	PointsCertAuto     = 5
 )
 
-// FloorScore is the minimum score of a server with no F or C cap: the bottom
-// of D. F is reserved for broken or weak setups.
+// FloorScore is the minimum score of a server with no F cap: the bottom of D.
+// F is reserved for broken setups.
 const FloorScore = 40
 
 // Grade thresholds: minimum score per letter.
@@ -271,29 +271,35 @@ func (e *evaluator) tls13() {
 // forwardSecrecy: every TLS 1.2 suite must use an ephemeral key exchange.
 // A TLS 1.3-only server has it by design.
 func (e *evaluator) forwardSecrecy() {
-	if !e.supports("TLS 1.2") {
-		if e.supports("TLS 1.3") {
+	// Every active version up to TLS 1.2 (and SSLv3): a TLS 1.0-only server
+	// with RSA key exchange has no forward secrecy either (2026.2).
+	suites := e.allSuites()
+	if len(suites) == 0 {
+		if e.supports("TLS 1.3") { // TLS 1.3 only: ephemeral by design
 			e.block("forward_secrecy", PointsFS, PointsFS)
 			e.add("FS_ALL", AxisCurrent, Pass, CatCipherSuites, nil)
 		} else {
-			e.block("forward_secrecy", 0, PointsFS)
+			e.block("forward_secrecy", 0, PointsFS) // nothing observed: coverage() reports it
 		}
 		return
 	}
-	tls12 := e.tls12Suites()
 	var noFS []string
-	for _, s := range tls12 {
-		if !s.ForwardSecrecy {
+	for _, s := range suites {
+		// Ephemeral key exchange per the IANA registry: anonymous DH is
+		// ephemeral too (its problem, no authentication, has its own F cap).
+		fs := s.ForwardSecrecy
+		if info := suiteInfo(s); info.Name != "" {
+			fs = info.ForwardSecrecy()
+		}
+		if !fs {
 			noFS = append(noFS, s.Name)
 		}
 	}
 	switch {
-	case len(tls12) == 0:
-		e.block("forward_secrecy", 0, PointsFS) // nothing observed: coverage() reports it
 	case len(noFS) == 0:
 		e.block("forward_secrecy", PointsFS, PointsFS)
 		e.add("FS_ALL", AxisCurrent, Pass, CatCipherSuites, nil)
-	case len(noFS) == len(tls12) && !e.supports("TLS 1.3"):
+	case len(noFS) == len(suites) && !e.supports("TLS 1.3"):
 		e.block("forward_secrecy", 0, PointsFS)
 		e.add("FS_NONE", AxisCurrent, High, CatCipherSuites, map[string]string{"suites": strings.Join(noFS, ", ")})
 		e.capAt("C", "FS_NONE")
@@ -753,9 +759,9 @@ func (e *evaluator) result() Result {
 	for _, b := range e.blocks {
 		res.Score += b.Points
 	}
-	_, broken := e.caps["F"]
-	_, weak := e.caps["C"]
-	if !broken && !weak && res.Score < FloorScore {
+	// Only an F cap (broken) cancels the floor: with a C cap (weak) the score
+	// stays at 40 or more and the cap brings the letter to D or C.
+	if _, broken := e.caps["F"]; !broken && res.Score < FloorScore {
 		res.FloorPoints = FloorScore - res.Score
 		res.Score = FloorScore
 	}
