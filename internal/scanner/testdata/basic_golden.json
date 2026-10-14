@@ -1,0 +1,596 @@
+{
+  "legacy": {
+    "certificate": {
+      "chain": [
+        {
+          "issuer": "QuantumReady Test CA",
+          "key_algorithm": "RSA",
+          "key_size": 2048,
+          "not_after": "2026-12-20T12:00:00Z",
+          "signature_algorithm": "ECDSA-SHA256",
+          "subject": "example.test"
+        },
+        {
+          "issuer": "QuantumReady Test CA",
+          "key_algorithm": "ECDSA",
+          "key_size": 256,
+          "not_after": "2031-10-01T12:00:00Z",
+          "signature_algorithm": "ECDSA-SHA256",
+          "subject": "QuantumReady Test CA"
+        }
+      ],
+      "days_to_expiry": 80,
+      "expired": false,
+      "hostname_match": true,
+      "issuer": "QuantumReady Test CA",
+      "issuer_org": [
+        "QR Test"
+      ],
+      "key_algorithm": "RSA",
+      "key_size": 2048,
+      "not_after": "2026-12-20T12:00:00Z",
+      "not_before": "2026-09-21T12:00:00Z",
+      "not_yet_valid": false,
+      "ocsp_stapled": false,
+      "sans": [
+        "example.test"
+      ],
+      "scts_embedded": 0,
+      "scts_handshake": 0,
+      "self_signed": false,
+      "signature_algorithm": "ECDSA-SHA256",
+      "subject": "example.test",
+      "trusted": true,
+      "validity_days": 90
+    },
+    "default": {
+      "cipher_suite": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+      "group": "x25519",
+      "group_id": 29,
+      "status": "supported",
+      "version": "TLS 1.2"
+    },
+    "duration_ms": 0,
+    "host": "example.test",
+    "ip": "127.0.0.1",
+    "key_exchange": {
+      "groups": [
+        {
+          "error": "remote error: tls: protocol version not supported",
+          "hybrid": true,
+          "id": 4588,
+          "name": "X25519MLKEM768",
+          "status": "not_supported"
+        },
+        {
+          "error": "remote error: tls: protocol version not supported",
+          "hybrid": true,
+          "id": 4587,
+          "name": "SecP256r1MLKEM768",
+          "status": "not_supported"
+        },
+        {
+          "error": "remote error: tls: protocol version not supported",
+          "hybrid": true,
+          "id": 4589,
+          "name": "SecP384r1MLKEM1024",
+          "status": "not_supported"
+        },
+        {
+          "hybrid": false,
+          "id": 29,
+          "name": "x25519",
+          "status": "supported"
+        },
+        {
+          "hybrid": false,
+          "id": 23,
+          "name": "secp256r1",
+          "status": "supported"
+        },
+        {
+          "hybrid": false,
+          "id": 24,
+          "name": "secp384r1",
+          "status": "supported"
+        },
+        {
+          "hybrid": false,
+          "id": 25,
+          "name": "secp521r1",
+          "status": "supported"
+        }
+      ],
+      "offered": [
+        "X25519MLKEM768",
+        "x25519",
+        "secp256r1",
+        "secp384r1"
+      ],
+      "selected": "x25519",
+      "selected_hybrid": false
+    },
+    "legacy_cipher_suites_complete": true,
+    "not_evaluated": [
+      "ssl2_ssl3",
+      "tls12_dhe_suites",
+      "tls12_ccm_camellia_aria_null_export_suites",
+      "tls13_suite_list",
+      "tls12_server_cipher_preference",
+      "legacy_groups",
+      "non_standard_pqc_groups",
+      "implementation_vulnerabilities"
+    ],
+    "port": 0,
+    "resolved_ips": [
+      "127.0.0.1"
+    ],
+    "schema_version": 1,
+    "started_at": "2026-10-01T12:00:00Z",
+    "tls10_cipher_suites": [
+      {
+        "aead": false,
+        "forward_secrecy": false,
+        "id": 47,
+        "insecure": true,
+        "name": "TLS_RSA_WITH_AES_128_CBC_SHA"
+      },
+      {
+        "aead": false,
+        "forward_secrecy": false,
+        "id": 10,
+        "insecure": true,
+        "name": "TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+      }
+    ],
+    "tls11_cipher_suites": [
+      {
+        "aead": false,
+        "forward_secrecy": false,
+        "id": 47,
+        "insecure": true,
+        "name": "TLS_RSA_WITH_AES_128_CBC_SHA"
+      },
+      {
+        "aead": false,
+        "forward_secrecy": false,
+        "id": 10,
+        "insecure": true,
+        "name": "TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+      }
+    ],
+    "tls12_cipher_suites": [
+      {
+        "aead": true,
+        "forward_secrecy": true,
+        "id": 49199,
+        "insecure": false,
+        "name": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+      },
+      {
+        "aead": false,
+        "forward_secrecy": false,
+        "id": 47,
+        "insecure": true,
+        "name": "TLS_RSA_WITH_AES_128_CBC_SHA"
+      },
+      {
+        "aead": false,
+        "forward_secrecy": false,
+        "id": 10,
+        "insecure": true,
+        "name": "TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+      }
+    ],
+    "tls12_cipher_suites_complete": true,
+    "versions": [
+      {
+        "id": 769,
+        "status": "supported",
+        "version": "TLS 1.0"
+      },
+      {
+        "id": 770,
+        "status": "supported",
+        "version": "TLS 1.1"
+      },
+      {
+        "id": 771,
+        "status": "supported",
+        "version": "TLS 1.2"
+      },
+      {
+        "error": "remote error: tls: protocol version not supported",
+        "id": 772,
+        "status": "not_supported",
+        "version": "TLS 1.3"
+      }
+    ]
+  },
+  "modern": {
+    "certificate": {
+      "chain": [
+        {
+          "issuer": "QuantumReady Test CA",
+          "key_algorithm": "ECDSA",
+          "key_size": 256,
+          "not_after": "2026-12-20T12:00:00Z",
+          "signature_algorithm": "ECDSA-SHA256",
+          "subject": "example.test"
+        },
+        {
+          "issuer": "QuantumReady Test CA",
+          "key_algorithm": "ECDSA",
+          "key_size": 256,
+          "not_after": "2031-10-01T12:00:00Z",
+          "signature_algorithm": "ECDSA-SHA256",
+          "subject": "QuantumReady Test CA"
+        }
+      ],
+      "curve": "P-256",
+      "days_to_expiry": 80,
+      "expired": false,
+      "hostname_match": true,
+      "issuer": "QuantumReady Test CA",
+      "issuer_org": [
+        "QR Test"
+      ],
+      "key_algorithm": "ECDSA",
+      "key_size": 256,
+      "not_after": "2026-12-20T12:00:00Z",
+      "not_before": "2026-09-21T12:00:00Z",
+      "not_yet_valid": false,
+      "ocsp_stapled": false,
+      "sans": [
+        "example.test"
+      ],
+      "scts_embedded": 0,
+      "scts_handshake": 0,
+      "self_signed": false,
+      "signature_algorithm": "ECDSA-SHA256",
+      "subject": "example.test",
+      "trusted": true,
+      "validity_days": 90
+    },
+    "default": {
+      "cipher_suite": "TLS_AES_128_GCM_SHA256",
+      "group": "X25519MLKEM768",
+      "group_id": 4588,
+      "status": "supported",
+      "version": "TLS 1.3"
+    },
+    "duration_ms": 0,
+    "host": "example.test",
+    "ip": "127.0.0.1",
+    "key_exchange": {
+      "groups": [
+        {
+          "hybrid": true,
+          "id": 4588,
+          "name": "X25519MLKEM768",
+          "status": "supported"
+        },
+        {
+          "error": "remote error: tls: handshake failure",
+          "hybrid": true,
+          "id": 4587,
+          "name": "SecP256r1MLKEM768",
+          "status": "not_supported"
+        },
+        {
+          "error": "remote error: tls: handshake failure",
+          "hybrid": true,
+          "id": 4589,
+          "name": "SecP384r1MLKEM1024",
+          "status": "not_supported"
+        },
+        {
+          "hybrid": false,
+          "id": 29,
+          "name": "x25519",
+          "status": "supported"
+        },
+        {
+          "hybrid": false,
+          "id": 23,
+          "name": "secp256r1",
+          "status": "supported"
+        },
+        {
+          "error": "remote error: tls: handshake failure",
+          "hybrid": false,
+          "id": 24,
+          "name": "secp384r1",
+          "status": "not_supported"
+        },
+        {
+          "error": "remote error: tls: handshake failure",
+          "hybrid": false,
+          "id": 25,
+          "name": "secp521r1",
+          "status": "not_supported"
+        }
+      ],
+      "offered": [
+        "X25519MLKEM768",
+        "x25519",
+        "secp256r1",
+        "secp384r1"
+      ],
+      "selected": "X25519MLKEM768",
+      "selected_hybrid": true
+    },
+    "legacy_cipher_suites_complete": true,
+    "not_evaluated": [
+      "ssl2_ssl3",
+      "tls12_dhe_suites",
+      "tls12_ccm_camellia_aria_null_export_suites",
+      "tls13_suite_list",
+      "tls12_server_cipher_preference",
+      "legacy_groups",
+      "non_standard_pqc_groups",
+      "implementation_vulnerabilities"
+    ],
+    "port": 0,
+    "resolved_ips": [
+      "127.0.0.1"
+    ],
+    "schema_version": 1,
+    "started_at": "2026-10-01T12:00:00Z",
+    "tls12_cipher_suites": [
+      {
+        "aead": true,
+        "forward_secrecy": true,
+        "id": 49195,
+        "insecure": false,
+        "name": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+      },
+      {
+        "aead": true,
+        "forward_secrecy": true,
+        "id": 49196,
+        "insecure": false,
+        "name": "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+      },
+      {
+        "aead": true,
+        "forward_secrecy": true,
+        "id": 52393,
+        "insecure": false,
+        "name": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"
+      },
+      {
+        "aead": false,
+        "forward_secrecy": true,
+        "id": 49161,
+        "insecure": false,
+        "name": "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"
+      },
+      {
+        "aead": false,
+        "forward_secrecy": true,
+        "id": 49162,
+        "insecure": false,
+        "name": "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"
+      }
+    ],
+    "tls12_cipher_suites_complete": true,
+    "tls13_cipher_suite": "TLS_AES_128_GCM_SHA256",
+    "versions": [
+      {
+        "error": "remote error: tls: protocol version not supported",
+        "id": 769,
+        "status": "not_supported",
+        "version": "TLS 1.0"
+      },
+      {
+        "error": "remote error: tls: protocol version not supported",
+        "id": 770,
+        "status": "not_supported",
+        "version": "TLS 1.1"
+      },
+      {
+        "id": 771,
+        "status": "supported",
+        "version": "TLS 1.2"
+      },
+      {
+        "id": 772,
+        "status": "supported",
+        "version": "TLS 1.3"
+      }
+    ]
+  },
+  "tls12_only": {
+    "certificate": {
+      "chain": [
+        {
+          "issuer": "QuantumReady Test CA",
+          "key_algorithm": "RSA",
+          "key_size": 2048,
+          "not_after": "2026-12-20T12:00:00Z",
+          "signature_algorithm": "ECDSA-SHA256",
+          "subject": "example.test"
+        },
+        {
+          "issuer": "QuantumReady Test CA",
+          "key_algorithm": "ECDSA",
+          "key_size": 256,
+          "not_after": "2031-10-01T12:00:00Z",
+          "signature_algorithm": "ECDSA-SHA256",
+          "subject": "QuantumReady Test CA"
+        }
+      ],
+      "days_to_expiry": 80,
+      "expired": false,
+      "hostname_match": true,
+      "issuer": "QuantumReady Test CA",
+      "issuer_org": [
+        "QR Test"
+      ],
+      "key_algorithm": "RSA",
+      "key_size": 2048,
+      "not_after": "2026-12-20T12:00:00Z",
+      "not_before": "2026-09-21T12:00:00Z",
+      "not_yet_valid": false,
+      "ocsp_stapled": false,
+      "sans": [
+        "example.test"
+      ],
+      "scts_embedded": 0,
+      "scts_handshake": 0,
+      "self_signed": false,
+      "signature_algorithm": "ECDSA-SHA256",
+      "subject": "example.test",
+      "trusted": true,
+      "validity_days": 90
+    },
+    "default": {
+      "cipher_suite": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+      "group": "x25519",
+      "group_id": 29,
+      "status": "supported",
+      "version": "TLS 1.2"
+    },
+    "duration_ms": 0,
+    "host": "example.test",
+    "ip": "127.0.0.1",
+    "key_exchange": {
+      "groups": [
+        {
+          "error": "remote error: tls: protocol version not supported",
+          "hybrid": true,
+          "id": 4588,
+          "name": "X25519MLKEM768",
+          "status": "not_supported"
+        },
+        {
+          "error": "remote error: tls: protocol version not supported",
+          "hybrid": true,
+          "id": 4587,
+          "name": "SecP256r1MLKEM768",
+          "status": "not_supported"
+        },
+        {
+          "error": "remote error: tls: protocol version not supported",
+          "hybrid": true,
+          "id": 4589,
+          "name": "SecP384r1MLKEM1024",
+          "status": "not_supported"
+        },
+        {
+          "hybrid": false,
+          "id": 29,
+          "name": "x25519",
+          "status": "supported"
+        },
+        {
+          "hybrid": false,
+          "id": 23,
+          "name": "secp256r1",
+          "status": "supported"
+        },
+        {
+          "hybrid": false,
+          "id": 24,
+          "name": "secp384r1",
+          "status": "supported"
+        },
+        {
+          "hybrid": false,
+          "id": 25,
+          "name": "secp521r1",
+          "status": "supported"
+        }
+      ],
+      "offered": [
+        "X25519MLKEM768",
+        "x25519",
+        "secp256r1",
+        "secp384r1"
+      ],
+      "selected": "x25519",
+      "selected_hybrid": false
+    },
+    "legacy_cipher_suites_complete": true,
+    "not_evaluated": [
+      "ssl2_ssl3",
+      "tls12_dhe_suites",
+      "tls12_ccm_camellia_aria_null_export_suites",
+      "tls13_suite_list",
+      "tls12_server_cipher_preference",
+      "legacy_groups",
+      "non_standard_pqc_groups",
+      "implementation_vulnerabilities"
+    ],
+    "port": 0,
+    "resolved_ips": [
+      "127.0.0.1"
+    ],
+    "schema_version": 1,
+    "started_at": "2026-10-01T12:00:00Z",
+    "tls12_cipher_suites": [
+      {
+        "aead": true,
+        "forward_secrecy": true,
+        "id": 49199,
+        "insecure": false,
+        "name": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+      },
+      {
+        "aead": true,
+        "forward_secrecy": true,
+        "id": 49200,
+        "insecure": false,
+        "name": "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+      },
+      {
+        "aead": true,
+        "forward_secrecy": true,
+        "id": 52392,
+        "insecure": false,
+        "name": "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+      },
+      {
+        "aead": false,
+        "forward_secrecy": true,
+        "id": 49171,
+        "insecure": false,
+        "name": "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"
+      },
+      {
+        "aead": false,
+        "forward_secrecy": true,
+        "id": 49172,
+        "insecure": false,
+        "name": "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+      }
+    ],
+    "tls12_cipher_suites_complete": true,
+    "versions": [
+      {
+        "error": "remote error: tls: protocol version not supported",
+        "id": 769,
+        "status": "not_supported",
+        "version": "TLS 1.0"
+      },
+      {
+        "error": "remote error: tls: protocol version not supported",
+        "id": 770,
+        "status": "not_supported",
+        "version": "TLS 1.1"
+      },
+      {
+        "id": 771,
+        "status": "supported",
+        "version": "TLS 1.2"
+      },
+      {
+        "error": "remote error: tls: protocol version not supported",
+        "id": 772,
+        "status": "not_supported",
+        "version": "TLS 1.3"
+      }
+    ]
+  }
+}
