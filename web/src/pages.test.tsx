@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
@@ -52,7 +52,8 @@ describe('result page', () => {
     expect(screen.getByRole('region', { name: 'No evaluado' })).toBeTruthy()
     expect(screen.getByText('Modelo de puntuación 2026.1')).toBeTruthy()
     expect(screen.getByText(/Escaneado el 13 de octubre de 2026/)).toBeTruthy()
-    expect(document.title).toBe('Resultado de fizsar.com · QuantumReady')
+    // The title is set in an effect after the report renders: wait for it (flaky under CI load otherwise).
+    await waitFor(() => expect(document.title).toBe('Resultado de fizsar.com · QuantumReady'))
     expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, nofollow')
   })
 
