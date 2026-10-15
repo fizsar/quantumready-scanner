@@ -68,7 +68,15 @@ func run(logger *slog.Logger) error {
 
 	// The pool connects lazily: the API starts even if PostgreSQL is down and
 	// /api/health reports it.
-	pool, err := pgxpool.New(ctx, dsn)
+	poolCfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("DATABASE_URL: %w", err)
+	}
+	// Every query runs as qr_app, under row-level security (docs/security.md).
+	if err := store.UseRole(poolCfg, store.RoleApp); err != nil {
+		return err
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return fmt.Errorf("configure database pool: %w", err)
 	}

@@ -256,14 +256,35 @@ func (q *Queries) GetScan(ctx context.Context, id uuid.UUID) (Scan, error) {
 	return i, err
 }
 
-type InsertFindingsParams struct {
-	ScanID   uuid.UUID
-	Position int32
-	Code     string
-	Axis     string
-	Severity string
-	Category string
-	Params   []byte
+const insertFindingsBatch = `-- name: InsertFindingsBatch :exec
+INSERT INTO findings (scan_id, position, code, axis, severity, category, params)
+SELECT unnest($1::uuid[]), unnest($2::int4[]), unnest($3::text[]), unnest($4::text[]),
+       unnest($5::text[]), unnest($6::text[]), unnest($7::jsonb[])
+`
+
+type InsertFindingsBatchParams struct {
+	ScanIds    []uuid.UUID
+	Positions  []int32
+	Codes      []string
+	Axes       []string
+	Severities []string
+	Categories []string
+	Params     [][]byte
+}
+
+// One statement for all the findings of a scan. Not COPY: PostgreSQL refuses
+// COPY FROM for roles under row-level security (the worker, qr_worker).
+func (q *Queries) InsertFindingsBatch(ctx context.Context, arg InsertFindingsBatchParams) error {
+	_, err := q.db.Exec(ctx, insertFindingsBatch,
+		arg.ScanIds,
+		arg.Positions,
+		arg.Codes,
+		arg.Axes,
+		arg.Severities,
+		arg.Categories,
+		arg.Params,
+	)
+	return err
 }
 
 const listFindings = `-- name: ListFindings :many

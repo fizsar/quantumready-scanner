@@ -58,7 +58,7 @@ func (s *Store) Complete(ctx context.Context, p CompleteScanParams, findings []I
 		if n == 0 {
 			return ErrLeaseLost
 		}
-		if _, err := q.InsertFindings(ctx, findings); err != nil {
+		if err := q.InsertFindings(ctx, findings); err != nil {
 			return fmt.Errorf("insert findings: %w", err)
 		}
 		return nil

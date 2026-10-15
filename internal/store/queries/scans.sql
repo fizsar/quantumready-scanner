@@ -58,9 +58,12 @@ SET status = 'queued', retries = retries + 1, error = @error,
     lease_token = NULL, lease_until = NULL
 WHERE id = @id AND status = 'running' AND lease_token = @lease_token;
 
--- name: InsertFindings :copyfrom
+-- name: InsertFindingsBatch :exec
+-- One statement for all the findings of a scan. Not COPY: PostgreSQL refuses
+-- COPY FROM for roles under row-level security (the worker, qr_worker).
 INSERT INTO findings (scan_id, position, code, axis, severity, category, params)
-VALUES (@scan_id, @position, @code, @axis, @severity, @category, @params);
+SELECT unnest(@scan_ids::uuid[]), unnest(@positions::int4[]), unnest(@codes::text[]), unnest(@axes::text[]),
+       unnest(@severities::text[]), unnest(@categories::text[]), unnest(@params::jsonb[]);
 
 -- name: LockTarget :exec
 -- Serializes enqueues of the same target until the transaction ends.

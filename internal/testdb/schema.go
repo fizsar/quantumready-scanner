@@ -65,3 +65,21 @@ func Schema(t testing.TB, migrate func(context.Context, *sql.DB) error) *pgxpool
 	t.Cleanup(pool.Close)
 	return pool
 }
+
+// AsRole returns a second pool on the same schema whose connections act as
+// role (SET ROLE), e.g. "qr_worker": tests then run code with exactly the
+// privileges it has in production.
+func AsRole(t testing.TB, pool *pgxpool.Pool, role string) *pgxpool.Pool {
+	t.Helper()
+	cfg := pool.Config()
+	cfg.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
+		_, err := c.Exec(ctx, "SET ROLE "+pgx.Identifier{role}.Sanitize())
+		return err
+	}
+	p, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Close)
+	return p
+}

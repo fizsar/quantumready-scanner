@@ -62,6 +62,10 @@ func run(logger *slog.Logger) error {
 	if err := requirePlaintextDB(cfg.ConnConfig); err != nil {
 		return err
 	}
+	// Least privilege: scan queue and findings only (docs/security.md).
+	if err := store.UseRole(cfg, store.RoleWorker); err != nil {
+		return err
+	}
 	concurrency, err := envInt("WORKER_CONCURRENCY", 2)
 	if err != nil {
 		return err

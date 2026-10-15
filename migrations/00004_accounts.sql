@@ -6,8 +6,8 @@
 -- 2. PostgreSQL RLS: the API runs its queries as role qr_app inside a
 --    transaction that sets app.org_id / app.user_id (store.Store.Tx). With
 --    FORCE ROW LEVEL SECURITY, a missing WHERE clause still cannot read or
---    write another organization's rows. The worker runs as qr_worker
---    (BYPASSRLS): it serves every organization (queue, emails, retention).
+--    write another organization's rows. The worker runs as qr_worker, which
+--    serves every organization but only on the tables it needs (00005).
 --
 -- Roles are cluster-wide, so they are created only if missing (tests run each
 -- package in its own schema of the same database) and never dropped here.
@@ -20,7 +20,7 @@ BEGIN
         CREATE ROLE qr_app NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'qr_worker') THEN
-        CREATE ROLE qr_worker NOLOGIN NOSUPERUSER BYPASSRLS NOCREATEDB NOCREATEROLE;
+        CREATE ROLE qr_worker NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
     END IF;
     -- The connecting user (owner, used by migrate and, until milestone 3.7,
     -- by the API and the worker) can switch to them with SET ROLE.

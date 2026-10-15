@@ -232,7 +232,8 @@ func TestGetScanReport(t *testing.T) {
 	v := decode[scanView](t, a.do(t, "POST", "/api/scans", `{"host":"fizsar.com"}`, reqOpts{}))
 
 	// A worker completes it with a canned scan result.
-	w, err := worker.New(a.st, cannedScanner{}, worker.Config{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	ws := store.NewStore(testdb.AsRole(t, a.st.Pool(), store.RoleWorker)) // production privileges
+	w, err := worker.New(ws, cannedScanner{}, worker.Config{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err != nil {
 		t.Fatal(err)
 	}

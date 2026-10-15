@@ -54,12 +54,14 @@ type EmailOutbox struct {
 	ToEmail       string
 	Template      string
 	Lang          string
-	Params        []byte
 	Status        string
 	Attempts      int32
 	NextAttemptAt time.Time
 	CreatedAt     time.Time
 	SentAt        *time.Time
+	Subject       string
+	BodyText      string
+	LastError     *string
 }
 
 type Finding struct {

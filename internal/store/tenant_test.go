@@ -52,7 +52,7 @@ func newWorld(t *testing.T) *world {
 	scan := func(org *uuid.UUID, intensity string) Scan {
 		sc, err := q.EnqueueScan(ctx, EnqueueScanParams{Host: "x.example", Port: 443, OrganizationID: org, Intensity: intensity})
 		must(err)
-		_, err = q.InsertFindings(ctx, findingsFor(sc))
+		err = q.InsertFindings(ctx, findingsFor(sc))
 		must(err)
 		return sc
 	}

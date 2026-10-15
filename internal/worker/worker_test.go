@@ -47,12 +47,19 @@ func (f scanFunc) ScanWith(ctx context.Context, host string, port int, _ scanner
 // ScanTimeout is short so tests can use leases of a few hundred milliseconds.
 func (f scanFunc) ScanTimeout() time.Duration { return 100 * time.Millisecond }
 
+// asWorker is st seen through the qr_worker role: the worker runs in tests with
+// exactly its production privileges (scan queue and findings only).
+func asWorker(t *testing.T, st *store.Store) *store.Store {
+	t.Helper()
+	return store.NewStore(testdb.AsRole(t, st.Pool(), store.RoleWorker))
+}
+
 func mustNew(t *testing.T, st *store.Store, sc Scanner, cfg Config) *Worker {
 	t.Helper()
 	if cfg.LeaseMargin == 0 {
 		cfg.LeaseMargin = 50 * time.Millisecond
 	}
-	w, err := New(st, sc, cfg)
+	w, err := New(asWorker(t, st), sc, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -538,10 +545,13 @@ func TestNoHeartbeatWhenTheQueueFails(t *testing.T) {
 		_, err := migrations.Up(ctx, db)
 		return err
 	})
-	st := store.NewStore(pool)
-	pool.Close() // every query fails from now on
+	ws := asWorker(t, store.NewStore(pool))
+	ws.Pool().Close() // every query of the worker fails from now on
 	var b beats
-	w := mustNew(t, st, fastScanner("X25519MLKEM768"), Config{Concurrency: 1, PollInterval: 20 * time.Millisecond, Heartbeat: b.record, Logger: quiet})
+	w, err := New(ws, fastScanner("X25519MLKEM768"), Config{Concurrency: 1, PollInterval: 20 * time.Millisecond, Heartbeat: b.record, Logger: quiet, LeaseMargin: 50 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
 	runInBackground(t, w)
 	time.Sleep(200 * time.Millisecond)
 	if n := len(b.snapshot()); n != 0 {
