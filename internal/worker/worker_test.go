@@ -40,7 +40,7 @@ func newTestStore(t *testing.T) *store.Store {
 
 type scanFunc func(ctx context.Context, host string, port int) (*scanner.Result, error)
 
-func (f scanFunc) Scan(ctx context.Context, host string, port int) (*scanner.Result, error) {
+func (f scanFunc) ScanWith(ctx context.Context, host string, port int, _ scanner.Intensity) (*scanner.Result, error) {
 	return f(ctx, host, port)
 }
 

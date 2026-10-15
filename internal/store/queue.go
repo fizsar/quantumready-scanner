@@ -29,33 +29,10 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool, Queries: New(pool)}
 }
 
-// Enqueue adds a scan to the queue.
+// Enqueue adds a public basic scan to the queue, as the connecting role (tests
+// and tools; requests go through EnqueueOrReuse).
 func (s *Store) Enqueue(ctx context.Context, host string, port int32) (Scan, error) {
-	return s.EnqueueScan(ctx, EnqueueScanParams{Host: host, Port: port})
-}
-
-// EnqueueOrReuse enqueues a scan of host:port unless one was created within
-// cooldown and has not failed, in which case it returns that one with
-// reused=true. Concurrent calls for the same target are serialized, so they
-// cannot both enqueue.
-func (s *Store) EnqueueOrReuse(ctx context.Context, host string, port int32, cooldown time.Duration) (sc Scan, reused bool, err error) {
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		q := s.WithTx(tx)
-		if err := q.LockTarget(ctx, fmt.Sprintf("%s:%d", host, port)); err != nil {
-			return err
-		}
-		recent, err := q.RecentScanForTarget(ctx, RecentScanForTargetParams{Host: host, Port: port, WithinSeconds: cooldown.Seconds()})
-		if err == nil {
-			sc, reused = recent, true
-			return nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		sc, err = q.EnqueueScan(ctx, EnqueueScanParams{Host: host, Port: port})
-		return err
-	})
-	return sc, reused, err
+	return s.EnqueueScan(ctx, EnqueueScanParams{Host: host, Port: port, Intensity: IntensityBasic})
 }
 
 // Claim leases the next scan for lease. The returned Scan carries the lease

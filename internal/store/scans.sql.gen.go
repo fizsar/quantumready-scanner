@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -27,7 +28,7 @@ WHERE id = (
     LIMIT 1
     FOR UPDATE SKIP LOCKED
 )
-RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before
+RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at
 `
 
 type ClaimScanParams struct {
@@ -64,6 +65,9 @@ func (q *Queries) ClaimScan(ctx context.Context, arg ClaimScanParams) (Scan, err
 		&i.Pqc,
 		&i.Retries,
 		&i.NotBefore,
+		&i.Intensity,
+		&i.RequestedBy,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -110,19 +114,29 @@ func (q *Queries) CompleteScan(ctx context.Context, arg CompleteScanParams) (int
 }
 
 const enqueueScan = `-- name: EnqueueScan :one
-INSERT INTO scans (host, port, organization_id)
-VALUES ($1, $2, $3)
-RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before
+INSERT INTO scans (host, port, organization_id, intensity, requested_by, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at
 `
 
 type EnqueueScanParams struct {
 	Host           string
 	Port           int32
 	OrganizationID *uuid.UUID
+	Intensity      string
+	RequestedBy    *uuid.UUID
+	ExpiresAt      *time.Time
 }
 
 func (q *Queries) EnqueueScan(ctx context.Context, arg EnqueueScanParams) (Scan, error) {
-	row := q.db.QueryRow(ctx, enqueueScan, arg.Host, arg.Port, arg.OrganizationID)
+	row := q.db.QueryRow(ctx, enqueueScan,
+		arg.Host,
+		arg.Port,
+		arg.OrganizationID,
+		arg.Intensity,
+		arg.RequestedBy,
+		arg.ExpiresAt,
+	)
 	var i Scan
 	err := row.Scan(
 		&i.ID,
@@ -147,6 +161,9 @@ func (q *Queries) EnqueueScan(ctx context.Context, arg EnqueueScanParams) (Scan,
 		&i.Pqc,
 		&i.Retries,
 		&i.NotBefore,
+		&i.Intensity,
+		&i.RequestedBy,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -203,7 +220,7 @@ func (q *Queries) FailScan(ctx context.Context, arg FailScanParams) (int64, erro
 }
 
 const getScan = `-- name: GetScan :one
-SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before FROM scans WHERE id = $1
+SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at FROM scans WHERE id = $1
 `
 
 func (q *Queries) GetScan(ctx context.Context, id uuid.UUID) (Scan, error) {
@@ -232,6 +249,9 @@ func (q *Queries) GetScan(ctx context.Context, id uuid.UUID) (Scan, error) {
 		&i.Pqc,
 		&i.Retries,
 		&i.NotBefore,
+		&i.Intensity,
+		&i.RequestedBy,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -290,22 +310,34 @@ func (q *Queries) LockTarget(ctx context.Context, target string) error {
 }
 
 const recentScanForTarget = `-- name: RecentScanForTarget :one
-SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before FROM scans
+SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at FROM scans
 WHERE host = $1 AND port = $2 AND status <> 'failed'
-  AND created_at > now() - make_interval(secs => $3::float8)
+  AND intensity = $3 AND organization_id IS NOT DISTINCT FROM $4
+  AND created_at > now() - make_interval(secs => $5::float8)
 ORDER BY created_at DESC
 LIMIT 1
 `
 
 type RecentScanForTargetParams struct {
-	Host          string
-	Port          int32
-	WithinSeconds float64
+	Host           string
+	Port           int32
+	Intensity      string
+	OrganizationID *uuid.UUID
+	WithinSeconds  float64
 }
 
-// The latest scan of a target created within the cooldown that has not failed.
+// The latest scan of a target created within the cooldown that has not
+// failed, with the same intensity and the same owner: a basic scan never
+// answers a full request, and an organization never gets another one's scan
+// (public scans have no organization).
 func (q *Queries) RecentScanForTarget(ctx context.Context, arg RecentScanForTargetParams) (Scan, error) {
-	row := q.db.QueryRow(ctx, recentScanForTarget, arg.Host, arg.Port, arg.WithinSeconds)
+	row := q.db.QueryRow(ctx, recentScanForTarget,
+		arg.Host,
+		arg.Port,
+		arg.Intensity,
+		arg.OrganizationID,
+		arg.WithinSeconds,
+	)
 	var i Scan
 	err := row.Scan(
 		&i.ID,
@@ -330,6 +362,9 @@ func (q *Queries) RecentScanForTarget(ctx context.Context, arg RecentScanForTarg
 		&i.Pqc,
 		&i.Retries,
 		&i.NotBefore,
+		&i.Intensity,
+		&i.RequestedBy,
+		&i.ExpiresAt,
 	)
 	return i, err
 }

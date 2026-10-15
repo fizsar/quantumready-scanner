@@ -93,25 +93,20 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency, "intensity", scanOpts.Intensity)
+	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency)
 	err = w.Run(ctx)
 	logger.Info("worker stopped")
 	return err
 }
 
-// scannerOptions builds the scanner configuration from the environment.
-// SCAN_INTENSITY is "full" (default: raw ClientHello probes too) or "basic".
-// Everything else keeps the scanner defaults: in particular the anti-SSRF
-// address policy cannot be changed from here (only cmd/qrscan -lab can).
-func scannerOptions(getenv func(string) string) (scanner.Options, error) {
-	intensity := scanner.IntensityFull
-	if v := getenv("SCAN_INTENSITY"); v != "" {
-		var err error
-		if intensity, err = scanner.ParseIntensity(v); err != nil {
-			return scanner.Options{}, fmt.Errorf("SCAN_INTENSITY: %w", err)
-		}
-	}
-	return scanner.Options{Intensity: intensity}, nil
+// scannerOptions is the scanner configuration. Since milestone 3.1 the
+// intensity comes with each queued scan (basic for public scans, full only
+// for verified domains of an organization), so nothing is read from the
+// environment: the scanner defaults stand, in particular the anti-SSRF
+// address policy cannot be changed (only cmd/qrscan -lab can). getenv is kept
+// so the test can prove that no variable changes it.
+func scannerOptions(_ func(string) string) (scanner.Options, error) {
+	return scanner.Options{}, nil
 }
 
 // requirePlaintextDB refuses any configuration that would use TLS to reach

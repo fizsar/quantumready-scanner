@@ -1,0 +1,126 @@
+package store
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+)
+
+// Tenant is who a request acts for. The zero value is the public,
+// anonymous tenant: it sees only public scans (no organization).
+type Tenant struct {
+	OrgID  *uuid.UUID // active organization, nil for public requests
+	UserID *uuid.UUID // signed-in user, nil for anonymous requests
+}
+
+// Public is the anonymous tenant.
+var Public = Tenant{}
+
+// Intensities of a scan (scanner.Intensity values).
+const (
+	IntensityBasic = "basic"
+	IntensityFull  = "full"
+)
+
+// PublicScanTTL is how long a public scan is kept (privacy: data minimization).
+const PublicScanTTL = 30 * 24 * time.Hour
+
+// ErrFullNeedsOrg is returned for a full scan without an organization: full
+// scans exist only for an organization's verified domains.
+var ErrFullNeedsOrg = errors.New("store: a full scan needs an organization")
+
+// Tx runs fn in a transaction as the database role qr_app, with the tenant
+// in app.org_id / app.user_id. Row-level security then limits every query
+// to the tenant's rows, even one that forgets its organization_id filter.
+// Both settings are transaction-local, so pooled connections never leak a
+// tenant to the next request.
+func (s *Store) Tx(ctx context.Context, t Tenant, fn func(q *Queries) error) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SET LOCAL ROLE qr_app"); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "SELECT set_config('app.org_id', $1, true), set_config('app.user_id', $2, true)",
+			idString(t.OrgID), idString(t.UserID)); err != nil {
+			return err
+		}
+		return fn(s.WithTx(tx))
+	})
+}
+
+func idString(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
+}
+
+// ScanRequest describes a scan to enqueue or reuse.
+type ScanRequest struct {
+	Host      string
+	Port      int32
+	Intensity string        // IntensityBasic or IntensityFull
+	Cooldown  time.Duration // reuse a non-failed scan this recent
+}
+
+// EnqueueOrReuse enqueues a scan for the tenant unless one of the same
+// target, intensity and owner was created within the cooldown and has not
+// failed; then it returns that one with reused=true. A basic scan never
+// answers a full request, and a tenant never gets another tenant's scan.
+// Public scans expire after PublicScanTTL. Concurrent calls for the same
+// target and owner are serialized, so they cannot both enqueue.
+func (s *Store) EnqueueOrReuse(ctx context.Context, t Tenant, r ScanRequest) (sc Scan, reused bool, err error) {
+	if r.Intensity != IntensityBasic && r.Intensity != IntensityFull {
+		return Scan{}, false, errors.New("store: unknown intensity " + r.Intensity)
+	}
+	if r.Intensity == IntensityFull && t.OrgID == nil {
+		return Scan{}, false, ErrFullNeedsOrg
+	}
+	err = s.Tx(ctx, t, func(q *Queries) error {
+		if err := q.LockTarget(ctx, fmt.Sprintf("%s:%d:%s:%s", r.Host, r.Port, r.Intensity, idString(t.OrgID))); err != nil {
+			return err
+		}
+		recent, err := q.RecentScanForTarget(ctx, RecentScanForTargetParams{
+			Host: r.Host, Port: r.Port, Intensity: r.Intensity, OrganizationID: t.OrgID, WithinSeconds: r.Cooldown.Seconds(),
+		})
+		if err == nil {
+			sc, reused = recent, true
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		var expires *time.Time
+		if t.OrgID == nil {
+			e := time.Now().Add(PublicScanTTL)
+			expires = &e
+		}
+		sc, err = q.EnqueueScan(ctx, EnqueueScanParams{
+			Host: r.Host, Port: r.Port, OrganizationID: t.OrgID, Intensity: r.Intensity, RequestedBy: t.UserID, ExpiresAt: expires,
+		})
+		return err
+	})
+	return sc, reused, err
+}
+
+// ScanFor returns a scan the tenant may see: public, or of its organization.
+// Another organization's scan is pgx.ErrNoRows, as if it did not exist.
+func (s *Store) ScanFor(ctx context.Context, t Tenant, id uuid.UUID) (sc Scan, err error) {
+	err = s.Tx(ctx, t, func(q *Queries) error {
+		sc, err = q.GetScanForTenant(ctx, GetScanForTenantParams{ID: id, OrganizationID: t.OrgID})
+		return err
+	})
+	return sc, err
+}
+
+// FindingsFor returns the findings of a scan the tenant may see (none otherwise).
+func (s *Store) FindingsFor(ctx context.Context, t Tenant, scanID uuid.UUID) (fs []Finding, err error) {
+	err = s.Tx(ctx, t, func(q *Queries) error {
+		fs, err = q.ListFindings(ctx, scanID)
+		return err
+	})
+	return fs, err
+}

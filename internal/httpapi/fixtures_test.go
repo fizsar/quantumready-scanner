@@ -25,13 +25,13 @@ type fixtureStore struct {
 	findings map[uuid.UUID][]store.Finding
 }
 
-func (f *fixtureStore) EnqueueOrReuse(context.Context, string, int32, time.Duration) (store.Scan, bool, error) {
+func (f *fixtureStore) EnqueueOrReuse(context.Context, store.Tenant, store.ScanRequest) (store.Scan, bool, error) {
 	panic("not used")
 }
-func (f *fixtureStore) GetScan(_ context.Context, id uuid.UUID) (store.Scan, error) {
+func (f *fixtureStore) ScanFor(_ context.Context, _ store.Tenant, id uuid.UUID) (store.Scan, error) {
 	return f.scans[id], nil
 }
-func (f *fixtureStore) ListFindings(_ context.Context, id uuid.UUID) ([]store.Finding, error) {
+func (f *fixtureStore) FindingsFor(_ context.Context, _ store.Tenant, id uuid.UUID) ([]store.Finding, error) {
 	return f.findings[id], nil
 }
 

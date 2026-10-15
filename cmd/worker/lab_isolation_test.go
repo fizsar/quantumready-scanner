@@ -21,12 +21,11 @@ func TestScannerOptions(t *testing.T) {
 		want scanner.Intensity
 		err  bool
 	}{
-		{nil, scanner.IntensityFull, false},
-		{map[string]string{"SCAN_INTENSITY": "basic"}, scanner.IntensityBasic, false},
-		{map[string]string{"SCAN_INTENSITY": "full"}, scanner.IntensityFull, false},
-		{map[string]string{"SCAN_INTENSITY": "lab"}, "", true},
+		{nil, "", false},
+		// The intensity comes with each scan (milestone 3.1), not from here.
+		{map[string]string{"SCAN_INTENSITY": "full"}, "", false},
 		// Nothing in the environment can relax the address policy.
-		{map[string]string{"SCAN_LAB": "1", "QRSCAN_LAB": "1", "LAB": "1", "SCAN_ALLOW_PRIVATE": "1"}, scanner.IntensityFull, false},
+		{map[string]string{"SCAN_LAB": "1", "QRSCAN_LAB": "1", "LAB": "1", "SCAN_ALLOW_PRIVATE": "1"}, "", false},
 	} {
 		opts, err := scannerOptions(func(k string) string { return tc.env[k] })
 		if (err != nil) != tc.err || opts.Intensity != tc.want {

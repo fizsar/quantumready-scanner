@@ -18,6 +18,12 @@ func TestHealthPostgres(t *testing.T) {
 		t.Fatalf("pgxpool.New: %v", err)
 	}
 	t.Cleanup(pool.Close)
+	// Open the connection first: the test router allows the ping only 50 ms,
+	// and dialing a new connection can take longer under a loaded test run
+	// (the timeout itself is tested with a fake in health_test.go).
+	if err := pool.Ping(context.Background()); err != nil {
+		t.Fatalf("warm-up ping: %v", err)
+	}
 
 	rec := doRequest(t, newTestRouter(pool), http.MethodGet, "/api/health")
 	if rec.Code != http.StatusOK {

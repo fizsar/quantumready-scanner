@@ -107,11 +107,19 @@ type target struct {
 	conns *atomic.Int32 // connections opened by this scan
 }
 
-// Scan probes host:port (port 0 means 443). It returns an error only when no
-// result is possible: invalid or blocked target, DNS failure, or a target that
-// is unreachable or does not speak TLS. Individual probe failures are recorded
-// in the Result with status "error".
+// Scan probes host:port (port 0 means 443) with the scanner's intensity. It
+// returns an error only when no result is possible: invalid or blocked target,
+// DNS failure, or a target that is unreachable or does not speak TLS.
+// Individual probe failures are recorded in the Result with status "error".
 func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, error) {
+	return s.ScanWith(ctx, host, port, s.opts.Intensity)
+}
+
+// ScanWith is Scan with an explicit intensity (each queued scan has its own).
+func (s *Scanner) ScanWith(ctx context.Context, host string, port int, intensity Intensity) (*Result, error) {
+	if _, err := ParseIntensity(string(intensity)); err != nil {
+		return nil, err
+	}
 	if port == 0 {
 		port = 443
 	}
@@ -145,7 +153,7 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 		TLS12SuitesComplete:  true,
 		LegacySuitesComplete: true,
 		NotEvaluated:         notEvaluated,
-		Intensity:            s.opts.Intensity,
+		Intensity:            intensity,
 	}
 	for _, a := range all {
 		res.ResolvedIPs = append(res.ResolvedIPs, a.String())
@@ -217,7 +225,7 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	})
 	_ = g.Wait()
 	res.LegacySuitesComplete = legacy10 && legacy11
-	if s.opts.Intensity == IntensityFull {
+	if intensity == IntensityFull {
 		s.runRaw(ctx, t, res)
 	}
 

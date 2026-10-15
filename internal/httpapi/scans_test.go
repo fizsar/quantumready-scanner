@@ -292,7 +292,7 @@ type cannedScanner struct{}
 
 func (cannedScanner) ScanTimeout() time.Duration { return time.Second }
 
-func (cannedScanner) Scan(_ context.Context, host string, port int) (*scanner.Result, error) {
+func (cannedScanner) ScanWith(_ context.Context, host string, port int, _ scanner.Intensity) (*scanner.Result, error) {
 	return &scanner.Result{
 		SchemaVersion: scanner.SchemaVersion, Host: host, Port: port,
 		Default:             scanner.Handshake{Status: scanner.Supported, Version: "TLS 1.3", CipherSuite: "TLS_AES_128_GCM_SHA256", Group: "X25519MLKEM768"},

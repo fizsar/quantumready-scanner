@@ -247,19 +247,24 @@ func TestFail(t *testing.T) {
 	}
 }
 
+// publicBasic is EnqueueOrReuse for a public basic scan (the phase 2 behaviour).
+func publicBasic(ctx context.Context, s *Store, host string, cooldown time.Duration) (Scan, bool, error) {
+	return s.EnqueueOrReuse(ctx, Public, ScanRequest{Host: host, Port: 443, Intensity: IntensityBasic, Cooldown: cooldown})
+}
+
 func TestEnqueueOrReuse(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	first, reused, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+	first, reused, err := publicBasic(ctx, s, "example.com", time.Minute)
 	if err != nil || reused {
 		t.Fatalf("first = %v reused=%v", err, reused)
 	}
-	again, reused, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+	again, reused, err := publicBasic(ctx, s, "example.com", time.Minute)
 	if err != nil || !reused || again.ID != first.ID {
 		t.Fatalf("within cooldown: %v reused=%v id=%s, want the first scan", err, reused, again.ID)
 	}
-	if _, reused, _ := s.EnqueueOrReuse(ctx, "other.example", 443, time.Minute); reused {
+	if _, reused, _ := publicBasic(ctx, s, "other.example", time.Minute); reused {
 		t.Error("another target was reused")
 	}
 
@@ -268,13 +273,13 @@ func TestEnqueueOrReuse(t *testing.T) {
 	if err := s.Fail(ctx, c.ID, *c.LeaseToken, "unreachable"); err != nil {
 		t.Fatal(err)
 	}
-	if fresh, reused, _ := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute); reused || fresh.ID == first.ID {
+	if fresh, reused, _ := publicBasic(ctx, s, "example.com", time.Minute); reused || fresh.ID == first.ID {
 		t.Errorf("a failed scan was reused")
 	}
 
 	// Outside the cooldown a new scan is created.
 	time.Sleep(300 * time.Millisecond)
-	if _, reused, _ := s.EnqueueOrReuse(ctx, "other.example", 443, 200*time.Millisecond); reused {
+	if _, reused, _ := publicBasic(ctx, s, "other.example", 200*time.Millisecond); reused {
 		t.Error("reused after the cooldown")
 	}
 }
@@ -290,7 +295,7 @@ func TestEnqueueOrReuseConcurrent(t *testing.T) {
 	)
 	for range 10 {
 		wg.Go(func() {
-			sc, _, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+			sc, _, err := publicBasic(ctx, s, "example.com", time.Minute)
 			if err != nil {
 				t.Error(err)
 				return

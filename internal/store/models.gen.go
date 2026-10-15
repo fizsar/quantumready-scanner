@@ -10,6 +10,58 @@ import (
 	"github.com/google/uuid"
 )
 
+type AuditLog struct {
+	ID             int64
+	OrganizationID *uuid.UUID
+	UserID         *uuid.UUID
+	Action         string
+	Target         *string
+	IpPrefix       *string
+	CreatedAt      time.Time
+}
+
+type AuthToken struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Purpose   string
+	TokenHash []byte
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+}
+
+type DeletionTombstone struct {
+	IDHash    []byte
+	Kind      string
+	DeletedAt time.Time
+}
+
+type Domain struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	Name           string
+	Token          string
+	Status         string
+	VerifiedAt     *time.Time
+	LastCheckedAt  *time.Time
+	LostAt         *time.Time
+	BlockPublic    bool
+	CreatedAt      time.Time
+}
+
+type EmailOutbox struct {
+	ID            int64
+	ToEmail       string
+	Template      string
+	Lang          string
+	Params        []byte
+	Status        string
+	Attempts      int32
+	NextAttemptAt time.Time
+	CreatedAt     time.Time
+	SentAt        *time.Time
+}
+
 type Finding struct {
 	ID       int64
 	ScanID   uuid.UUID
@@ -19,6 +71,31 @@ type Finding struct {
 	Severity string
 	Category string
 	Params   []byte
+}
+
+type Invitation struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	Email          string
+	Role           string
+	TokenHash      []byte
+	InvitedBy      *uuid.UUID
+	CreatedAt      time.Time
+	ExpiresAt      time.Time
+	AcceptedAt     *time.Time
+}
+
+type Membership struct {
+	OrganizationID uuid.UUID
+	UserID         uuid.UUID
+	Role           string
+	CreatedAt      time.Time
+}
+
+type Organization struct {
+	ID        uuid.UUID
+	Name      string
+	CreatedAt time.Time
 }
 
 type Scan struct {
@@ -44,4 +121,39 @@ type Scan struct {
 	Pqc            *bool
 	Retries        int32
 	NotBefore      *time.Time
+	Intensity      string
+	RequestedBy    *uuid.UUID
+	ExpiresAt      *time.Time
+}
+
+type Session struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	TokenHash   []byte
+	CsrfToken   string
+	ActiveOrgID *uuid.UUID
+	CreatedAt   time.Time
+	LastSeenAt  time.Time
+	ExpiresAt   time.Time
+}
+
+type SignupCode struct {
+	ID        uuid.UUID
+	CodeHash  []byte
+	Note      *string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	UsedBy    *uuid.UUID
+	UsedAt    *time.Time
+}
+
+type User struct {
+	ID              uuid.UUID
+	Email           string
+	EmailVerifiedAt *time.Time
+	PasswordHash    string
+	Name            *string
+	Lang            string
+	CreatedAt       time.Time
+	LastLoginAt     *time.Time
 }

@@ -22,7 +22,8 @@ import (
 
 // Scanner is what the worker needs from internal/scanner.
 type Scanner interface {
-	Scan(ctx context.Context, host string, port int) (*scanner.Result, error)
+	// ScanWith scans with the intensity stored in the queued scan.
+	ScanWith(ctx context.Context, host string, port int, intensity scanner.Intensity) (*scanner.Result, error)
 	// ScanTimeout bounds one Scan; the lease must outlast it.
 	ScanTimeout() time.Duration
 }
@@ -179,7 +180,7 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 	log.Info("worker: scan claimed")
 
 	start := time.Now()
-	res, err := w.sc.Scan(ctx, sc.Host, int(sc.Port))
+	res, err := w.sc.ScanWith(ctx, sc.Host, int(sc.Port), scanner.Intensity(sc.Intensity))
 	if ctx.Err() != nil {
 		log.Warn("worker: stopped mid-scan; the lease will expire and the scan will be retried")
 		return true, nil

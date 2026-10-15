@@ -24,9 +24,11 @@ const maxBodyBytes = 1 << 10
 
 // ScanStore is what the scan endpoints need from internal/store.
 type ScanStore interface {
-	EnqueueOrReuse(ctx context.Context, host string, port int32, cooldown time.Duration) (store.Scan, bool, error)
-	GetScan(ctx context.Context, id uuid.UUID) (store.Scan, error)
-	ListFindings(ctx context.Context, scanID uuid.UUID) ([]store.Finding, error)
+	// Every call names the tenant: the API never reads or writes scans
+	// outside it (store.Store.Tx, row-level security).
+	EnqueueOrReuse(ctx context.Context, t store.Tenant, r store.ScanRequest) (store.Scan, bool, error)
+	ScanFor(ctx context.Context, t store.Tenant, id uuid.UUID) (store.Scan, error)
+	FindingsFor(ctx context.Context, t store.Tenant, scanID uuid.UUID) ([]store.Finding, error)
 }
 
 type createScanRequest struct {
@@ -78,7 +80,9 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusTooManyRequests, "rate_limited")
 		return
 	}
-	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), host, ScanPort, a.cfg.TargetCooldown)
+	// Until accounts (milestone 3.2) every request is public: basic intensity.
+	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), store.Public,
+		store.ScanRequest{Host: host, Port: ScanPort, Intensity: store.IntensityBasic, Cooldown: a.cfg.TargetCooldown})
 	if err != nil {
 		a.cfg.Limiter.Cancel(key)
 		a.internal(w, r, "enqueue scan", err)
@@ -109,7 +113,7 @@ func (a *api) getScan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found")
 		return
 	}
-	sc, err := a.cfg.Scans.GetScan(r.Context(), id)
+	sc, err := a.cfg.Scans.ScanFor(r.Context(), store.Public, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		writeError(w, r, http.StatusNotFound, "not_found")
 		return
@@ -233,7 +237,7 @@ func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
 	if err := json.Unmarshal(sc.Result, &facts); err != nil {
 		return nil, err
 	}
-	rows, err := a.cfg.Scans.ListFindings(r.Context(), sc.ID)
+	rows, err := a.cfg.Scans.FindingsFor(r.Context(), store.Public, sc.ID)
 	if err != nil {
 		return nil, err
 	}

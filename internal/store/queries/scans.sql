@@ -1,6 +1,6 @@
 -- name: EnqueueScan :one
-INSERT INTO scans (host, port, organization_id)
-VALUES (@host, @port, @organization_id)
+INSERT INTO scans (host, port, organization_id, intensity, requested_by, expires_at)
+VALUES (@host, @port, sqlc.narg(organization_id), @intensity, sqlc.narg(requested_by), sqlc.narg(expires_at))
 RETURNING *;
 
 -- name: ClaimScan :one
@@ -67,9 +67,13 @@ VALUES (@scan_id, @position, @code, @axis, @severity, @category, @params);
 SELECT pg_advisory_xact_lock(hashtextextended(@target::text, 0));
 
 -- name: RecentScanForTarget :one
--- The latest scan of a target created within the cooldown that has not failed.
+-- The latest scan of a target created within the cooldown that has not
+-- failed, with the same intensity and the same owner: a basic scan never
+-- answers a full request, and an organization never gets another one's scan
+-- (public scans have no organization).
 SELECT * FROM scans
 WHERE host = @host AND port = @port AND status <> 'failed'
+  AND intensity = @intensity AND organization_id IS NOT DISTINCT FROM sqlc.narg(organization_id)
   AND created_at > now() - make_interval(secs => @within_seconds::float8)
 ORDER BY created_at DESC
 LIMIT 1;
