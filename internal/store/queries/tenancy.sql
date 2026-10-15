@@ -8,7 +8,9 @@ VALUES (@email, @password_hash, sqlc.narg(name), @lang)
 RETURNING *;
 
 -- name: CreateOrganization :one
-INSERT INTO organizations (name) VALUES (@name) RETURNING *;
+-- The ID comes from the application: under RLS, RETURNING needs the new row
+-- to be readable, so the caller makes it the active organization first.
+INSERT INTO organizations (id, name) VALUES (@id, @name) RETURNING *;
 
 -- name: AddMembership :exec
 INSERT INTO memberships (organization_id, user_id, role) VALUES (@organization_id, @user_id, @role);

@@ -87,6 +87,9 @@ services:
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-5}
       RATE_LIMIT_PER_DAY: ${RATE_LIMIT_PER_DAY:-30}
       SCAN_TARGET_COOLDOWN: ${SCAN_TARGET_COOLDOWN:-2m}
+      # Accounts (/api/auth): off while empty (until milestone 3.7).
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+      MAIL_SUPPORT: ${MAIL_SUPPORT:-soporte@fizsar.com}
     ports:
       - "127.0.0.1:8080:8080"
     networks:
@@ -139,6 +142,43 @@ services:
     # Equal to the memory limit: containers never use host swap.
     memswap_limit: 256M
 
+  # Sends the queued emails (Scaleway TEM). Its database role reads only the
+  # email outbox (docs/security.md). Own way out (mail-egress), not the
+  # worker's, and never the Caddy network. Only with COMPOSE_PROFILES=mail in
+  # .env (from milestone 3.7, with the SMTP credentials).
+  mailer:
+    image: *api-image
+    <<: *hardening
+    profiles: [mail]
+    entrypoint: ["/mailer"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: *database-url
+      SMTP_HOST: ${SMTP_HOST:-smtp.tem.scaleway.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-QuantumReady <no-reply@quantumready.fizsar.com>}
+      MAIL_REPLY_TO: ${MAIL_REPLY_TO:-soporte@fizsar.com}
+    tmpfs:
+      - /tmp # heartbeat file for the healthcheck
+    networks: [backend, mail-egress]
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "/mailer", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 64M, pids: 50 }
+    # Equal to the memory limit: containers never use host swap.
+    memswap_limit: 64M
+
   web:
     image: ghcr.io/fizsar/quantumready-saas-web:${QR_TAG:?set QR_TAG in .env}
     <<: *hardening
@@ -162,11 +202,13 @@ services:
     memswap_limit: 64M
 
 networks:
-  # No route outside: only api, migrate and worker can reach the database.
+  # No route outside: only api, migrate, worker and mailer can reach the database.
   backend:
     internal: true
   # The worker's own way out to the Internet (scan targets); nothing else on it.
   egress: {}
+  # The mailer's way out (SMTP provider).
+  mail-egress: {}
   # Shared with the host's Caddy container (created by /srv/caddy/compose.yaml).
   web:
     external: true

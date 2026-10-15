@@ -36,6 +36,24 @@ var messages = map[string]map[string]string{
 	"not_found":              {"es": "No encontrado.", "en": "Not found."},
 	"method_not_allowed":     {"es": "Método no permitido.", "en": "Method not allowed."},
 	"internal":               {"es": "Error interno. Inténtalo más tarde.", "en": "Internal error. Try again later."},
+	"bad_origin":             {"es": "Petición rechazada: no viene de esta web.", "en": "Request refused: it does not come from this site."},
+
+	// Accounts.
+	"invalid_email":           {"es": "El email no es válido.", "en": "The email is not valid."},
+	"invalid_name":            {"es": "El nombre no es válido (máximo 100 caracteres).", "en": "The name is not valid (100 characters at most)."},
+	"invalid_organization":    {"es": "El nombre de la organización no es válido (máximo 100 caracteres).", "en": "The organization name is not valid (100 characters at most)."},
+	"invalid_signup_code":     {"es": "El código de invitación no es válido, ha caducado o ya se usó.", "en": "The invitation code is not valid, has expired or was already used."},
+	"password_too_short":      {"es": "La contraseña debe tener al menos 12 caracteres.", "en": "The password must have at least 12 characters."},
+	"password_too_long":       {"es": "La contraseña puede tener como mucho 128 caracteres.", "en": "The password can have 128 characters at most."},
+	"password_common":         {"es": "Esa contraseña aparece en listas de contraseñas filtradas. Elige otra.", "en": "That password appears in lists of leaked passwords. Choose another one."},
+	"password_contains_email": {"es": "La contraseña no puede contener tu email.", "en": "The password cannot contain your email."},
+	"invalid_credentials":     {"es": "Email o contraseña incorrectos.", "en": "Wrong email or password."},
+	"email_not_verified":      {"es": "Confirma tu email antes de entrar: busca el enlace en tu correo.", "en": "Confirm your email before signing in: look for the link in your inbox."},
+	"too_many_attempts":       {"es": "Demasiados intentos. Espera un poco y vuelve a intentarlo.", "en": "Too many attempts. Wait a little and try again."},
+	"invalid_token":           {"es": "El enlace no es válido, ha caducado o ya se usó. Pide uno nuevo.", "en": "The link is not valid, has expired or was already used. Ask for a new one."},
+	"unauthenticated":         {"es": "Tienes que iniciar sesión.", "en": "You need to sign in."},
+	"csrf_failed":             {"es": "Petición rechazada (falta el token CSRF). Recarga la página.", "en": "Request refused (missing CSRF token). Reload the page."},
+	"wrong_password":          {"es": "La contraseña actual no es correcta.", "en": "The current password is not correct."},
 
 	// Scan failures (scans.error).
 	"blocked_address":    {"es": "El dominio apunta a una dirección interna o reservada; no se escanea.", "en": "The domain points to an internal or reserved address; it is not scanned."},

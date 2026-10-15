@@ -11,18 +11,19 @@ PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
 # Pinned by digest; bump tag and digest together (CI uses the same image).
 SQLC_IMAGE := sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537
 
-.PHONY: help dev test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down tlslab-test tlslab-scan
+.PHONY: help dev signup-code test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down tlslab-test tlslab-scan
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
 
-dev: .env web/node_modules ## Start PostgreSQL, the API (:8080), the worker and Vite (:5173)
-	docker compose up -d --wait db
+dev: .env web/node_modules ## Start PostgreSQL, Mailpit (:8025), the API (:8080), the worker, the mailer and Vite (:5173)
+	docker compose up -d --wait db mailpit
 	@set -a; . ./.env; set +a; \
 	go run ./cmd/migrate && \
 	trap 'kill 0' EXIT; \
 	go run -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT)" ./cmd/api & \
 	WORKER_HEARTBEAT_FILE=$${TMPDIR:-/tmp}/qr-worker-heartbeat go run ./cmd/worker & \
+	MAILER_HEARTBEAT_FILE=$${TMPDIR:-/tmp}/qr-mailer-heartbeat go run ./cmd/mailer & \
 	npm --prefix web run dev; \
 	wait
 
@@ -47,7 +48,10 @@ lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint
 	npm --prefix web run lint
 	npm --prefix web run typecheck
 
-build: web/node_modules ## Build bin/{api,migrate,worker} and web/dist
+signup-code: .env ## Create a closed-beta signup code in the dev database: make signup-code NOTE="for Ana"
+	@set -a; . ./.env; set +a; go run ./cmd/qradmin signup-code -note "$(NOTE)"
+
+build: web/node_modules ## Build bin/{api,migrate,worker,mailer,qradmin,qrscan} and web/dist
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/ ./cmd/...
 	npm --prefix web run build
 
@@ -56,7 +60,7 @@ sqlc: ## Regenerate internal/store from migrations/ and internal/store/queries/
 
 check-compose: ## Check the security policy of deploy/compose.prod.yaml (networks, limits, ports)
 	QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d \
-	docker compose -f deploy/compose.prod.yaml config --format json | python3 deploy/check_compose.py
+	docker compose -f deploy/compose.prod.yaml --profile mail config --format json | python3 deploy/check_compose.py
 
 test-backup: ## Test the backup scripts (local restic repository, throwaway PostgreSQL)
 	bash deploy/backup/test.sh

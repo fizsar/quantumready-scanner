@@ -56,11 +56,18 @@ func (q *Queries) CreateDomain(ctx context.Context, arg CreateDomainParams) (Dom
 }
 
 const createOrganization = `-- name: CreateOrganization :one
-INSERT INTO organizations (name) VALUES ($1) RETURNING id, name, created_at
+INSERT INTO organizations (id, name) VALUES ($1, $2) RETURNING id, name, created_at
 `
 
-func (q *Queries) CreateOrganization(ctx context.Context, name string) (Organization, error) {
-	row := q.db.QueryRow(ctx, createOrganization, name)
+type CreateOrganizationParams struct {
+	ID   uuid.UUID
+	Name string
+}
+
+// The ID comes from the application: under RLS, RETURNING needs the new row
+// to be readable, so the caller makes it the active organization first.
+func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error) {
+	row := q.db.QueryRow(ctx, createOrganization, arg.ID, arg.Name)
 	var i Organization
 	err := row.Scan(&i.ID, &i.Name, &i.CreatedAt)
 	return i, err

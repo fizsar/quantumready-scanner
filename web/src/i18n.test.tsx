@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { AuthProvider } from './AuthProvider'
 import { detectLang, translate } from './i18n'
 import { LangProvider } from './LangProvider'
 import { json, setNavigatorLanguages, stubFetch } from './test/fixtures'
@@ -45,11 +46,13 @@ describe('translate', () => {
 
 describe('language switch', () => {
   const renderApp = () => {
-    stubFetch(() => json({ hosts: ['fizsar.com'], port: 443 }))
+    stubFetch((url) => (url.startsWith('/api/auth/') ? json({ error: { code: 'unauthenticated' } }, 401) : json({ hosts: ['fizsar.com'], port: 443 })))
     return render(
       <MemoryRouter>
         <LangProvider>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </LangProvider>
       </MemoryRouter>,
     )

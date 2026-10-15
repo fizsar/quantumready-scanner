@@ -24,16 +24,47 @@ type window struct {
 
 // NewLimiter allows perMinute requests per minute and perDay per 24 hours.
 func NewLimiter(perMinute, perDay int) *Limiter {
-	return &Limiter{
-		windows: []window{{time.Minute, perMinute}, {24 * time.Hour, perDay}},
-		hits:    map[string][]time.Time{},
-		now:     time.Now,
-	}
+	return newLimiter(window{time.Minute, perMinute}, window{24 * time.Hour, perDay})
+}
+
+// NewWindowLimiter allows n events per span (e.g. 5 failed logins per
+// 15 minutes).
+func NewWindowLimiter(n int, span time.Duration) *Limiter {
+	return newLimiter(window{span, n})
+}
+
+// newLimiter takes the windows shortest first.
+func newLimiter(ws ...window) *Limiter {
+	return &Limiter{windows: ws, hits: map[string][]time.Time{}, now: time.Now}
 }
 
 // Reserve takes one slot for key. If a window is full it returns false and
 // how long until a slot frees up.
 func (l *Limiter) Reserve(key string) (ok bool, retryAfter time.Duration) {
+	return l.take(key, true)
+}
+
+// Check reports whether key has a free slot without taking it. With Add it
+// counts only some events, such as failed logins.
+func (l *Limiter) Check(key string) (ok bool, retryAfter time.Duration) {
+	return l.take(key, false)
+}
+
+// Add records one event for key, even if its windows are full.
+func (l *Limiter) Add(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.hits[key] = append(l.hits[key], l.now())
+}
+
+// Reset forgets key (e.g. its failed logins after a successful one).
+func (l *Limiter) Reset(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.hits, key)
+}
+
+func (l *Limiter) take(key string, record bool) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.now()
@@ -57,7 +88,10 @@ func (l *Limiter) Reserve(key string) (ok bool, retryAfter time.Duration) {
 			return false, oldest.Add(w.span).Sub(now)
 		}
 	}
-	l.hits[key] = append(h, now)
+	if record {
+		h = append(h, now)
+	}
+	l.hits[key] = h
 	return true, 0
 }
 

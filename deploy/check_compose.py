@@ -27,6 +27,7 @@ expected_networks = {
     "migrate": {"backend"},
     "api": {"backend", "web"},
     "worker": {"backend", "egress"},  # never web: scan targets must not reach Caddy/API through it
+    "mailer": {"backend", "mail-egress"},  # its own way out, not the worker's; never web
     "web": {"web"},
 }
 for name, want in expected_networks.items():
@@ -46,14 +47,23 @@ for name, svc in services.items():
         check(p.get("host_ip") == "127.0.0.1", f"{name}: port {p.get('published')} must bind 127.0.0.1")
     check("healthcheck" in svc or name == "migrate", f"{name}: healthcheck required")
 
-for name in ("db", "worker", "migrate"):
+for name in ("db", "worker", "mailer", "migrate"):
     check(not services.get(name, {}).get("ports"), f"{name}: must not publish ports")
 
+for name in ("worker", "mailer"):
+    if name in services:
+        test = services[name]["healthcheck"]["test"]
+        check(test[:1] == ["CMD"], f"{name}: healthcheck must not use a shell (CMD, not CMD-SHELL)")
+
 if "worker" in services:
-    test = services["worker"]["healthcheck"]["test"]
-    check(test[:1] == ["CMD"], "worker: healthcheck must not use a shell (CMD, not CMD-SHELL)")
     env = services["worker"].get("environment", {})
     check("sslmode=disable" in env.get("DATABASE_URL", ""), "worker: DATABASE_URL must set sslmode=disable")
+
+if "mailer" in services:
+    env = services["mailer"].get("environment", {})
+    # Credentials only over TLS (the mailer refuses them anyway).
+    check(env.get("SMTP_SECURITY") in ("starttls", "tls"), "mailer: SMTP_SECURITY must default to starttls or tls")
+    check(services["mailer"].get("profiles") == ["mail"], "mailer: must be behind the mail profile until configured")
 
 if errors:
     print("compose policy violations:\n  " + "\n  ".join(errors))

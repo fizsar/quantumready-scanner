@@ -1,21 +1,8 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
-import type { Lang } from './api'
-import App from './App'
-import { LangProvider } from './LangProvider'
 import { json, reportA, reportD, scanView, stubFetch } from './test/fixtures'
-
-function renderAt(path: string, lang: Lang = 'es') {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <LangProvider initial={lang}>
-        <App />
-      </LangProvider>
-    </MemoryRouter>,
-  )
-}
+import { renderAt } from './test/render'
 
 describe('result page', () => {
   it('done, grade A: plain-language verdict, grade, PQC, axes, breakdown, footer', async () => {

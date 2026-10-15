@@ -4,7 +4,9 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"mime"
 	"net/http"
 	"net/netip"
 	"time"
@@ -45,6 +47,19 @@ type Config struct {
 	// TargetCooldown defaults to DefaultTargetCooldown.
 	TargetCooldown time.Duration
 
+	// Accounts enables /api/auth; it needs PublicOrigin.
+	Accounts AccountStore
+	// PublicOrigin is the site's origin ("https://quantumready.fizsar.com"):
+	// links in emails, and state-changing requests from browsers must come
+	// from it.
+	PublicOrigin string
+	// Support is the address shown in emails (default soporte@fizsar.com).
+	Support    string
+	AuthLimits AuthLimits
+	// Async runs work after the response (default: a goroutine). Tests make
+	// it synchronous.
+	Async func(func())
+
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -66,12 +81,16 @@ func NewRouter(cfg Config) http.Handler {
 		cfg.TargetCooldown = DefaultTargetCooldown
 	}
 	a := &api{cfg: cfg}
+	a.authDefaults()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	// Serve HEAD with the GET handlers (net/http drops the body).
 	r.Use(middleware.GetHead)
 	r.Use(apiHeaders)
+	if cfg.PublicOrigin != "" {
+		r.Use(checkOrigin(cfg.PublicOrigin))
+	}
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) { writeError(w, r, http.StatusNotFound, "not_found") })
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusMethodNotAllowed, "method_not_allowed")
@@ -82,6 +101,23 @@ func NewRouter(cfg Config) http.Handler {
 			r.Get("/targets", a.listTargets)
 			r.Post("/scans", a.createScan)
 			r.Get("/scans/{id}", a.getScan)
+		}
+		if cfg.Accounts != nil {
+			r.Route("/auth", func(r chi.Router) {
+				r.Use(a.loadSession)
+				r.Post("/register", a.register)
+				r.Post("/login", a.login)
+				r.Post("/verify-email", a.verifyEmail)
+				r.Post("/resend-verification", a.resendVerification)
+				r.Post("/forgot-password", a.forgotPassword)
+				r.Post("/reset-password", a.resetPassword)
+				r.Group(func(r chi.Router) {
+					r.Use(requireSession)
+					r.Get("/me", a.me)
+					r.Post("/logout", a.logout)
+					r.Post("/change-password", a.changePassword)
+				})
+			})
 		}
 	})
 	return r
@@ -96,6 +132,28 @@ func apiHeaders(next http.Handler) http.Handler {
 		h.Set("Vary", "Accept-Language")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// decodeJSON reads a JSON body of at most limit bytes into v. On failure it
+// writes the error and returns false.
+func decodeJSON(w http.ResponseWriter, r *http.Request, limit int64, v any) bool {
+	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+		// Also keeps cross-site HTML forms out: they cannot send JSON.
+		writeError(w, r, http.StatusUnsupportedMediaType, "unsupported_media_type")
+		return false
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeError(w, r, http.StatusRequestEntityTooLarge, "body_too_large")
+		} else {
+			writeError(w, r, http.StatusBadRequest, "invalid_json")
+		}
+		return false
+	}
+	return true
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

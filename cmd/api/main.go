@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -62,6 +64,13 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	origin, err := publicOrigin(os.Getenv("PUBLIC_ORIGIN"))
+	if err != nil {
+		return err
+	}
+	if origin == "" {
+		logger.Warn("PUBLIC_ORIGIN is empty: accounts (/api/auth) are disabled")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -82,18 +91,25 @@ func run(logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	st := store.NewStore(pool)
+	cfg := httpapi.Config{
+		Version:        version,
+		DB:             pool,
+		Scans:          st,
+		Allowlist:      allow,
+		TrustedProxies: trusted,
+		Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
+		TargetCooldown: lim.cooldown,
+		PublicOrigin:   origin,
+		Support:        os.Getenv("MAIL_SUPPORT"),
+		Logger:         logger,
+	}
+	if origin != "" {
+		cfg.Accounts = st
+	}
 	srv := &http.Server{
-		Addr: addr,
-		Handler: httpapi.NewRouter(httpapi.Config{
-			Version:        version,
-			DB:             pool,
-			Scans:          store.NewStore(pool),
-			Allowlist:      allow,
-			TrustedProxies: trusted,
-			Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
-			TargetCooldown: lim.cooldown,
-			Logger:         logger,
-		}),
+		Addr:              addr,
+		Handler:           httpapi.NewRouter(cfg),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -116,6 +132,23 @@ func run(logger *slog.Logger) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// publicOrigin checks PUBLIC_ORIGIN: scheme and host only, https except for
+// localhost (development).
+func publicOrigin(s string) (string, error) {
+	if s == "" {
+		return "", nil
+	}
+	u, err := url.Parse(s)
+	if err != nil || u.Host == "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return "", fmt.Errorf("PUBLIC_ORIGIN %q: want scheme://host[:port]", s)
+	}
+	local := u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1"
+	if u.Scheme != "https" && (u.Scheme != "http" || !local) {
+		return "", fmt.Errorf("PUBLIC_ORIGIN %q: must be https (http only for localhost)", s)
+	}
+	return u.Scheme + "://" + strings.ToLower(u.Host), nil // as browsers send it
 }
 
 func envOr(key, fallback string) string {

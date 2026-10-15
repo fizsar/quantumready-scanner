@@ -272,6 +272,48 @@ a.btn:hover {
   min-height: 1.6em;
 }
 
+/* Accounts */
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.nav-link {
+  color: var(--green);
+}
+.auth {
+  width: min(100%, 30rem);
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.field .input {
+  flex: none;
+  width: 100%;
+}
+.ok {
+  color: var(--green);
+}
+.btn-link {
+  color: var(--green);
+  background: transparent;
+  font-weight: 400;
+  padding: 0.3rem 0;
+  border: none;
+  text-decoration: underline;
+}
+.orgs {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
 /* Progress */
 .progress {
   display: flex;

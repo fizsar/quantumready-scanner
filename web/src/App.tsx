@@ -1,6 +1,8 @@
 import { Link, Route, Routes } from 'react-router'
 import type { Lang } from './api'
+import { useAuth } from './auth'
 import { useLang } from './i18n'
+import { AccountPage, ForgotPage, LoginPage, RegisterPage, ResetPage, VerifyPage } from './pages/AccountPages'
 import { Home } from './pages/Home'
 import { ScanPage } from './pages/ScanPage'
 import { usePageMeta } from './usePageMeta'
@@ -23,13 +25,22 @@ export default function App() {
             quantumready
           </Link>
         </nav>
-        <LangSwitch />
+        <div className="topbar-right">
+          <AccountLink />
+          <LangSwitch />
+        </div>
       </header>
 
       <main id="main" className="main" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/scans/:id" element={<ScanPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify" element={<VerifyPage />} />
+          <Route path="/forgot" element={<ForgotPage />} />
+          <Route path="/reset" element={<ResetPage />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
@@ -38,6 +49,21 @@ export default function App() {
         <a href="https://fizsar.com">← fizsar.com</a>
       </footer>
     </div>
+  )
+}
+
+function AccountLink() {
+  const { t } = useLang()
+  const { state } = useAuth()
+  if (state.status === 'loading') return null
+  return state.status === 'user' ? (
+    <Link to="/account" className="nav-link">
+      {t('nav.account')}
+    </Link>
+  ) : (
+    <Link to="/login" className="nav-link">
+      {t('nav.login')}
+    </Link>
   )
 }
 

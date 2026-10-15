@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"mime"
 	"net/http"
 	"strconv"
 	"time"
@@ -43,21 +42,8 @@ func (a *api) listTargets(w http.ResponseWriter, _ *http.Request) {
 
 // createScan: POST /api/scans {"host": "..."}.
 func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
-	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
-		// Also keeps cross-site HTML forms out: they cannot send JSON.
-		writeError(w, r, http.StatusUnsupportedMediaType, "unsupported_media_type")
-		return
-	}
 	var req createScanRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
-			writeError(w, r, http.StatusRequestEntityTooLarge, "body_too_large")
-		} else {
-			writeError(w, r, http.StatusBadRequest, "invalid_json")
-		}
+	if !decodeJSON(w, r, maxBodyBytes, &req) {
 		return
 	}
 	host, err := NormalizeHost(req.Host)
