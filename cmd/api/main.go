@@ -105,7 +105,7 @@ func run(logger *slog.Logger) error {
 		Logger:         logger,
 	}
 	if origin != "" {
-		cfg.Accounts = st
+		cfg.Accounts, cfg.Orgs = st, st
 	}
 	srv := &http.Server{
 		Addr:              addr,

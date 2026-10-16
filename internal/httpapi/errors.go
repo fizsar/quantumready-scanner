@@ -53,6 +53,10 @@ var messages = map[string]map[string]string{
 	"invalid_token":           {"es": "El enlace no es válido, ha caducado o ya se usó. Pide uno nuevo.", "en": "The link is not valid, has expired or was already used. Ask for a new one."},
 	"unauthenticated":         {"es": "Tienes que iniciar sesión.", "en": "You need to sign in."},
 	"csrf_failed":             {"es": "Petición rechazada (falta el token CSRF). Recarga la página.", "en": "Request refused (missing CSRF token). Reload the page."},
+	"forbidden":               {"es": "Tu rol en esta organización no permite hacer esto.", "en": "Your role in this organization does not allow this."},
+	"no_organization":         {"es": "No perteneces a ninguna organización.", "en": "You do not belong to any organization."},
+	"last_owner":              {"es": "La organización necesita al menos un propietario: nombra antes a otro.", "en": "The organization needs at least one owner: make someone else owner first."},
+	"invalid_role":            {"es": "El rol no es válido (owner, admin o viewer).", "en": "The role is not valid (owner, admin or viewer)."},
 	"wrong_password":          {"es": "La contraseña actual no es correcta.", "en": "The current password is not correct."},
 
 	// Scan failures (scans.error).

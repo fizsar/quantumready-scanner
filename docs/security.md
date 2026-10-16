@@ -43,6 +43,24 @@ Cada servicio actúa con su rol desde que abre la conexión (`store.UseRole`: `S
 - **Reutilización** (`TestReuseNeverCrossesIntensityOrTenant`): `basic` nunca responde a `full`, ni entre organizaciones; `full` sin organización se rechaza.
 - **Endpoints (hitos 3.3–3.4)**: cada endpoint con IDs de organización entra en una batería IDOR que lo llama con IDs de la otra organización y exige 404 y que no aparezcan en ningún listado. Los de cuentas (3.2) no reciben IDs: actúan sobre el usuario de la sesión.
 
+## Roles en una organización
+
+Definidos en `internal/org` (un test fija la matriz entera). La API decide con las filas del actor y del afectado bloqueadas en la misma transacción que el cambio, así que un rol no puede cambiar entre la comprobación y la acción.
+
+| Acción | owner | admin | viewer |
+|---|---|---|---|
+| Ver la organización, sus miembros, escaneos y dominios | ✓ | ✓ | ✓ |
+| Renombrar la organización | ✓ | ✓ | – |
+| Invitar (como admin o viewer) y revocar invitaciones | ✓ | ✓ | – |
+| Cambiar el rol de un miembro (a cualquier rol) | ✓ | – | – |
+| Quitar a un miembro | ✓ | solo viewers | – |
+| Salir de la organización | ✓ | ✓ | ✓ |
+| Gestionar dominios y escaneos `full` (hito 3.4) | ✓ | ✓ | – |
+
+- **Siempre queda un owner**: PostgreSQL lo impone con un trigger (`memberships_keep_owner`) en todo cambio o baja de una membresía; bloquea la fila de la organización, de modo que dos owners que se degradan a la vez no la dejan sin owner (hay un test de la carrera). La API responde **409** `last_owner`. Borrar la organización entera sigue funcionando.
+- Nadie da más poder del que tiene: los owners se hacen por ascenso, nunca por invitación.
+- Si a alguien lo quitan de la organización activa, su sesión pasa a su primera organización en la siguiente petición; sin ninguna, **403** `no_organization`.
+
 ## Cuentas
 
 Autenticación propia (hito 3.2; `internal/auth`, `internal/httpapi/auth.go`, `internal/store/accounts.go`). Endpoints en [api.md](api.md#cuentas-apiauth-hito-32).

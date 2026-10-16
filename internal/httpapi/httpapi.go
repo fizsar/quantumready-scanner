@@ -49,6 +49,8 @@ type Config struct {
 
 	// Accounts enables /api/auth; it needs PublicOrigin.
 	Accounts AccountStore
+	// Orgs (with Accounts) enables /api/org.
+	Orgs OrgStore
 	// PublicOrigin is the site's origin ("https://quantumready.fizsar.com"):
 	// links in emails, and state-changing requests from browsers must come
 	// from it.
@@ -101,6 +103,17 @@ func NewRouter(cfg Config) http.Handler {
 			r.Get("/targets", a.listTargets)
 			r.Post("/scans", a.createScan)
 			r.Get("/scans/{id}", a.getScan)
+		}
+		if cfg.Accounts != nil && cfg.Orgs != nil {
+			r.Route("/org", func(r chi.Router) {
+				r.Use(a.loadSession, requireSession, a.requireOrg)
+				r.Get("/", a.getOrg)
+				r.Patch("/", a.renameOrg)
+				r.Get("/members", a.listMembers)
+				r.Patch("/members/{userID}", a.changeRole)
+				r.Delete("/members/{userID}", a.removeMember)
+				r.Post("/leave", a.leaveOrg)
+			})
 		}
 		if cfg.Accounts != nil {
 			r.Route("/auth", func(r chi.Router) {

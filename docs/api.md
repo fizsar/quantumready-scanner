@@ -68,6 +68,19 @@ Los enlaces de los emails son `PUBLIC_ORIGIN/verify#token=…` y `/reset#token=�
 
 **Límites** (en memoria): login 10/min y 50/día por IP; 5 contraseñas fallidas por cuenta en 15 min (también para emails que no existen, para no delatarlos); registro, verificación, reenvío, recuperación y reset 5/min y 30/día por IP → **429** `too_many_attempts` con `Retry-After`. Además, como mucho 3 emails por dirección y hora: los que sobran no se envían, sin avisar.
 
+## Organización: `/api/org/*` (hito 3.3)
+
+Con sesión (y CSRF en lo que cambia algo). Actúan siempre sobre la **organización activa** de la sesión; los IDs de la URL son de miembros dentro de ella. Permisos por rol en [security.md](security.md#roles-en-una-organización): sin permiso → **403** `forbidden`; un ID que no es de un miembro → **404**; dejarla sin owner → **409** `last_owner`; el usuario sin ninguna organización → **403** `no_organization`.
+
+| Endpoint | Cuerpo | Respuesta |
+|---|---|---|
+| `GET /org` | — | `{"id", "name", "role", "permissions": ["view", …]}` |
+| `PATCH /org` | `name` | **204** (owner, admin) |
+| `GET /org/members` | — | `{"members": [{"user_id", "email", "name", "role", "joined_at", "you"}]}` |
+| `PATCH /org/members/{userID}` | `role` | **204** (owner) |
+| `DELETE /org/members/{userID}` | — | **204** (owner: cualquiera; admin: viewers; uno mismo: salir) |
+| `POST /org/leave` | — | **204**; la sesión pasa a otra organización del usuario |
+
 ## Errores
 
 Siempre `{"error": {"code": "…", "message": "…"}}` con el mensaje en el idioma de la petición: `invalid_json` (400), `invalid_host` (400), `port_not_allowed` (400), `body_too_large` (413), `unsupported_media_type` (415), `host_not_allowed` (403), `bad_origin` (403), `rate_limited` (429), `not_found` (404), `method_not_allowed` (405), `internal` (500); de cuentas, los de la tabla anterior. Códigos de fallo de un escaneo: `blocked_address`, `invalid_target`, `dns_not_found`, `dns_temporary`, `dns`, `connection_refused`, `timeout`, `network`, `unreachable`, `scan_error`, `lease_expired`.

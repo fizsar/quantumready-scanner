@@ -85,6 +85,8 @@ type Invitation struct {
 	CreatedAt      time.Time
 	ExpiresAt      time.Time
 	AcceptedAt     *time.Time
+	RevokedAt      *time.Time
+	AcceptedBy     *uuid.UUID
 }
 
 type Membership struct {
