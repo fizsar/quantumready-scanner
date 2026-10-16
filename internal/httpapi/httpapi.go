@@ -127,6 +127,11 @@ func NewRouter(cfg Config) http.Handler {
 					r.Get("/domains/{domainID}", a.getDomain)
 					r.Delete("/domains/{domainID}", a.deleteDomain)
 					r.Post("/domains/{domainID}/verify", a.verifyDomain)
+					if cfg.Scans != nil {
+						r.Get("/scans", a.listOrgScans)
+						r.Post("/scans", a.createOrgScan)
+						r.Get("/scans/{scanID}", a.getOrgScan)
+					}
 				}
 			})
 			r.Route("/organizations", func(r chi.Router) {

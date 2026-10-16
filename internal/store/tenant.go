@@ -26,8 +26,21 @@ const (
 	IntensityFull  = "full"
 )
 
-// PublicScanTTL is how long a public scan is kept (privacy: data minimization).
-const PublicScanTTL = 30 * 24 * time.Hour
+// How long scans are kept (privacy: data minimization): public ones 30
+// days, an organization's history 13 months. The purge comes with milestone 3.6.
+const (
+	PublicScanTTL = 30 * 24 * time.Hour
+	OrgScanTTL    = 395 * 24 * time.Hour
+)
+
+// OrgScans lists the active organization's scans, newest first.
+func (s *Store) OrgScans(ctx context.Context, t Tenant, limit int32) (scs []Scan, err error) {
+	err = s.Tx(ctx, t, func(q *Queries) error {
+		scs, err = q.ListOrganizationScans(ctx, ListOrganizationScansParams{OrganizationID: t.OrgID, MaxRows: limit})
+		return err
+	})
+	return scs, err
+}
 
 // ErrFullNeedsOrg is returned for a full scan without an organization: full
 // scans exist only for an organization's verified domains.
@@ -93,11 +106,11 @@ func (s *Store) EnqueueOrReuse(ctx context.Context, t Tenant, r ScanRequest) (sc
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		var expires *time.Time
-		if t.OrgID == nil {
-			e := time.Now().Add(PublicScanTTL)
-			expires = &e
+		e := time.Now().Add(PublicScanTTL)
+		if t.OrgID != nil {
+			e = time.Now().Add(OrgScanTTL)
 		}
+		expires := &e
 		sc, err = q.EnqueueScan(ctx, EnqueueScanParams{
 			Host: r.Host, Port: r.Port, OrganizationID: t.OrgID, Intensity: r.Intensity, RequestedBy: t.UserID, ExpiresAt: expires,
 		})

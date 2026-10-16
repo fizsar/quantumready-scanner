@@ -278,7 +278,8 @@ func TestReuseNeverCrossesIntensityOrTenant(t *testing.T) {
 		t.Errorf("public scan: org %v, expires %v", pub.OrganizationID, pub.ExpiresAt)
 	}
 	fullA, reused := enqueue(a, IntensityFull)
-	if reused || fullA.ID == pub.ID || fullA.Intensity != IntensityFull || fullA.ExpiresAt != nil || *fullA.RequestedBy != w.userA.ID {
+	if reused || fullA.ID == pub.ID || fullA.Intensity != IntensityFull || *fullA.RequestedBy != w.userA.ID ||
+		fullA.ExpiresAt == nil || time.Until(*fullA.ExpiresAt) < 394*24*time.Hour { // an organization's history: 13 months
 		t.Errorf("full for A reused the public basic scan or lost its owner: %+v", fullA)
 	}
 	if again, reused := enqueue(a, IntensityFull); !reused || again.ID != fullA.ID {

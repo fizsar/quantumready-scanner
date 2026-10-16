@@ -48,6 +48,8 @@ type AuthLimits struct {
 	OrgInvitations *Limiter
 	// DomainChecks: verification requests per domain: 10/hour.
 	DomainChecks *Limiter
+	// OrgScans: full scans started per organization: 30/day (reused ones do not count).
+	OrgScans *Limiter
 }
 
 // Session cookie and lifetimes.
@@ -94,6 +96,9 @@ func (a *api) authDefaults() {
 	}
 	if l.DomainChecks == nil {
 		l.DomainChecks = NewWindowLimiter(10, time.Hour)
+	}
+	if l.OrgScans == nil {
+		l.OrgScans = NewWindowLimiter(30, 24*time.Hour)
 	}
 	if a.cfg.Async == nil {
 		a.cfg.Async = func(f func()) { go f() }

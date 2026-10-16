@@ -90,6 +90,10 @@ Con sesión (y CSRF en lo que cambia algo). Actúan siempre sobre la **organizac
 | `DELETE /org/domains/{id}` | — | **204** (owner, admin); sus escaneos siguen en el historial |
 | `POST /org/domains/{id}/verify` | — | **202** con `check_pending: true` (owner, admin; 10 por hora y dominio). El worker consulta el TXT en segundos: consultar `GET` hasta que `check_pending` sea `false` |
 
+| `POST /org/scans` | `host` | Escaneo **`full`** de un dominio verificado de la organización o de un subdominio suyo (owner, admin). **202** (o **200** reutilizado, como `/api/scans`), `Location: /api/org/scans/{id}`. **403** `domain_not_verified`; **429** (30 al día por organización; los reutilizados no cuentan). La allowlist de escaneos públicos no se aplica: la verificación prueba el control |
+| `GET /org/scans` | — | Historial (13 meses, los 200 últimos): `{"scans": [{id, host, status, intensity, created_at, finished_at, score, grade}]}` |
+| `GET /org/scans/{id}` | — | El escaneo, como `GET /api/scans/{id}` (con `intensity`). Solo los de la organización; un escaneo público → **404** |
+
 `status`: `pending` (nunca verificado o verificación perdida), `verified`, `lost` (el registro desapareció; los escaneos `full` siguen hasta `grace_until`, 14 días). `verified` indica si ahora se permiten escaneos `full`.
 
 Fuera de `/org`:

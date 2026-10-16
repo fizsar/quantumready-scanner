@@ -54,6 +54,17 @@ Cada servicio actúa con su rol desde que abre la conexión (`store.UseRole`: `S
 | Sin filtro y sin RLS | detectada (72: aparecen los miembros de la otra organización) |
 
   Es lo que se busca con dos barreras independientes: cualquiera de las dos sola protege, y la batería detecta cuando faltan las dos.
+- **Hito 3.4**: los endpoints de dominios y de escaneos de organización entran en la batería: leer, borrar y pedir la verificación de un dominio de la otra organización, leer su escaneo por la ruta de organización, y lanzar un escaneo `full` de su dominio verificado (403: el dominio verificado de otra organización no cuenta). Segunda prueba de mutación (16/10/2026):
+
+| Mutación | Resultado |
+|---|---|
+| Escaneo `full` sin comprobar que el dominio esté verificado | detectada |
+| La ruta de escaneos de organización sirve escaneos públicos | detectada |
+| Los hallazgos de un escaneo de organización se leen con el inquilino público | detectada: el informe salía **sin hallazgos** (RLS los ocultaba). Era un fallo real del código, encontrado y corregido en este hito |
+| Consultas de dominios sin el filtro `organization_id`, con RLS | no detectada: RLS sola basta |
+| Sin filtro y sin RLS | detectada (10) |
+
+  Al preparar esta prueba apareció que, en los tests, la comprobación de `GET /api/scans/{id}` daba 404 porque la ruta no estaba registrada (la configuración de los tests no tenía escaneos): no probaba nada. Ahora la ruta existe en esos tests y la comprobación es real.
 - **Límites por organización**: 20 invitaciones pendientes, 50 miembros contando las pendientes (aceptar nunca lo supera), 50 invitaciones creadas al día (en memoria; 429 con `Retry-After`) y 10 organizaciones por usuario. Cada dirección recibe como mucho 3 emails por hora.
 
 ## Roles en una organización

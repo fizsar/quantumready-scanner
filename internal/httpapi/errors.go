@@ -61,6 +61,7 @@ var messages = map[string]map[string]string{
 	"domain_reserved":          {"es": "Ese nombre es de uso reservado o interno y no se puede verificar.", "en": "That name is reserved or internal and cannot be verified."},
 	"domain_unknown_tld":       {"es": "La terminación del dominio no existe.", "en": "The domain's ending does not exist."},
 	"domain_public_suffix":     {"es": "Es un sufijo público (como .com o .co.uk), no un dominio que se pueda poseer: añade tu dominio completo.", "en": "That is a public suffix (like .com or .co.uk), not a domain anyone owns: add your full domain."},
+	"domain_not_verified":      {"es": "Ese dominio no está verificado en tu organización. Verifícalo (o el dominio del que cuelga) para hacer un análisis completo.", "en": "That domain is not verified in your organization. Verify it (or its parent domain) to run a full scan."},
 	"domain_exists":            {"es": "Ese dominio ya está añadido.", "en": "That domain is already added."},
 	"dns_record_missing":       {"es": "No encontramos el registro TXT de verificación en los servidores DNS del dominio.", "en": "We did not find the verification TXT record on the domain's DNS servers."},
 	"dns_unavailable":          {"es": "Los servidores DNS del dominio no respondieron; lo intentaremos más tarde.", "en": "The domain's DNS servers did not answer; we will try again later."},

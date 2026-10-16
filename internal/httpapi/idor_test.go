@@ -53,6 +53,7 @@ func buildTenant(t *testing.T, a *authAPI, tag string, ipBase int) *tenantWorld 
 	w.invitation = iv.ID
 	w.inviteTok = a.lastToken(t, w.inviteTo, "invitation")
 	w.domain = addDomain(t, owner, "secret-"+tag+"-domain.com").ID
+	a.verify(t, w.domain, "verified", 0)
 	if err := a.owner.QueryRow(context.Background(), `INSERT INTO scans (host, port, organization_id, intensity, status)
 		VALUES ('secret-`+tag+`.example', 443, $1, 'full', 'queued') RETURNING id`, w.org).Scan(&w.scan); err != nil {
 		t.Fatal(err)
@@ -120,6 +121,9 @@ func TestIDOR(t *testing.T) {
 			check("DELETE domain", c.do(t, "DELETE", dom, ""), 404, 403)
 			check("verify domain", c.do(t, "POST", dom+"/verify", ""), 404, 403)
 			check("GET scan", c.do(t, "GET", "/api/scans/"+to.scan.String(), ""), 404)
+			check("GET org scan", c.do(t, "GET", "/api/org/scans/"+to.scan.String(), ""), 404)
+			// The other organization's verified domain does not let anyone here scan it.
+			check("full scan of its domain", c.do(t, "POST", "/api/org/scans", js(map[string]string{"host": "secret-" + to.tag + "-domain.com"})), 403)
 			check("accept invitation", c.do(t, "POST", "/api/invitations/accept", js(map[string]string{"token": to.inviteTok})), 403)
 			// The organization comes from the session, never from the request.
 			tamper := func(r *http.Request) {
@@ -128,7 +132,7 @@ func TestIDOR(t *testing.T) {
 				q.Set("organization_id", to.org.String())
 				r.URL.RawQuery = q.Encode()
 			}
-			for _, path := range []string{"/api/org", "/api/org/members", "/api/org/invitations", "/api/org/domains", "/api/auth/me"} {
+			for _, path := range []string{"/api/org", "/api/org/members", "/api/org/invitations", "/api/org/domains", "/api/org/scans", "/api/auth/me"} {
 				check("GET "+path, c.do(t, "GET", path, "", tamper), 200, 403)
 			}
 			check("PATCH /api/org (tampered)", c.do(t, "PATCH", "/api/org", `{"name":"`+from.name+`"}`, tamper), 204, 403)

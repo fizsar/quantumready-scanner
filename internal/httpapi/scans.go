@@ -28,6 +28,8 @@ type ScanStore interface {
 	EnqueueOrReuse(ctx context.Context, t store.Tenant, r store.ScanRequest) (store.Scan, bool, error)
 	ScanFor(ctx context.Context, t store.Tenant, id uuid.UUID) (store.Scan, error)
 	FindingsFor(ctx context.Context, t store.Tenant, scanID uuid.UUID) ([]store.Finding, error)
+	// OrgScans lists an organization's scans (history).
+	OrgScans(ctx context.Context, t store.Tenant, limit int32) ([]store.Scan, error)
 }
 
 type createScanRequest struct {
@@ -78,7 +80,7 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		a.cfg.Limiter.Cancel(key) // no new scan: it does not count
 	}
 
-	view, err := a.view(r, sc)
+	view, err := a.view(r, store.Public, sc)
 	if err != nil {
 		a.internal(w, r, "scan view", err)
 		return
@@ -108,7 +110,7 @@ func (a *api) getScan(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, r, "get scan", err)
 		return
 	}
-	view, err := a.view(r, sc)
+	view, err := a.view(r, store.Public, sc)
 	if err != nil {
 		a.internal(w, r, "scan view", err)
 		return
@@ -131,7 +133,8 @@ type scanView struct {
 	ID         uuid.UUID  `json:"id"`
 	Host       string     `json:"host"`
 	Port       int32      `json:"port"`
-	Status     string     `json:"status"` // queued, running, done, failed
+	Intensity  string     `json:"intensity,omitempty"` // basic (public) or full (verified domains)
+	Status     string     `json:"status"`              // queued, running, done, failed
 	Retries    int32      `json:"retries"`
 	CreatedAt  time.Time  `json:"created_at"`
 	StartedAt  *time.Time `json:"started_at,omitempty"`
@@ -195,10 +198,10 @@ type findingView struct {
 	scoring.Text
 }
 
-func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
+func (a *api) view(r *http.Request, t store.Tenant, sc store.Scan) (*scanView, error) {
 	lang := pickLang(r)
 	v := &scanView{
-		ID: sc.ID, Host: sc.Host, Port: sc.Port, Status: sc.Status, Retries: sc.Retries,
+		ID: sc.ID, Host: sc.Host, Port: sc.Port, Intensity: sc.Intensity, Status: sc.Status, Retries: sc.Retries,
 		CreatedAt: sc.CreatedAt, StartedAt: sc.StartedAt, FinishedAt: sc.FinishedAt, Lang: lang,
 	}
 	if sc.Error != nil {
@@ -223,7 +226,7 @@ func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
 	if err := json.Unmarshal(sc.Result, &facts); err != nil {
 		return nil, err
 	}
-	rows, err := a.cfg.Scans.FindingsFor(r.Context(), store.Public, sc.ID)
+	rows, err := a.cfg.Scans.FindingsFor(r.Context(), t, sc.ID)
 	if err != nil {
 		return nil, err
 	}
