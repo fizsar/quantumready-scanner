@@ -56,6 +56,12 @@ type Config struct {
 	Altcha *altcha.Verifier
 	// PublicLimits apply to open public scans, on top of Limiter (per IP).
 	PublicLimits PublicLimits
+	// PublicQueueMax: queued public scans above which new ones get 429 busy
+	// (QR_PUBLIC_QUEUE_MAX; default 100, about five minutes of work).
+	PublicQueueMax int
+	// ScansPerMinute is the worker's pace (WORKER_MAX_SCANS_PER_MINUTE,
+	// default 20), for the queue wait shown to visitors.
+	ScansPerMinute int
 
 	// Accounts enables /api/auth; it needs PublicOrigin.
 	Accounts AccountStore
@@ -103,6 +109,12 @@ func NewRouter(cfg Config) http.Handler {
 	}
 	if cfg.TargetCooldown <= 0 {
 		cfg.TargetCooldown = DefaultTargetCooldown
+	}
+	if cfg.PublicQueueMax <= 0 {
+		cfg.PublicQueueMax = 100
+	}
+	if cfg.ScansPerMinute <= 0 {
+		cfg.ScansPerMinute = 20
 	}
 	if cfg.PublicLimits.PerDomain == nil {
 		cfg.PublicLimits.PerDomain = NewWindowLimiter(10, 24*time.Hour)

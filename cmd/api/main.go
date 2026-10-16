@@ -72,6 +72,10 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	queueMax, perMinute, err := queueConfig(os.Getenv)
+	if err != nil {
+		return err
+	}
 	if openScans {
 		logger.Warn("PUBLIC_SCAN_OPEN: anyone can scan any domain (basic), with a proof of work")
 	}
@@ -110,6 +114,8 @@ func run(logger *slog.Logger) error {
 		PublicOrigin:   origin,
 		PublicScanOpen: openScans,
 		Altcha:         proof,
+		PublicQueueMax: queueMax,
+		ScansPerMinute: perMinute,
 		Support:        os.Getenv("MAIL_SUPPORT"),
 		Logger:         logger,
 	}

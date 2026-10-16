@@ -65,6 +65,16 @@ describe('open public scanning', () => {
     expect((await screen.findByText(/^Resultado de hace 25 min/)).getAttribute('role')).toBe('status')
   })
 
+  it.each([
+    [1, 3, 'En cola: el tuyo es el siguiente (espera aproximada: menos de un minuto).'],
+    [12, 36, 'En cola: hay 11 análisis antes que el tuyo (espera aproximada: menos de un minuto).'],
+    [45, 135, 'En cola: hay 44 análisis antes que el tuyo (espera aproximada: unos 3 min).'],
+  ])('queued at position %i: shows the place and the wait', async (position, eta, text) => {
+    stubFetch((url) => (url.startsWith('/api/auth/') ? unauth() : json({ ...scanView('queued'), queue_position: position, queue_eta_seconds: eta })))
+    renderAt('/scans/abc')
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(text))
+  })
+
   it('closed: no proof of work, the demo text', async () => {
     const fetch = stubFetch((url) => (url === '/api/targets' ? json({ hosts: ['fizsar.com'], port: 443 }) : unauth()))
     renderAt('/')

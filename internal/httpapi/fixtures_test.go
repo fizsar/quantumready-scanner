@@ -31,6 +31,10 @@ func (f *fixtureStore) EnqueueOrReuse(context.Context, store.Tenant, store.ScanR
 func (f *fixtureStore) ScanFor(_ context.Context, _ store.Tenant, id uuid.UUID) (store.Scan, error) {
 	return f.scans[id], nil
 }
+func (f *fixtureStore) PublicQueueLength(context.Context) (int64, error) { return 0, nil }
+func (f *fixtureStore) PublicQueuePosition(context.Context, time.Time) (int64, error) {
+	return 0, nil
+}
 func (f *fixtureStore) RecentPublicScan(context.Context, string, int32, time.Duration, time.Duration) (store.Scan, error) {
 	panic("not used")
 }

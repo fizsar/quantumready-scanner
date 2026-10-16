@@ -35,6 +35,9 @@ type ScanStore interface {
 	PublicScanBlocked(ctx context.Context, host string) (bool, error)
 	// RecentPublicScan: a public basic scan to reuse (pgx.ErrNoRows if none).
 	RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration) (store.Scan, error)
+	// PublicQueueLength and PublicQueuePosition count public scans only.
+	PublicQueueLength(ctx context.Context) (int64, error)
+	PublicQueuePosition(ctx context.Context, createdAt time.Time) (int64, error)
 }
 
 type createScanRequest struct {
@@ -127,6 +130,17 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		a.internal(w, r, "recent public scan", err)
+		return
+	}
+
+	// A full public queue (about five minutes of work) refuses new scans
+	// before any quota is spent.
+	if queued, err := a.cfg.Scans.PublicQueueLength(r.Context()); err != nil {
+		a.internal(w, r, "public queue length", err)
+		return
+	} else if queued >= int64(a.cfg.PublicQueueMax) {
+		w.Header().Set("Retry-After", "60")
+		writeError(w, r, http.StatusTooManyRequests, "busy")
 		return
 	}
 
@@ -237,8 +251,12 @@ type scanView struct {
 	Error      *apiError  `json:"error,omitempty"`       // failed (or waiting to retry)
 	Reused     bool       `json:"reused,omitempty"`      // POST returned a recent scan of the same target
 	AgeSeconds *int       `json:"age_seconds,omitempty"` // with reused: how old the result is (since it finished)
-	Lang       string     `json:"lang"`
-	Report     *report    `json:"report,omitempty"` // done
+	// A queued public scan: its place among public scans (1: next) and a
+	// rough wait from the worker's pace. Organizations' scans are not counted.
+	QueuePosition   *int64  `json:"queue_position,omitempty"`
+	QueueETASeconds *int64  `json:"queue_eta_seconds,omitempty"`
+	Lang            string  `json:"lang"`
+	Report          *report `json:"report,omitempty"` // done
 }
 
 type report struct {
@@ -302,6 +320,14 @@ func (a *api) view(r *http.Request, t store.Tenant, sc store.Scan) (*scanView, e
 	}
 	if sc.Error != nil {
 		v.Error = &apiError{Code: *sc.Error, Message: message(*sc.Error, lang)}
+	}
+	if sc.Status == "queued" && sc.OrganizationID == nil && t.OrgID == nil {
+		pos, err := a.cfg.Scans.PublicQueuePosition(r.Context(), sc.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		eta := (pos*60 + int64(a.cfg.ScansPerMinute) - 1) / int64(a.cfg.ScansPerMinute)
+		v.QueuePosition, v.QueueETASeconds = &pos, &eta
 	}
 	if sc.Status != "done" {
 		return v, nil

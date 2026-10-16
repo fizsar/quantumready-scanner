@@ -76,6 +76,10 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	queueTimeout, err := publicQueueTimeout(os.Getenv)
+	if err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -92,9 +96,10 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	w, err := worker.New(store.NewStore(pool), scanner.New(scanOpts), worker.Config{
-		Concurrency:  concurrency,
-		MaxPerMinute: perMinute,
-		Logger:       logger,
+		Concurrency:        concurrency,
+		MaxPerMinute:       perMinute,
+		PublicQueueTimeout: queueTimeout,
+		Logger:             logger,
 		Heartbeat: func(oldest time.Time) {
 			if err := writeHeartbeat(hbPath, oldest); err != nil {
 				logger.Warn("worker: cannot write heartbeat", "err", err)
@@ -108,7 +113,7 @@ func run(logger *slog.Logger) error {
 	checker := &worker.DomainChecker{Queue: store.NewStore(pool).Queries, DNS: &dnscheck.Checker{}, Logger: logger}
 	go checker.Run(ctx)
 
-	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency, "max_scans_per_minute", perMinute)
+	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency, "max_scans_per_minute", perMinute, "public_queue_timeout", queueTimeout.String())
 	err = w.Run(ctx)
 	logger.Info("worker stopped")
 	return err
@@ -151,6 +156,20 @@ func maxScansPerMinute(getenv func(string) string) (int, error) {
 		return 0, fmt.Errorf("WORKER_MAX_SCANS_PER_MINUTE must be an integer between 1 and 600, got %q", v)
 	}
 	return n, nil
+}
+
+// publicQueueTimeout is QR_PUBLIC_QUEUE_TIMEOUT: how long a public scan may
+// wait in the queue before failing with queue_timeout (default 15m, 1m–24h).
+func publicQueueTimeout(getenv func(string) string) (time.Duration, error) {
+	v := getenv("QR_PUBLIC_QUEUE_TIMEOUT")
+	if v == "" {
+		return 15 * time.Minute, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < time.Minute || d > 24*time.Hour {
+		return 0, fmt.Errorf("QR_PUBLIC_QUEUE_TIMEOUT must be a duration between 1m and 24h (e.g. 15m), got %q", v)
+	}
+	return d, nil
 }
 
 func envInt(key string, def int) (int, error) {

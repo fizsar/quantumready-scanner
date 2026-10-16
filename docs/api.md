@@ -22,6 +22,8 @@ Pide un escaneo. Cuerpo (máx. 1 KiB, `Content-Type: application/json`, campos d
 - **Límite por cliente** (en memoria, sin guardar IP): 5 escaneos por minuto y 30 al día por IP (IPv6 por /64) → **429** `rate_limited` con `Retry-After`. `X-Forwarded-For` solo se cree si la conexión viene de la red de Caddy (`TRUSTED_PROXIES`).
 - Nuevo escaneo → **202** con `Location: /api/scans/{id}` y el escaneo en estado `queued`.
 
+**Cola (hito 3.5e)**: un escaneo público en cola trae `"queue_position"` (su puesto entre los escaneos públicos; 1 es el siguiente) y `"queue_eta_seconds"` (estimación a partir de `WORKER_MAX_SCANS_PER_MINUTE`). Con `QR_PUBLIC_QUEUE_MAX` (100) escaneos públicos en cola, `POST /api/scans` responde **429** `busy` con `Retry-After: 60`. Un escaneo público que pasa más de `QR_PUBLIC_QUEUE_TIMEOUT` (15 minutos) en cola falla con el código `queue_timeout`.
+
 **Reutilización (hito 3.5e)**: antes de aplicar los límites, si hay un escaneo público `basic` del mismo objetivo terminado hace menos de 1 hora (o en curso, de hace menos de 2 minutos), se devuelve ese (**200**, `"reused": true`, `"age_seconds"`: antigüedad del resultado) sin gastar cupo. Nunca un escaneo de una organización. Con el escaneo abierto, la prueba de trabajo se exige igualmente, y un dominio excluido u opt-out recibe `scan_not_allowed` aunque haya un resultado.
 
 ### Escaneo público abierto (hito 3.5, `PUBLIC_SCAN_OPEN`)

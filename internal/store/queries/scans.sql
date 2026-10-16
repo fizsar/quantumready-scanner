@@ -33,7 +33,8 @@ WHERE id = (
       -- across all workers (0: no cap), so the server never looks like a sweep.
       AND (@max_per_minute::int = 0
            OR (SELECT count(*) FROM scans x WHERE x.started_at > now() - interval '1 minute') < @max_per_minute::int)
-    ORDER BY s.created_at
+    -- Organizations first (false sorts before true), then the oldest.
+    ORDER BY (s.organization_id IS NULL), s.created_at
     LIMIT 1
     FOR UPDATE SKIP LOCKED
 )
@@ -101,3 +102,21 @@ SELECT * FROM scans WHERE id = @id;
 
 -- name: ListFindings :many
 SELECT * FROM findings WHERE scan_id = @scan_id ORDER BY position;
+
+-- name: ExpireQueuedPublicScans :many
+-- Public scans that waited too long in the queue give up (the visitor has
+-- likely left); organizations' scans never expire.
+UPDATE scans SET status = 'failed', error = 'queue_timeout', finished_at = now()
+WHERE status = 'queued' AND organization_id IS NULL
+  AND created_at < now() - make_interval(secs => @max_wait_seconds::float8)
+RETURNING id;
+
+-- name: CountPublicQueued :one
+-- Run with the public tenant: only public scans are counted.
+SELECT count(*) FROM scans WHERE status = 'queued' AND organization_id IS NULL;
+
+-- name: PublicQueuePosition :one
+-- 1 for the next public scan to start. Public tenant: organizations' scans
+-- (which go first) are neither counted nor revealed.
+SELECT count(*) FROM scans
+WHERE status = 'queued' AND organization_id IS NULL AND created_at <= @created_at;

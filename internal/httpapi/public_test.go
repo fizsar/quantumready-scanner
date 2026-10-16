@@ -29,9 +29,14 @@ func openPublic(limits PublicLimits) func(*Config) {
 
 // shape removes what differs between two scans of different hosts (ids,
 // times, the host itself) to compare the rest of two answers.
-var volatile = regexp.MustCompile(`"(id|created_at|host)":"[^"]*"`)
+var (
+	volatile    = regexp.MustCompile(`"(id|created_at|host)":"[^"]*"`)
+	volatileNum = regexp.MustCompile(`"(queue_position|queue_eta_seconds)":\d+`)
+)
 
-func shape(body string) string { return volatile.ReplaceAllString(body, `"$1":"…"`) }
+func shape(body string) string {
+	return volatileNum.ReplaceAllString(volatile.ReplaceAllString(body, `"$1":"…"`), `"$1":0`)
+}
 
 func TestOpenPublicScans(t *testing.T) {
 	a := newAuthAPI(t, AuthLimits{EmailIP: NewLimiter(100, 100)}, openPublic(PublicLimits{}))

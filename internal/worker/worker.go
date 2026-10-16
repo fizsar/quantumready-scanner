@@ -47,6 +47,10 @@ type Config struct {
 	// MaxPerMinute caps the scans started per minute across all workers (0: no
 	// cap; cmd/worker sets WORKER_MAX_SCANS_PER_MINUTE, default 20).
 	MaxPerMinute int
+	// PublicQueueTimeout: public scans queued longer fail with queue_timeout
+	// (0: never; cmd/worker sets QR_PUBLIC_QUEUE_TIMEOUT, default 15 min).
+	// Organizations' scans never expire.
+	PublicQueueTimeout time.Duration
 	// PollInterval is the wait when the queue is empty. Default 1 s.
 	PollInterval time.Duration
 	// ShutdownTimeout bounds the wait for in-flight scans on stop. Scans still
@@ -170,6 +174,15 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("fail expired scans: %w", err)
 	} else if len(ids) > 0 {
 		w.cfg.Logger.Warn("worker: scans failed after exhausting their attempts", "ids", ids)
+	}
+	if w.cfg.PublicQueueTimeout > 0 {
+		ids, err := w.st.ExpireQueuedPublicScans(ctx, w.cfg.PublicQueueTimeout.Seconds())
+		if err != nil {
+			return false, fmt.Errorf("expire queued public scans: %w", err)
+		}
+		if len(ids) > 0 {
+			w.cfg.Logger.Warn("worker: public scans waited too long in the queue", "ids", ids)
+		}
 	}
 
 	sc, err := w.st.ClaimCapped(ctx, w.cfg.Lease, w.cfg.MaxPerMinute)

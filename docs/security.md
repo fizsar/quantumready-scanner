@@ -140,7 +140,13 @@ Definidos en `internal/org` (un test fija la matriz entera). La API decide con l
 | La reutilización pública sin el filtro de organización | no detectada: **RLS sola** (inquilino público) impide entregar un escaneo de organización |
 | Sin filtro y sin RLS | detectada: se entregaba el escaneo `basic` reciente de una organización |
 
-- **Orden del escaneo público** (hito 3.5e): validar el objetivo → prueba de trabajo → exclusión del operador y opt-out → **reutilización** → límites (IP, dominio, global) → encolar. Un resultado público `basic` (sin organización) terminado hace menos de 1 hora, o uno en curso de hace menos de 2 minutos, se entrega sin gastar cupo, aunque la IP o el dominio hayan agotado el suyo. La prueba de trabajo se exige igualmente. La búsqueda se hace con el inquilino público, así que RLS por sí sola ya excluye los escaneos de organizaciones, además del filtro en la consulta.
+- **Cola** (hito 3.5e):
+  - **Prioridad**: el worker toma antes los escaneos de organización que los públicos y, dentro de cada grupo, el más antiguo. El índice `scans_queued_idx` es `((organization_id IS NULL), created_at) WHERE status = 'queued'`, y `EXPLAIN` confirma que el planificador lo usa.
+  - **Tope**: con `QR_PUBLIC_QUEUE_MAX` (100) escaneos públicos en cola, los nuevos reciben 429 `busy` sin gastar cupo; la reutilización sigue funcionando.
+  - **Caducidad**: los públicos que llevan más de `QR_PUBLIC_QUEUE_TIMEOUT` (15 minutos) en cola pasan a fallidos con `queue_timeout`. Los de organización no caducan.
+  - **Posición y espera**: la web muestra la posición y una espera aproximada (`WORKER_MAX_SCANS_PER_MINUTE`). Se calculan con el inquilino público, así que solo cuentan escaneos públicos y no revelan cuántos hay de organizaciones; por la prioridad, la espera real puede ser algo mayor.
+  - **Mutaciones**: sin prioridad, detectada; caducidad sin el filtro de públicos, detectada (caducaba también el de la organización).
+- **Orden del escaneo público** (hito 3.5e): validar el objetivo → prueba de trabajo → exclusión del operador y opt-out → **reutilización** → tope de la cola pública → límites (IP, dominio, global) → encolar. Un resultado público `basic` (sin organización) terminado hace menos de 1 hora, o uno en curso de hace menos de 2 minutos, se entrega sin gastar cupo, aunque la IP o el dominio hayan agotado el suyo. La prueba de trabajo se exige igualmente. La búsqueda se hace con el inquilino público, así que RLS por sí sola ya excluye los escaneos de organizaciones, además del filtro en la consulta.
 | No se aplican exclusiones ni opt-out | detectada |
 
 ## Cuentas

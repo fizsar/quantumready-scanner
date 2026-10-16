@@ -63,6 +63,12 @@ export function ScanPage({ org = false }: { org?: boolean }) {
 
   // Loading, queued or running: progress, announced to screen readers.
   let progress = t('progress.queued')
+  if (scan?.status === 'queued' && scan.queue_position) {
+    const eta = scan.queue_eta_seconds ?? 0
+    const wait = eta < 60 ? t('progress.waitUnderMinute') : t('progress.waitMinutes', { minutes: Math.ceil(eta / 60) })
+    progress =
+      scan.queue_position === 1 ? t('progress.queuedNext', { wait }) : t('progress.queuedAt', { ahead: scan.queue_position - 1, wait })
+  }
   if (scan?.status === 'running') progress = t('progress.running', { host: scan.host })
   if (scan?.status === 'queued' && scan.retries > 0) progress = t('progress.retrying')
   if (reconnecting) progress = t('progress.reconnecting')

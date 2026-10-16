@@ -88,5 +88,6 @@ var messages = map[string]map[string]string{
 	"network":            {"es": "La conexión se interrumpió.", "en": "The connection was interrupted."},
 	"unreachable":        {"es": "El servidor no responde con TLS en el puerto 443.", "en": "The server does not speak TLS on port 443."},
 	"scan_error":         {"es": "El escaneo falló.", "en": "The scan failed."},
+	"queue_timeout":      {"es": "El análisis esperó demasiado en la cola porque había mucha demanda. Vuelve a intentarlo.", "en": "The scan waited too long in the queue because of high demand. Try again."},
 	"lease_expired":      {"es": "El escaneo no pudo completarse tras varios intentos.", "en": "The scan could not complete after several attempts."},
 }

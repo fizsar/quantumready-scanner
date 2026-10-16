@@ -28,7 +28,8 @@ WHERE id = (
       -- across all workers (0: no cap), so the server never looks like a sweep.
       AND ($3::int = 0
            OR (SELECT count(*) FROM scans x WHERE x.started_at > now() - interval '1 minute') < $3::int)
-    ORDER BY s.created_at
+    -- Organizations first (false sorts before true), then the oldest.
+    ORDER BY (s.organization_id IS NULL), s.created_at
     LIMIT 1
     FOR UPDATE SKIP LOCKED
 )
@@ -118,6 +119,18 @@ func (q *Queries) CompleteScan(ctx context.Context, arg CompleteScanParams) (int
 	return result.RowsAffected(), nil
 }
 
+const countPublicQueued = `-- name: CountPublicQueued :one
+SELECT count(*) FROM scans WHERE status = 'queued' AND organization_id IS NULL
+`
+
+// Run with the public tenant: only public scans are counted.
+func (q *Queries) CountPublicQueued(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicQueued)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const enqueueScan = `-- name: EnqueueScan :one
 INSERT INTO scans (host, port, organization_id, intensity, requested_by, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -171,6 +184,35 @@ func (q *Queries) EnqueueScan(ctx context.Context, arg EnqueueScanParams) (Scan,
 		&i.ExpiresAt,
 	)
 	return i, err
+}
+
+const expireQueuedPublicScans = `-- name: ExpireQueuedPublicScans :many
+UPDATE scans SET status = 'failed', error = 'queue_timeout', finished_at = now()
+WHERE status = 'queued' AND organization_id IS NULL
+  AND created_at < now() - make_interval(secs => $1::float8)
+RETURNING id
+`
+
+// Public scans that waited too long in the queue give up (the visitor has
+// likely left); organizations' scans never expire.
+func (q *Queries) ExpireQueuedPublicScans(ctx context.Context, maxWaitSeconds float64) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, expireQueuedPublicScans, maxWaitSeconds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const failExpiredScans = `-- name: FailExpiredScans :many
@@ -333,6 +375,20 @@ SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
 func (q *Queries) LockTarget(ctx context.Context, target string) error {
 	_, err := q.db.Exec(ctx, lockTarget, target)
 	return err
+}
+
+const publicQueuePosition = `-- name: PublicQueuePosition :one
+SELECT count(*) FROM scans
+WHERE status = 'queued' AND organization_id IS NULL AND created_at <= $1
+`
+
+// 1 for the next public scan to start. Public tenant: organizations' scans
+// (which go first) are neither counted nor revealed.
+func (q *Queries) PublicQueuePosition(ctx context.Context, createdAt time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, publicQueuePosition, createdAt)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const recentPublicScan = `-- name: RecentPublicScan :one

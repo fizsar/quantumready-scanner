@@ -132,6 +132,26 @@ func (s *Store) RecentPublicScan(ctx context.Context, host string, port int32, c
 	return sc, err
 }
 
+// PublicQueueLength is how many public scans wait in the queue (public
+// tenant: organizations' scans are not visible, let alone counted).
+func (s *Store) PublicQueueLength(ctx context.Context) (n int64, err error) {
+	err = s.Tx(ctx, Public, func(q *Queries) error {
+		n, err = q.CountPublicQueued(ctx)
+		return err
+	})
+	return n, err
+}
+
+// PublicQueuePosition is the place of a queued public scan among public
+// scans (1: next). Organizations' scans, which go first, are not counted.
+func (s *Store) PublicQueuePosition(ctx context.Context, createdAt time.Time) (n int64, err error) {
+	err = s.Tx(ctx, Public, func(q *Queries) error {
+		n, err = q.PublicQueuePosition(ctx, createdAt)
+		return err
+	})
+	return n, err
+}
+
 // ScanFor returns a scan the tenant may see: public, or of its organization.
 // Another organization's scan is pgx.ErrNoRows, as if it did not exist.
 func (s *Store) ScanFor(ctx context.Context, t Tenant, id uuid.UUID) (sc Scan, err error) {

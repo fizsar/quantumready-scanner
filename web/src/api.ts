@@ -63,6 +63,9 @@ export interface ScanView {
   reused?: boolean
   /** With reused: seconds since the result was produced. */
   age_seconds?: number
+  /** A queued public scan: its place among public scans (1: next) and a rough wait. */
+  queue_position?: number
+  queue_eta_seconds?: number
   lang: Lang
   report?: Report
 }

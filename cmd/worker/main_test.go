@@ -80,6 +80,19 @@ func TestEnvInt(t *testing.T) {
 	}
 }
 
+func TestPublicQueueTimeout(t *testing.T) {
+	for v, want := range map[string]time.Duration{"": 15 * time.Minute, "1m": time.Minute, "2h": 2 * time.Hour} {
+		if d, err := publicQueueTimeout(func(string) string { return v }); err != nil || d != want {
+			t.Errorf("%q: %v %v", v, d, err)
+		}
+	}
+	for _, v := range []string{"30s", "25h", "x"} {
+		if _, err := publicQueueTimeout(func(string) string { return v }); err == nil {
+			t.Errorf("%q accepted", v)
+		}
+	}
+}
+
 func TestMaxScansPerMinute(t *testing.T) {
 	for v, want := range map[string]int{"": 20, "1": 1, "600": 600} {
 		if n, err := maxScansPerMinute(func(string) string { return v }); err != nil || n != want {
