@@ -23,6 +23,33 @@ func TestUsage(t *testing.T) {
 	}
 }
 
+func TestExclusions(t *testing.T) {
+	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
+		_, err := migrations.Up(ctx, db)
+		return err
+	})
+	ctx := context.Background()
+	q := store.NewStore(pool).Queries
+	var out bytes.Buffer
+	if err := excludeOn(ctx, q, "add", "example.org", "asked by mail", &out); err != nil {
+		t.Fatal(err)
+	}
+	if err := excludeOn(ctx, q, "list", "", "", &out); err != nil || !strings.Contains(out.String(), "example.org\t") || !strings.Contains(out.String(), "asked by mail") {
+		t.Errorf("list: %q %v", out.String(), err)
+	}
+	if err := excludeOn(ctx, q, "remove", "example.org", "", &out); err != nil {
+		t.Error(err)
+	}
+	if err := excludeOn(ctx, q, "remove", "example.org", "", &out); err == nil {
+		t.Error("removing a missing name succeeded")
+	}
+	for _, args := range [][]string{{"exclude"}, {"exclude", "add"}, {"exclude", "add", "co.uk"}, {"exclude", "add", "192.0.2.1"}, {"exclude", "nope"}} {
+		if err := run(ctx, args, func(string) string { return "" }, &out); err == nil {
+			t.Errorf("run(%q) accepted", args)
+		}
+	}
+}
+
 func TestSignupCode(t *testing.T) {
 	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
 		_, err := migrations.Up(ctx, db)

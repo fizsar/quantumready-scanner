@@ -80,6 +80,17 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
+func TestRegistrable(t *testing.T) {
+	for in, want := range map[string]string{
+		"fizsar.com": "fizsar.com", "quantumready.fizsar.com": "fizsar.com", "a.b.shop.example.co.uk": "example.co.uk",
+		"me.github.io": "me.github.io", "x.me.github.io": "me.github.io", "co.uk": "co.uk",
+	} {
+		if got := Registrable(in); got != want {
+			t.Errorf("Registrable(%s) = %s, want %s", in, got, want)
+		}
+	}
+}
+
 func TestCovers(t *testing.T) {
 	for _, tc := range []struct {
 		domain, host string

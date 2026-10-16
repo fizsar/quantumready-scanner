@@ -23,7 +23,10 @@ import (
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
 
-const usage = `usage: qradmin signup-code [-note TEXT] [-days N]`
+const usage = `usage: qradmin signup-code [-note TEXT] [-days N]
+       qradmin exclude add DOMAIN [-reason TEXT]   (public scans of DOMAIN and its subdomains)
+       qradmin exclude remove DOMAIN
+       qradmin exclude list`
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Getenv, os.Stdout); err != nil {
@@ -32,7 +35,18 @@ func main() {
 	}
 }
 
+func open(ctx context.Context, getenv func(string) string) (*pgxpool.Pool, error) {
+	dsn := getenv("DATABASE_URL")
+	if dsn == "" {
+		return nil, errors.New("DATABASE_URL is required")
+	}
+	return pgxpool.New(ctx, dsn)
+}
+
 func run(ctx context.Context, args []string, getenv func(string) string, out io.Writer) error {
+	if len(args) > 0 && args[0] == "exclude" {
+		return exclude(ctx, args[1:], getenv, out)
+	}
 	if len(args) == 0 || args[0] != "signup-code" {
 		return errors.New(usage)
 	}
@@ -46,11 +60,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, out io.
 	if *days < 1 || *days > 90 {
 		return errors.New("-days must be between 1 and 90")
 	}
-	dsn := getenv("DATABASE_URL")
-	if dsn == "" {
-		return errors.New("DATABASE_URL is required")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	pool, err := open(ctx, getenv)
 	if err != nil {
 		return err
 	}

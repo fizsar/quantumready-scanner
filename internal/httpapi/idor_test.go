@@ -80,7 +80,7 @@ func (a *authAPI) snapshot(t *testing.T) string {
 		(SELECT string_agg(organization_id || ':' || user_id || ':' || role, ',' ORDER BY organization_id, user_id) FROM memberships),
 		(SELECT string_agg(id || ':' || coalesce(accepted_at::text, '') || ':' || coalesce(revoked_at::text, ''), ',' ORDER BY id) FROM invitations),
 		(SELECT string_agg(id || ':' || coalesce(organization_id::text, ''), ',' ORDER BY id) FROM scans),
-		(SELECT string_agg(id || ':' || organization_id || ':' || name || ':' || status || ':' || coalesce(check_requested_at::text, ''), ',' ORDER BY id) FROM domains))`).Scan(&s)
+		(SELECT string_agg(id || ':' || organization_id || ':' || name || ':' || status || ':' || block_public || ':' || coalesce(check_requested_at::text, ''), ',' ORDER BY id) FROM domains))`).Scan(&s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,6 +120,7 @@ func TestIDOR(t *testing.T) {
 			check("GET domain", c.do(t, "GET", dom, ""), 404)
 			check("DELETE domain", c.do(t, "DELETE", dom, ""), 404, 403)
 			check("verify domain", c.do(t, "POST", dom+"/verify", ""), 404, 403)
+			check("opt-out of its domain", c.do(t, "PATCH", dom, `{"block_public":true}`), 404, 403)
 			check("GET scan", c.do(t, "GET", "/api/scans/"+to.scan.String(), ""), 404)
 			check("GET org scan", c.do(t, "GET", "/api/org/scans/"+to.scan.String(), ""), 404)
 			// The other organization's verified domain does not let anyone here scan it.

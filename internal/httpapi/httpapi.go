@@ -46,6 +46,14 @@ type Config struct {
 	TrustedProxies []netip.Prefix
 	// TargetCooldown defaults to DefaultTargetCooldown.
 	TargetCooldown time.Duration
+	// PublicScanOpen lets anyone scan any domain (basic). False: only the
+	// Allowlist (PUBLIC_SCAN_OPEN; opened after the security review).
+	PublicScanOpen bool
+	// Proof checks the proof of work (ALTCHA) of an open public scan; nil:
+	// none required (cmd/api refuses to open without it).
+	Proof ProofChecker
+	// PublicLimits apply to open public scans, on top of Limiter (per IP).
+	PublicLimits PublicLimits
 
 	// Accounts enables /api/auth; it needs PublicOrigin.
 	Accounts AccountStore
@@ -71,6 +79,17 @@ type Config struct {
 	Logger *slog.Logger
 }
 
+// ProofChecker verifies a client's proof of work (internal/altcha).
+type ProofChecker interface {
+	Verify(payload string) error
+}
+
+// PublicLimits of open public scanning. Nil fields take the defaults.
+type PublicLimits struct {
+	PerDomain *Limiter // new scans per registrable domain: 10/day
+	Global    *Limiter // new public scans in all: 30/min, 1000/day
+}
+
 type api struct{ cfg Config }
 
 // NewRouter returns the root handler of the API.
@@ -86,6 +105,12 @@ func NewRouter(cfg Config) http.Handler {
 	}
 	if cfg.TargetCooldown <= 0 {
 		cfg.TargetCooldown = DefaultTargetCooldown
+	}
+	if cfg.PublicLimits.PerDomain == nil {
+		cfg.PublicLimits.PerDomain = NewWindowLimiter(10, 24*time.Hour)
+	}
+	if cfg.PublicLimits.Global == nil {
+		cfg.PublicLimits.Global = NewLimiter(30, 1000)
 	}
 	a := &api{cfg: cfg}
 	a.authDefaults()
@@ -126,6 +151,7 @@ func NewRouter(cfg Config) http.Handler {
 					r.Post("/domains", a.addDomain)
 					r.Get("/domains/{domainID}", a.getDomain)
 					r.Delete("/domains/{domainID}", a.deleteDomain)
+					r.Patch("/domains/{domainID}", a.patchDomain)
 					r.Post("/domains/{domainID}/verify", a.verifyDomain)
 					if cfg.Scans != nil {
 						r.Get("/scans", a.listOrgScans)

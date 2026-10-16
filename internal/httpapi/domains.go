@@ -23,6 +23,7 @@ type DomainStore interface {
 	DomainFor(ctx context.Context, t store.Tenant, id uuid.UUID) (store.Domain, error)
 	DeleteDomain(ctx context.Context, t store.Tenant, id uuid.UUID) error
 	RequestDomainCheck(ctx context.Context, t store.Tenant, id uuid.UUID) (store.Domain, error)
+	SetDomainBlockPublic(ctx context.Context, t store.Tenant, id uuid.UUID, block bool) (store.Domain, error)
 }
 
 const maxDomainsPerOrg = 20
@@ -32,6 +33,9 @@ const (
 	auditDomainAdded   = "domain.added"
 	auditDomainDeleted = "domain.deleted"
 	auditDomainCheck   = "domain.check_requested"
+
+	auditDomainBlockPublic = "domain.public_scans_blocked"
+	auditDomainAllowPublic = "domain.public_scans_allowed"
 )
 
 type txtRecord struct {
@@ -50,13 +54,14 @@ type domainView struct {
 	LostAt         *time.Time `json:"lost_at,omitempty"`
 	GraceUntil     *time.Time `json:"grace_until,omitempty"`
 	CheckPending   bool       `json:"check_pending"`
+	BlockPublic    bool       `json:"block_public"` // public scans refused (effective while verified)
 	LastCheckError *apiError  `json:"last_check_error,omitempty"`
 	Record         txtRecord  `json:"record"`
 }
 
 func viewDomain(r *http.Request, d store.Domain) domainView {
 	v := domainView{ID: d.ID, Name: d.Name, Status: d.Status, Verified: d.Verified(time.Now()), VerifiedAt: d.VerifiedAt,
-		LastCheckedAt: d.LastCheckedAt, LostAt: d.LostAt, CheckPending: d.CheckRequestedAt != nil,
+		LastCheckedAt: d.LastCheckedAt, LostAt: d.LostAt, CheckPending: d.CheckRequestedAt != nil, BlockPublic: d.BlockPublic,
 		Record: txtRecord{Type: "TXT", Name: domains.RecordName(d.Name), Value: domains.RecordValue(d.Token)}}
 	if d.LostAt != nil {
 		g := d.LostAt.Add(store.DomainGrace)
@@ -192,6 +197,35 @@ func (a *api) verifyDomain(w http.ResponseWriter, r *http.Request) {
 	}
 	a.orgAudit(r, auditDomainCheck, &d.Name)
 	writeJSON(w, http.StatusAccepted, viewDomain(r, d))
+}
+
+type patchDomainRequest struct {
+	BlockPublic *bool `json:"block_public"`
+}
+
+// patchDomain: PATCH /api/org/domains/{domainID} {"block_public": true}:
+// the owner's opt-out from public scans of the domain and its subdomains.
+// It takes effect only while the domain is verified.
+func (a *api) patchDomain(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "domainID")
+	if !ok {
+		return
+	}
+	var req patchDomainRequest
+	if !decodeJSON(w, r, authBodyBytes, &req) || !allow(w, r, org.ManageDomains) {
+		return
+	}
+	if req.BlockPublic == nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	d, err := a.cfg.Domains.SetDomainBlockPublic(r.Context(), tenant(r), id, *req.BlockPublic)
+	if a.domainError(w, r, err) {
+		return
+	}
+	action := map[bool]string{true: auditDomainBlockPublic, false: auditDomainAllowPublic}[*req.BlockPublic]
+	a.orgAudit(r, action, &d.Name)
+	writeJSON(w, http.StatusOK, viewDomain(r, d))
 }
 
 func (a *api) domainError(w http.ResponseWriter, r *http.Request, err error) bool {

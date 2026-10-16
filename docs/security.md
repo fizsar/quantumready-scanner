@@ -105,6 +105,25 @@ Definidos en `internal/org` (un test fija la matriz entera). La API decide con l
   - DNSSEC no se valida: un atacante en la ruta entre el VPS y los servidores autoritativos podría falsear la respuesta. Es un riesgo aceptado para este tipo de verificación, el mismo método que usan los proveedores habituales.
 - **Ciclo**: `pending` → (registro encontrado) `verified` → comprobación semanal → si falta, `lost` (los escaneos `full` siguen 14 días y se comprueba a diario) → si sigue faltando pasados los 14 días, `pending` otra vez: ya no está verificado, pero el historial se conserva. Si el registro vuelve, `verified`. Pedir la verificación (botón) la encola para el worker.
 
+## Escaneo público (hito 3.5)
+
+- **Cerrado por defecto** (`PUBLIC_SCAN_OPEN` desactivado): solo los dominios de la allowlist. Se abre después de la revisión de seguridad.
+- **Abierto**: cualquier dominio, siempre en intensidad `basic` y siempre como inquilino público. Se rechazan IPs, nombres reservados, terminaciones desconocidas y sufijos públicos (las mismas reglas que al añadir dominios). Se exige además la prueba de trabajo (ALTCHA, 3.5b) y se aplican límites:
+  - por IP: 5 por minuto y 30 al día (`RATE_LIMIT_*`);
+  - por dominio registrable: 10 al día;
+  - globales: 30 por minuto y 1.000 al día;
+  - los escaneos reutilizados no cuentan.
+- **Exclusiones**: hay dos vías. La lista del operador (`qradmin exclude add|remove|list`, tabla `scan_exclusions`, que ningún rol de servicio puede leer) y el **opt-out del dueño verificado** (`PATCH /api/org/domains/{id}` con `block_public`; solo cuenta mientras el dominio está verificado, incluida la gracia). Las dos cubren los subdominios y dan la **misma** respuesta (403 `scan_not_allowed`).
+- **La función `public_scan_blocked`** (`SECURITY DEFINER`, con el mismo endurecimiento que `invitation_by_token` y su test) solo devuelve sí o no. Así una petición pública no puede saber qué organización tiene el dominio, ni si alguien lo ha verificado.
+- **Un escaneo público nunca devuelve ni reutiliza el de una organización.** `TestOpenPublicScans` lo comprueba con un dominio verificado por una organización que tiene un escaneo `full` reciente: la respuesta pública es idéntica a la de un dominio cualquiera (salvo id, fechas y host), es un escaneo nuevo `basic` sin organización, y la URL pública del escaneo de la organización da 404. Prueba de mutación (16/10/2026):
+
+| Mutación | Resultado |
+|---|---|
+| La reutilización ignora la organización y la intensidad | la detectan los tests del store; en la API, **RLS sola** sigue impidiendo la fuga |
+| Lo mismo, con RLS apagada | detectada: la petición pública recibía el escaneo `full` de la organización |
+| El opt-out cuenta aunque el dominio no esté verificado | detectada |
+| No se aplican exclusiones ni opt-out | detectada |
+
 ## Cuentas
 
 Autenticación propia (hito 3.2; `internal/auth`, `internal/httpapi/auth.go`, `internal/store/accounts.go`). Endpoints en [api.md](api.md#cuentas-apiauth-hito-32).

@@ -133,6 +133,12 @@ type Scan struct {
 	ExpiresAt      *time.Time
 }
 
+type ScanExclusion struct {
+	Name      string
+	Reason    *string
+	CreatedAt time.Time
+}
+
 type Session struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID

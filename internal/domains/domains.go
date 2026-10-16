@@ -143,6 +143,18 @@ func allDigits(s string) bool {
 	return s != ""
 }
 
+// Registrable returns the registrable domain of a normalized host (its
+// public suffix plus one label: www.shop.example.co.uk → example.co.uk), or
+// the host itself if it has none.
+func Registrable(host string) string {
+	suffix, _ := PublicSuffix(host)
+	if host == suffix || !strings.HasSuffix(host, "."+suffix) {
+		return host
+	}
+	rest := strings.TrimSuffix(host, "."+suffix)
+	return rest[strings.LastIndexByte(rest, '.')+1:] + "." + suffix
+}
+
 // Covers reports whether a verified domain covers host: the domain itself
 // or any subdomain of it (both normalized).
 func Covers(domain, host string) bool {

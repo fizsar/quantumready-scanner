@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/fizsar/quantumready-saas/internal/domains"
 	"github.com/fizsar/quantumready-saas/internal/scoring"
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
@@ -30,19 +31,41 @@ type ScanStore interface {
 	FindingsFor(ctx context.Context, t store.Tenant, scanID uuid.UUID) ([]store.Finding, error)
 	// OrgScans lists an organization's scans (history).
 	OrgScans(ctx context.Context, t store.Tenant, limit int32) ([]store.Scan, error)
+	// PublicScanBlocked: excluded or opted out (a yes or no, nothing else).
+	PublicScanBlocked(ctx context.Context, host string) (bool, error)
 }
 
 type createScanRequest struct {
-	Host string `json:"host"`
+	Host   string `json:"host"`
+	Altcha string `json:"altcha,omitempty"` // proof of work, when public scanning is open
 }
 
-// listTargets: GET /api/targets, the hosts that may be scanned (the
-// frontend shows them as buttons instead of keeping its own copy).
+// listTargets: GET /api/targets: the demo hosts (the frontend shows them as
+// buttons), whether any domain may be scanned and whether a proof of work
+// is required.
 func (a *api) listTargets(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort})
+	writeJSON(w, http.StatusOK, map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort,
+		"open": a.cfg.PublicScanOpen, "proof": a.cfg.PublicScanOpen && a.cfg.Proof != nil})
 }
 
-// createScan: POST /api/scans {"host": "..."}.
+// slot is one rate-limit reservation, given back if no scan is started.
+type slot struct {
+	lim *Limiter
+	key string
+}
+
+func cancelAll(slots []slot) {
+	for _, s := range slots {
+		s.lim.Cancel(s.key)
+	}
+}
+
+// createScan: POST /api/scans {"host": "...", "altcha": "..."}: a public,
+// basic scan. Closed (default): only the allowlist. Open
+// (PUBLIC_SCAN_OPEN): any domain, with a proof of work, unless excluded or
+// opted out by its verified owner, within per-IP, per-domain and global
+// limits. A public scan is never an organization's: the tenant is always
+// store.Public.
 func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 	var req createScanRequest
 	if !decodeJSON(w, r, maxBodyBytes, &req) {
@@ -57,27 +80,71 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "invalid_host")
 		return
 	}
-	if !a.cfg.Allowlist.Allows(host) {
+	open := a.cfg.PublicScanOpen && !a.cfg.Allowlist.Allows(host)
+	if !a.cfg.PublicScanOpen && !a.cfg.Allowlist.Allows(host) {
 		writeError(w, r, http.StatusForbidden, "host_not_allowed")
 		return
 	}
+	if open {
+		if _, err := domains.Normalize(host); err != nil {
+			code := "invalid_host"
+			for e, c := range domainErrors {
+				if errors.Is(err, e) {
+					code = c
+				}
+			}
+			writeError(w, r, http.StatusBadRequest, code)
+			return
+		}
+	}
+	if a.cfg.PublicScanOpen && a.cfg.Proof != nil {
+		if err := a.cfg.Proof.Verify(req.Altcha); err != nil {
+			writeError(w, r, http.StatusBadRequest, "proof_failed")
+			return
+		}
+	}
+	if open {
+		// Excluded and opted-out domains get the same answer: nobody learns
+		// which, nor whether an organization has the domain verified.
+		blocked, err := a.cfg.Scans.PublicScanBlocked(r.Context(), host)
+		if err != nil {
+			a.internal(w, r, "public scan blocked", err)
+			return
+		}
+		if blocked {
+			writeError(w, r, http.StatusForbidden, "scan_not_allowed")
+			return
+		}
+	}
 
-	key := rateKey(clientAddr(r, a.cfg.TrustedProxies))
-	if ok, retry := a.cfg.Limiter.Reserve(key); !ok {
-		w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
-		writeError(w, r, http.StatusTooManyRequests, "rate_limited")
+	var slots []slot
+	take := func(lim *Limiter, key, code string) bool {
+		ok, retry := lim.Reserve(key)
+		if !ok {
+			cancelAll(slots)
+			w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
+			writeError(w, r, http.StatusTooManyRequests, code)
+			return false
+		}
+		slots = append(slots, slot{lim, key})
+		return true
+	}
+	if !take(a.cfg.Limiter, rateKey(clientAddr(r, a.cfg.TrustedProxies)), "rate_limited") {
 		return
 	}
-	// Until accounts (milestone 3.2) every request is public: basic intensity.
+	if open && (!take(a.cfg.PublicLimits.PerDomain, domains.Registrable(host), "domain_rate_limited") ||
+		!take(a.cfg.PublicLimits.Global, "all", "busy")) {
+		return
+	}
 	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), store.Public,
 		store.ScanRequest{Host: host, Port: ScanPort, Intensity: store.IntensityBasic, Cooldown: a.cfg.TargetCooldown})
 	if err != nil {
-		a.cfg.Limiter.Cancel(key)
+		cancelAll(slots)
 		a.internal(w, r, "enqueue scan", err)
 		return
 	}
 	if reused {
-		a.cfg.Limiter.Cancel(key) // no new scan: it does not count
+		cancelAll(slots) // no new scan: it does not count
 	}
 
 	view, err := a.view(r, store.Public, sc)
