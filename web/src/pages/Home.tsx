@@ -42,7 +42,7 @@ export function Home() {
         setProving(false)
       }
       const s = await createScan(h, lang, proof)
-      navigate(`/scans/${s.id}`)
+      navigate(`/scans/${s.id}`, { state: s.reused ? { reusedAge: s.age_seconds ?? 0 } : undefined })
     } catch (e) {
       setProving(false)
       setError(e instanceof ApiError ? e : new ApiError(0, 'network', ''))

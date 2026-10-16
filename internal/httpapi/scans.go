@@ -33,6 +33,8 @@ type ScanStore interface {
 	OrgScans(ctx context.Context, t store.Tenant, limit int32) ([]store.Scan, error)
 	// PublicScanBlocked: excluded or opted out (a yes or no, nothing else).
 	PublicScanBlocked(ctx context.Context, host string) (bool, error)
+	// RecentPublicScan: a public basic scan to reuse (pgx.ErrNoRows if none).
+	RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration) (store.Scan, error)
 }
 
 type createScanRequest struct {
@@ -117,6 +119,17 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Reuse before the limits: a recent public result costs nothing, so it is
+	// served even when this client or this domain has used up its quota.
+	// Read with the public tenant: an organization's scan is never handed out.
+	if recent, err := a.cfg.Scans.RecentPublicScan(r.Context(), host, ScanPort, a.cfg.TargetCooldown, PublicReuseWindow); err == nil {
+		a.writeScan(w, r, recent, true)
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		a.internal(w, r, "recent public scan", err)
+		return
+	}
+
 	var slots []slot
 	take := func(lim *Limiter, key, code string) bool {
 		ok, retry := lim.Reserve(key)
@@ -144,18 +157,33 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if reused {
-		cancelAll(slots) // no new scan: it does not count
+		cancelAll(slots) // a concurrent request enqueued it first: it does not count
 	}
+	a.writeScan(w, r, sc, reused)
+}
 
+// PublicReuseWindow is how recent a finished public result must be to be handed out
+// instead of scanning again (and without spending any quota).
+const PublicReuseWindow = time.Hour
+
+// writeScan answers a public scan request: 202 for a new scan, 200 with
+// reused and the result's age for an existing one.
+func (a *api) writeScan(w http.ResponseWriter, r *http.Request, sc store.Scan, reused bool) {
 	view, err := a.view(r, store.Public, sc)
 	if err != nil {
 		a.internal(w, r, "scan view", err)
 		return
 	}
-	view.Reused = reused
 	status := http.StatusAccepted
 	if reused {
 		status = http.StatusOK
+		view.Reused = true
+		since := sc.CreatedAt
+		if sc.FinishedAt != nil {
+			since = *sc.FinishedAt
+		}
+		age := max(0, int(time.Since(since).Seconds()))
+		view.AgeSeconds = &age
 	}
 	w.Header().Set("Location", "/api/scans/"+sc.ID.String())
 	writeView(w, status, view)
@@ -206,8 +234,9 @@ type scanView struct {
 	CreatedAt  time.Time  `json:"created_at"`
 	StartedAt  *time.Time `json:"started_at,omitempty"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
-	Error      *apiError  `json:"error,omitempty"`  // failed (or waiting to retry)
-	Reused     bool       `json:"reused,omitempty"` // POST returned a recent scan of the same target
+	Error      *apiError  `json:"error,omitempty"`       // failed (or waiting to retry)
+	Reused     bool       `json:"reused,omitempty"`      // POST returned a recent scan of the same target
+	AgeSeconds *int       `json:"age_seconds,omitempty"` // with reused: how old the result is (since it finished)
 	Lang       string     `json:"lang"`
 	Report     *report    `json:"report,omitempty"` // done
 }

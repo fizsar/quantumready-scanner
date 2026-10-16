@@ -348,6 +348,15 @@ a.btn:hover {
   padding: 0.5rem 0;
   border-bottom: 1px dashed var(--line);
 }
+.notice {
+  width: min(100%, 46rem);
+  margin: 0 0 1rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: 8px;
+  color: var(--text);
+}
 .check {
   display: grid;
   grid-template-columns: auto 1fr;

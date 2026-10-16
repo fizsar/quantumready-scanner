@@ -335,6 +335,63 @@ func (q *Queries) LockTarget(ctx context.Context, target string) error {
 	return err
 }
 
+const recentPublicScan = `-- name: RecentPublicScan :one
+SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at FROM scans
+WHERE host = $1 AND port = $2 AND intensity = 'basic' AND organization_id IS NULL
+  AND ((status <> 'failed' AND created_at > now() - make_interval(secs => $3::float8))
+       OR (status = 'done' AND finished_at > now() - make_interval(secs => $4::float8)))
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type RecentPublicScanParams struct {
+	Host            string
+	Port            int32
+	CooldownSeconds float64
+	DoneSeconds     float64
+}
+
+// A public basic scan to hand out instead of a new one: in flight (or done)
+// within the cooldown, or done within @done_seconds. Run with the public
+// tenant: RLS hides organizations' scans even without the filter below.
+func (q *Queries) RecentPublicScan(ctx context.Context, arg RecentPublicScanParams) (Scan, error) {
+	row := q.db.QueryRow(ctx, recentPublicScan,
+		arg.Host,
+		arg.Port,
+		arg.CooldownSeconds,
+		arg.DoneSeconds,
+	)
+	var i Scan
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Host,
+		&i.Port,
+		&i.Status,
+		&i.Attempts,
+		&i.MaxAttempts,
+		&i.LeaseToken,
+		&i.LeaseUntil,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Error,
+		&i.Result,
+		&i.ScannerSchema,
+		&i.Scoring,
+		&i.ScoringVersion,
+		&i.Score,
+		&i.Grade,
+		&i.Pqc,
+		&i.Retries,
+		&i.NotBefore,
+		&i.Intensity,
+		&i.RequestedBy,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
 const recentScanForTarget = `-- name: RecentScanForTarget :one
 SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at FROM scans
 WHERE host = $1 AND port = $2 AND status <> 'failed'

@@ -3,6 +3,17 @@ INSERT INTO scans (host, port, organization_id, intensity, requested_by, expires
 VALUES (@host, @port, sqlc.narg(organization_id), @intensity, sqlc.narg(requested_by), sqlc.narg(expires_at))
 RETURNING *;
 
+-- name: RecentPublicScan :one
+-- A public basic scan to hand out instead of a new one: in flight (or done)
+-- within the cooldown, or done within @done_seconds. Run with the public
+-- tenant: RLS hides organizations' scans even without the filter below.
+SELECT * FROM scans
+WHERE host = @host AND port = @port AND intensity = 'basic' AND organization_id IS NULL
+  AND ((status <> 'failed' AND created_at > now() - make_interval(secs => @cooldown_seconds::float8))
+       OR (status = 'done' AND finished_at > now() - make_interval(secs => @done_seconds::float8)))
+ORDER BY created_at DESC
+LIMIT 1;
+
 -- name: ClaimScan :one
 -- Leases the oldest queued scan that is due (not_before passed), or a running
 -- one whose lease expired (its worker died), to the caller. SKIP LOCKED lets

@@ -22,6 +22,8 @@ Pide un escaneo. Cuerpo (máx. 1 KiB, `Content-Type: application/json`, campos d
 - **Límite por cliente** (en memoria, sin guardar IP): 5 escaneos por minuto y 30 al día por IP (IPv6 por /64) → **429** `rate_limited` con `Retry-After`. `X-Forwarded-For` solo se cree si la conexión viene de la red de Caddy (`TRUSTED_PROXIES`).
 - Nuevo escaneo → **202** con `Location: /api/scans/{id}` y el escaneo en estado `queued`.
 
+**Reutilización (hito 3.5e)**: antes de aplicar los límites, si hay un escaneo público `basic` del mismo objetivo terminado hace menos de 1 hora (o en curso, de hace menos de 2 minutos), se devuelve ese (**200**, `"reused": true`, `"age_seconds"`: antigüedad del resultado) sin gastar cupo. Nunca un escaneo de una organización. Con el escaneo abierto, la prueba de trabajo se exige igualmente, y un dominio excluido u opt-out recibe `scan_not_allowed` aunque haya un resultado.
+
 ### Escaneo público abierto (hito 3.5, `PUBLIC_SCAN_OPEN`)
 
 `GET /api/targets` añade `"open"` (cualquier dominio) y `"proof"` (hace falta la prueba de trabajo). `GET /api/altcha` da el reto (`{algorithm, challenge, maxnumber, salt, signature}`, formato ALTCHA; 60 por minuto por IP); la solución es el JSON `{algorithm, challenge, number, salt, signature}` en base64, de un solo uso y válida 10 minutos. Abierto, `POST /api/scans` acepta cualquier dominio (siempre `basic`, público) con `{"host", "altcha"}`. Errores además de los anteriores: **400** `domain_ip`, `domain_reserved`, `domain_unknown_tld`, `domain_public_suffix`, `proof_failed`; **403** `scan_not_allowed` (excluido por el operador u opt-out del dueño: la misma respuesta); **429** `domain_rate_limited` (10 al día por dominio registrable) y `busy` (30 por minuto y 1.000 al día en total), con `Retry-After`.

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { solveAltcha, type AltchaChallenge } from './altcha'
 import type { Domain, Me, Org } from './api'
-import { json, scanView, stubFetch } from './test/fixtures'
+import { json, reportA, scanView, stubFetch } from './test/fixtures'
 import { renderAt } from './test/render'
 
 async function sha256hex(s: string) {
@@ -49,6 +49,20 @@ describe('open public scanning', () => {
     const body = JSON.parse(String(post[1]!.body))
     expect(body.host).toBe('example.org')
     expect(JSON.parse(atob(body.altcha)).number).toBe(12)
+  })
+
+  it('a recent result handed out instead of a new scan says how old it is', async () => {
+    stubFetch((url, init) => {
+      if (url === '/api/targets') return json({ hosts: [], port: 443, open: true, proof: false })
+      if (url.startsWith('/api/scans?') && init?.method === 'POST')
+        return json({ ...scanView('done', { report: reportA }), reused: true, age_seconds: 1500 })
+      if (url.startsWith('/api/auth/')) return unauth()
+      return json(scanView('done', { report: reportA }))
+    })
+    renderAt('/')
+    await userEvent.type(await screen.findByLabelText('Dominio'), 'fizsar.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Escanear' }))
+    expect((await screen.findByText(/^Resultado de hace 25 min/)).getAttribute('role')).toBe('status')
   })
 
   it('closed: no proof of work, the demo text', async () => {

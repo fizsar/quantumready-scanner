@@ -61,6 +61,8 @@ export interface ScanView {
   finished_at?: string
   error?: { code: string; message: string }
   reused?: boolean
+  /** With reused: seconds since the result was produced. */
+  age_seconds?: number
   lang: Lang
   report?: Report
 }

@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { Report } from '../components/Report'
 import { useLang } from '../i18n'
 import { usePageMeta } from '../usePageMeta'
@@ -11,6 +11,8 @@ export function ScanPage({ org = false }: { org?: boolean }) {
   const { lang, t } = useLang()
   const { scan, error, reconnecting } = useScan(id, lang, org)
   const back = org ? '/org' : '/'
+  // Set by the home page when the API handed out a recent result.
+  const reusedAge = (useLocation().state as { reusedAge?: number } | null)?.reusedAge
   usePageMeta(t('meta.scan', { host: scan?.host ?? '…' }), true)
 
   if (error && !scan) {
@@ -30,7 +32,16 @@ export function ScanPage({ org = false }: { org?: boolean }) {
   }
 
   if (scan?.status === 'done' && scan.report) {
-    return <Report scan={scan} report={scan.report} />
+    return (
+      <>
+        {reusedAge !== undefined && (
+          <p className="notice" role="status">
+            {reusedAge < 60 ? t('scan.reusedNow') : t('scan.reused', { minutes: Math.round(reusedAge / 60) })}
+          </p>
+        )}
+        <Report scan={scan} report={scan.report} />
+      </>
+    )
   }
 
   if (scan?.status === 'failed') {

@@ -136,6 +136,11 @@ Definidos en `internal/org` (un test fija la matriz entera). La API decide con l
 | Cualquiera pone un opt-out sin tener el dominio verificado | detectada |
 | Borrar un dominio bloqueado quita el bloqueo | detectada |
 | `clientAddr` cree `X-Forwarded-For` de cualquier conexión | detectada (`TestForgedForwardedFor`) |
+| (hito 3.5e) La reutilización se comprueba antes que la exclusión y el opt-out | detectada: se entregaba el resultado de un dominio excluido |
+| La reutilización pública sin el filtro de organización | no detectada: **RLS sola** (inquilino público) impide entregar un escaneo de organización |
+| Sin filtro y sin RLS | detectada: se entregaba el escaneo `basic` reciente de una organización |
+
+- **Orden del escaneo público** (hito 3.5e): validar el objetivo → prueba de trabajo → exclusión del operador y opt-out → **reutilización** → límites (IP, dominio, global) → encolar. Un resultado público `basic` (sin organización) terminado hace menos de 1 hora, o uno en curso de hace menos de 2 minutos, se entrega sin gastar cupo, aunque la IP o el dominio hayan agotado el suyo. La prueba de trabajo se exige igualmente. La búsqueda se hace con el inquilino público, así que RLS por sí sola ya excluye los escaneos de organizaciones, además del filtro en la consulta.
 | No se aplican exclusiones ni opt-out | detectada |
 
 ## Cuentas

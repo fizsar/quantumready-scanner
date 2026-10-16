@@ -119,6 +119,19 @@ func (s *Store) EnqueueOrReuse(ctx context.Context, t Tenant, r ScanRequest) (sc
 	return sc, reused, err
 }
 
+// RecentPublicScan returns a public basic scan of host:port to reuse — in
+// flight or done within cooldown, or done within doneWithin — or
+// pgx.ErrNoRows. It reads with the public tenant, so row-level security
+// alone already keeps organizations' scans out.
+func (s *Store) RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration) (sc Scan, err error) {
+	err = s.Tx(ctx, Public, func(q *Queries) error {
+		sc, err = q.RecentPublicScan(ctx, RecentPublicScanParams{Host: host, Port: port,
+			CooldownSeconds: cooldown.Seconds(), DoneSeconds: doneWithin.Seconds()})
+		return err
+	})
+	return sc, err
+}
+
 // ScanFor returns a scan the tenant may see: public, or of its organization.
 // Another organization's scan is pgx.ErrNoRows, as if it did not exist.
 func (s *Store) ScanFor(ctx context.Context, t Tenant, id uuid.UUID) (sc Scan, err error) {
