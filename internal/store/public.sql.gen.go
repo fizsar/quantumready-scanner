@@ -26,6 +26,67 @@ func (q *Queries) AddScanExclusion(ctx context.Context, arg AddScanExclusionPara
 	return err
 }
 
+const clearOptOut = `-- name: ClearOptOut :execrows
+UPDATE domains SET block_public = false WHERE name = $1 AND block_public
+`
+
+func (q *Queries) ClearOptOut(ctx context.Context, name string) (int64, error) {
+	result, err := q.db.Exec(ctx, clearOptOut, name)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const keepOptOutAsExclusion = `-- name: KeepOptOutAsExclusion :exec
+INSERT INTO scan_exclusions (name, reason)
+SELECT $1::text, $2::text WHERE NOT public_scan_blocked(ARRAY[$1::text])
+`
+
+type KeepOptOutAsExclusionParams struct {
+	Name   string
+	Reason string
+}
+
+// A blocked domain removed from an organization keeps its block (run after
+// the delete). qr_app cannot read scan_exclusions, so instead of ON
+// CONFLICT it asks public_scan_blocked whether the name is still covered.
+func (q *Queries) KeepOptOutAsExclusion(ctx context.Context, arg KeepOptOutAsExclusionParams) error {
+	_, err := q.db.Exec(ctx, keepOptOutAsExclusion, arg.Name, arg.Reason)
+	return err
+}
+
+const listOptOuts = `-- name: ListOptOuts :many
+SELECT name, organization_id, status FROM domains WHERE block_public ORDER BY name
+`
+
+type ListOptOutsRow struct {
+	Name           string
+	OrganizationID uuid.UUID
+	Status         string
+}
+
+// Owner opt-outs (operator view, qradmin): every organization.
+func (q *Queries) ListOptOuts(ctx context.Context) ([]ListOptOutsRow, error) {
+	rows, err := q.db.Query(ctx, listOptOuts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOptOutsRow
+	for rows.Next() {
+		var i ListOptOutsRow
+		if err := rows.Scan(&i.Name, &i.OrganizationID, &i.Status); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listScanExclusions = `-- name: ListScanExclusions :many
 SELECT name, reason, created_at FROM scan_exclusions ORDER BY name
 `
@@ -76,8 +137,8 @@ type SetDomainBlockPublicParams struct {
 }
 
 // Public scanning (milestone 3.5).
-// The verified owner's opt-out from public scans (it only takes effect while
-// the domain is verified: public_scan_blocked checks).
+// The owner's opt-out from public scans. Only a verified domain can change
+// it (the caller checks Verified); once set it stays in force regardless.
 func (q *Queries) SetDomainBlockPublic(ctx context.Context, arg SetDomainBlockPublicParams) (Domain, error) {
 	row := q.db.QueryRow(ctx, setDomainBlockPublic, arg.BlockPublic, arg.OrganizationID, arg.ID)
 	var i Domain

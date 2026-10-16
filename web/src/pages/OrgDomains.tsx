@@ -194,6 +194,7 @@ function DomainItem(props: {
           {t('domains.keepRecord')}
         </p>
       )}
+      {!d.verified && d.block_public && <p className="muted small">{t('domains.blockedLapsed')}</p>}
       {d.verified && props.manage && (
         <div className="check">
           <input

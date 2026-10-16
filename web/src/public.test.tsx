@@ -103,6 +103,21 @@ describe('opt-out of public scans', () => {
     record: { type: 'TXT', name: '_quantumready.fizsar.com', value: 'qr-verify=x' },
   }
 
+  it('a block that outlived the verification is shown, without the switch', async () => {
+    stubFetch((url) => {
+      if (url.startsWith('/api/auth/me')) return json(me)
+      if (url.startsWith('/api/org?')) return json(owner)
+      if (url.startsWith('/api/org/domains?')) return json({ domains: [{ ...verified, status: 'pending', verified: false, block_public: true }] })
+      if (url.startsWith('/api/org/members')) return json({ members: [] })
+      if (url.startsWith('/api/org/invitations')) return json({ invitations: [] })
+      if (url.startsWith('/api/org/scans')) return json({ scans: [] })
+      return new Response(null, { status: 204 })
+    })
+    renderAt('/org')
+    expect(await screen.findByText(/siguen bloqueados\. Para quitar el bloqueo, verifica el dominio de nuevo/)).toBeTruthy()
+    expect(screen.queryByLabelText(/Bloquear los análisis públicos/)).toBeNull()
+  })
+
   it('the owner of a verified domain blocks public scans', async () => {
     const fetch = stubFetch((url, init) => {
       const method = init?.method ?? 'GET'

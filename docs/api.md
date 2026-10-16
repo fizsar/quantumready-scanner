@@ -91,7 +91,7 @@ Con sesión (y CSRF en lo que cambia algo). Actúan siempre sobre la **organizac
 | `GET /org/domains` | — | `{"domains": [{id, name, status, verified, verified_at, last_checked_at, lost_at, grace_until, check_pending, last_check_error, record: {type: "TXT", name: "_quantumready.<dominio>", value: "qr-verify=<token>"}}]}` |
 | `POST /org/domains` | `name` | **201** (owner, admin). Se normaliza (minúsculas, punycode). **400**: `invalid_domain`, `domain_ip`, `domain_reserved` (`.local`, `.test`, `.internal`, `arpa`…), `domain_unknown_tld`, `domain_public_suffix` (según la Public Suffix List incrustada). **409** `domain_exists`, `limit_reached` (20) |
 | `GET /org/domains/{id}` | — | El dominio |
-| `PATCH /org/domains/{id}` | `block_public` (bool) | **200** (owner, admin): el opt-out de escaneos públicos del dominio y sus subdominios; solo cuenta mientras esté verificado |
+| `PATCH /org/domains/{id}` | `block_public` (bool) | **200** (owner, admin): el opt-out de escaneos públicos del dominio y sus subdominios. Ponerlo o quitarlo exige el dominio verificado (**409** `optout_needs_verification`); una vez puesto sigue vigente aunque la verificación caduque |
 | `DELETE /org/domains/{id}` | — | **204** (owner, admin); sus escaneos siguen en el historial |
 | `POST /org/domains/{id}/verify` | — | **202** con `check_pending: true` (owner, admin; 10 por hora y dominio). El worker consulta el TXT en segundos: consultar `GET` hasta que `check_pending` sea `false` |
 

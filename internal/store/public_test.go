@@ -53,10 +53,13 @@ func TestPublicScanBlockedIsNarrow(t *testing.T) {
 	if public {
 		t.Error("PUBLIC can execute public_scan_blocked")
 	}
-	// The API's role cannot read the exclusion list itself.
-	var pg *pgconn.PgError
-	if _, err := testdb.AsRole(t, pool, RoleApp).Exec(ctx, "SELECT * FROM scan_exclusions"); !errors.As(err, &pg) || pg.Code != "42501" {
-		t.Errorf("qr_app reads scan_exclusions: %v", err)
+	// The API's role cannot read, change or delete the exclusion list (it
+	// only adds to it, when a blocked domain is removed).
+	for _, q := range []string{"SELECT * FROM scan_exclusions", "DELETE FROM scan_exclusions", "UPDATE scan_exclusions SET reason = 'x'"} {
+		var pg *pgconn.PgError
+		if _, err := testdb.AsRole(t, pool, RoleApp).Exec(ctx, q); !errors.As(err, &pg) || pg.Code != "42501" {
+			t.Errorf("qr_app: %s: %v", q, err)
+		}
 	}
 
 	org, _ := orgWithOwners(t, pool, 1)
@@ -73,8 +76,9 @@ func TestPublicScanBlockedIsNarrow(t *testing.T) {
 	app := NewStore(testdb.AsRole(t, pool, RoleApp))
 	for host, want := range map[string]bool{
 		"excluded.example": true, "www.excluded.example": true, "notexcluded.example": false,
-		"optout.example": true, "a.b.optout.example": true,
-		"pending.example": false, "verified.example": false, // not verified / not opted out: like any domain
+		"optout.example": true, "a.b.optout.example": true, // the owner's block covers subdomains too
+		"pending.example":  true,  // a block stays in force whatever the status (the API only sets it while verified)
+		"verified.example": false, // verified but not opted out: like any domain
 	} {
 		if got, err := app.PublicScanBlocked(ctx, host); err != nil || got != want {
 			t.Errorf("PublicScanBlocked(%s) = %v, %v; want %v", host, got, err, want)

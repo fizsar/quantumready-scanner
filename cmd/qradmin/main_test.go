@@ -50,6 +50,40 @@ func TestExclusions(t *testing.T) {
 	}
 }
 
+func TestOptOuts(t *testing.T) {
+	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
+		_, err := migrations.Up(ctx, db)
+		return err
+	})
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, `INSERT INTO organizations (id, name) VALUES ('00000000-0000-0000-0000-0000000000aa', 'Acme');
+		INSERT INTO domains (organization_id, name, token, status, block_public)
+		VALUES ('00000000-0000-0000-0000-0000000000aa', 'example.org', 't', 'pending', true)`); err != nil {
+		t.Fatal(err)
+	}
+	q := store.NewStore(pool).Queries
+	var out bytes.Buffer
+	if err := optoutOn(ctx, q, "list", "", &out); err != nil || !strings.Contains(out.String(), "example.org\tpending") {
+		t.Errorf("list: %q %v", out.String(), err)
+	}
+	if err := optoutOn(ctx, q, "clear", "example.org", &out); err != nil {
+		t.Fatal(err)
+	}
+	var blocked bool
+	_ = pool.QueryRow(ctx, "SELECT public_scan_blocked(ARRAY['example.org'])").Scan(&blocked)
+	if blocked {
+		t.Error("still blocked after clear")
+	}
+	if err := optoutOn(ctx, q, "clear", "example.org", &out); err == nil {
+		t.Error("clearing twice succeeded")
+	}
+	for _, args := range [][]string{{"optout"}, {"optout", "clear"}, {"optout", "clear", "co.uk"}, {"optout", "nope"}} {
+		if err := run(ctx, args, func(string) string { return "" }, &out); err == nil {
+			t.Errorf("run(%q) accepted", args)
+		}
+	}
+}
+
 func TestSignupCode(t *testing.T) {
 	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
 		_, err := migrations.Up(ctx, db)

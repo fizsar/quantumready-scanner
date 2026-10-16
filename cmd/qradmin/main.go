@@ -26,7 +26,9 @@ import (
 const usage = `usage: qradmin signup-code [-note TEXT] [-days N]
        qradmin exclude add DOMAIN [-reason TEXT]   (public scans of DOMAIN and its subdomains)
        qradmin exclude remove DOMAIN
-       qradmin exclude list`
+       qradmin exclude list
+       qradmin optout list                         (owners' opt-outs, kept even if no longer verified)
+       qradmin optout clear DOMAIN`
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Getenv, os.Stdout); err != nil {
@@ -46,6 +48,9 @@ func open(ctx context.Context, getenv func(string) string) (*pgxpool.Pool, error
 func run(ctx context.Context, args []string, getenv func(string) string, out io.Writer) error {
 	if len(args) > 0 && args[0] == "exclude" {
 		return exclude(ctx, args[1:], getenv, out)
+	}
+	if len(args) > 0 && args[0] == "optout" {
+		return optout(ctx, args[1:], getenv, out)
 	}
 	if len(args) == 0 || args[0] != "signup-code" {
 		return errors.New(usage)

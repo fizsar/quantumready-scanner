@@ -75,14 +75,27 @@ func (s *Store) DomainFor(ctx context.Context, t Tenant, id uuid.UUID) (d Domain
 	return d, err
 }
 
-// DeleteDomain removes a domain of the active organization (its scans stay).
+// DeleteDomain removes a domain of the active organization (its scans
+// stay). If it blocked public scans, the block survives as an operator
+// exclusion: an opt-out is never lifted by accident.
 func (s *Store) DeleteDomain(ctx context.Context, t Tenant, id uuid.UUID) error {
 	return s.Tx(ctx, t, func(q *Queries) error {
+		d, err := q.GetDomain(ctx, GetDomainParams{OrganizationID: *t.OrgID, ID: id})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
 		n, err := q.DeleteDomain(ctx, DeleteDomainParams{OrganizationID: *t.OrgID, ID: id})
 		if err == nil && n != 1 {
 			err = ErrNotFound
 		}
-		return err
+		if err != nil || !d.BlockPublic {
+			return err
+		}
+		return q.KeepOptOutAsExclusion(ctx, KeepOptOutAsExclusionParams{Name: d.Name,
+			Reason: "owner opt-out kept after the domain was removed from organization " + t.OrgID.String()})
 	})
 }
 

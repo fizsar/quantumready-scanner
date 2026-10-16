@@ -205,7 +205,8 @@ type patchDomainRequest struct {
 
 // patchDomain: PATCH /api/org/domains/{domainID} {"block_public": true}:
 // the owner's opt-out from public scans of the domain and its subdomains.
-// It takes effect only while the domain is verified.
+// Setting or lifting it needs the domain verified (409 otherwise); once set
+// it stays in force even if the verification lapses.
 func (a *api) patchDomain(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "domainID")
 	if !ok {
@@ -220,6 +221,10 @@ func (a *api) patchDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := a.cfg.Domains.SetDomainBlockPublic(r.Context(), tenant(r), id, *req.BlockPublic)
+	if errors.Is(err, store.ErrNotVerified) {
+		writeError(w, r, http.StatusConflict, "optout_needs_verification")
+		return
+	}
 	if a.domainError(w, r, err) {
 		return
 	}

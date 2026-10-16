@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -34,9 +35,23 @@ func (s *Store) PublicScanBlocked(ctx context.Context, host string) (blocked boo
 	return blocked, err
 }
 
-// SetDomainBlockPublic sets the opt-out of a domain of the active organization.
+// ErrNotVerified means the domain is not verified: its opt-out cannot change.
+var ErrNotVerified = errors.New("store: the domain is not verified")
+
+// SetDomainBlockPublic sets or lifts the opt-out of a domain of the active
+// organization. Both need the domain verified now (ErrNotVerified): nobody
+// blocks a domain they do not control, and a lapsed owner cannot lift a
+// block. Once set, the block stays in force whatever the status.
 func (s *Store) SetDomainBlockPublic(ctx context.Context, t Tenant, id uuid.UUID, block bool) (d Domain, err error) {
 	err = s.Tx(ctx, t, func(q *Queries) error {
+		cur, err := q.GetDomain(ctx, GetDomainParams{OrganizationID: *t.OrgID, ID: id})
+		if err != nil {
+			return err
+		}
+		if !cur.Verified(time.Now()) {
+			d = cur
+			return ErrNotVerified
+		}
 		d, err = q.SetDomainBlockPublic(ctx, SetDomainBlockPublicParams{OrganizationID: *t.OrgID, ID: id, BlockPublic: block})
 		return err
 	})

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -68,17 +69,47 @@ func TestOpenPublicScans(t *testing.T) {
 
 	ana, _ := a.signedIn(t, "ana@example.com", "203.0.113.1")
 	opt := addDomain(t, ana, "optout.example.com")
-	expect(t, ana.do(t, "PATCH", "/api/org/domains/"+opt.ID.String(), `{"block_public":true}`), http.StatusOK, "")
-	expect(t, pub("optout.example.com"), http.StatusAccepted, "") // not verified yet: the opt-out does not apply
+	block := func(on bool) *httptestRecorder {
+		return ana.do(t, "PATCH", "/api/org/domains/"+opt.ID.String(), js(map[string]bool{"block_public": on}))
+	}
+	// Nobody blocks a domain they have not proved they control.
+	expect(t, block(true), http.StatusConflict, "optout_needs_verification")
+	expect(t, pub("optout.example.com"), http.StatusAccepted, "")
 	a.verify(t, opt.ID, "verified", 0)
-	optedOut := pub("shop.optout.example.com")
+	expect(t, block(true), http.StatusOK, "")
+	optedOut := pub("shop.optout.example.com") // subdomains too, like the operator's exclusions
 	expect(t, optedOut, http.StatusForbidden, "scan_not_allowed")
 	if optedOut.Body.String() != excluded.Body.String() {
 		t.Errorf("opt-out and exclusion answers differ:\n%s\n%s", optedOut.Body, excluded.Body)
 	}
-	a.verify(t, opt.ID, "lost", 15) // verification lost after the grace: the opt-out lapses
-	expect(t, pub("optout.example.com"), http.StatusOK, "")
+	// The block stays in force when the verification lapses, and a lapsed
+	// owner cannot lift it; only verifying again (or the operator) does.
+	a.verify(t, opt.ID, "lost", 15)
+	expect(t, pub("optout.example.com"), http.StatusForbidden, "scan_not_allowed")
+	if _, err := a.owner.Exec(ctx, "UPDATE domains SET status = 'pending', lost_at = NULL, verified_at = NULL WHERE id = $1", opt.ID); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, pub("optout.example.com"), http.StatusForbidden, "scan_not_allowed")
+	expect(t, block(false), http.StatusConflict, "optout_needs_verification")
+	a.verify(t, opt.ID, "verified", 0)
+	expect(t, block(false), http.StatusOK, "")
+	expect(t, pub("optout.example.com"), http.StatusOK, "") // the scan from before, reused
 	expect(t, ana.do(t, "PATCH", "/api/org/domains/"+opt.ID.String(), `{}`), http.StatusBadRequest, "invalid_json")
+
+	// Removing a blocked domain from the organization keeps the block, as an
+	// operator exclusion.
+	kept := addDomain(t, ana, "kept.example.com")
+	a.verify(t, kept.ID, "verified", 0)
+	expect(t, ana.do(t, "PATCH", "/api/org/domains/"+kept.ID.String(), `{"block_public":true}`), http.StatusOK, "")
+	if w := ana.do(t, "DELETE", "/api/org/domains/"+kept.ID.String(), ""); w.Code != http.StatusNoContent {
+		t.Fatalf("delete: %d %s", w.Code, w.Body)
+	}
+	expect(t, pub("www.kept.example.com"), http.StatusForbidden, "scan_not_allowed")
+	var reason string
+	_ = a.owner.QueryRow(ctx, "SELECT reason FROM scan_exclusions WHERE name = 'kept.example.com'").Scan(&reason)
+	if !strings.Contains(reason, "owner opt-out kept") {
+		t.Errorf("exclusion reason: %q", reason)
+	}
 
 	// A domain verified by an organization, with a recent full scan, looks
 	// exactly like any other domain to a public request.
@@ -154,6 +185,56 @@ func TestPublicScanProofOfWork(t *testing.T) {
 	c.do(t, "GET", "/api/altcha", "")
 	c.do(t, "GET", "/api/altcha", "")
 	expect(t, c.do(t, "GET", "/api/altcha", ""), http.StatusTooManyRequests, "too_many_attempts")
+}
+
+// Every per-IP limit (open public scans, ALTCHA challenges, login) keys on
+// the real client: an invented X-Forwarded-For is ignored unless the
+// connection comes from the Caddy network, and then only the address Caddy
+// appended (the rightmost untrusted one) counts.
+func TestForgedForwardedFor(t *testing.T) {
+	v, _ := altcha.New([]byte(strings.Repeat("k", 32)), 10, time.Minute)
+	trusted, _ := ParsePrefixes("172.18.0.0/16")
+	a := newAuthAPI(t, AuthLimits{LoginIP: NewLimiter(2, 100)},
+		openPublic(PublicLimits{Challenge: NewLimiter(2, 100)}),
+		func(c *Config) { c.Altcha = v; c.Limiter = NewLimiter(2, 100); c.TrustedProxies = trusted })
+	forged := 0
+	req := func(method, path, body, remote, xff string) *httptestRecorder {
+		c := a.client("x")
+		c.remote = remote
+		return c.do(t, method, path, body, func(r *http.Request) {
+			if xff == "" {
+				forged++
+				xff = fmt.Sprintf("198.51.100.%d", forged) // a new invented address every time
+			}
+			r.Header.Set("X-Forwarded-For", xff)
+		})
+	}
+	for _, ep := range []struct{ method, path, body string }{
+		{"GET", "/api/altcha", ""},
+		{"POST", "/api/auth/login", `{"email":"x@example.com","password":"wrong-password-12"}`},
+	} {
+		// A direct client (not the Caddy network) cannot dodge its limit.
+		for range 2 {
+			req(ep.method, ep.path, ep.body, "203.0.113.50:1000", "")
+		}
+		expect(t, req(ep.method, ep.path, ep.body, "203.0.113.50:1001", ""), http.StatusTooManyRequests, "too_many_attempts")
+		// Through Caddy: a client-supplied prefix is ignored; Caddy's entry counts.
+		for range 2 {
+			req(ep.method, ep.path, ep.body, "172.18.0.2:2000", "10.9.9.9, 203.0.113.60")
+		}
+		expect(t, req(ep.method, ep.path, ep.body, "172.18.0.2:2001", "1.2.3.4, 203.0.113.60"), http.StatusTooManyRequests, "too_many_attempts")
+	}
+	// Open public scans (without the proof of work, to reach the limiter).
+	b := newAuthAPI(t, AuthLimits{}, openPublic(PublicLimits{}),
+		func(c *Config) { c.Limiter = NewLimiter(2, 100); c.TrustedProxies = trusted })
+	scan := func(host, remote, xff string) *httptestRecorder {
+		c := b.client("x")
+		c.remote = remote
+		return c.do(t, "POST", "/api/scans", js(map[string]string{"host": host}), func(r *http.Request) { r.Header.Set("X-Forwarded-For", xff) })
+	}
+	expect(t, scan("a.example.org", "203.0.113.70:1", "198.51.100.201"), http.StatusAccepted, "")
+	expect(t, scan("b.example.org", "203.0.113.70:2", "198.51.100.202"), http.StatusAccepted, "")
+	expect(t, scan("c.example.org", "203.0.113.70:3", "198.51.100.203"), http.StatusTooManyRequests, "rate_limited")
 }
 
 func TestPublicScanLimits(t *testing.T) {
