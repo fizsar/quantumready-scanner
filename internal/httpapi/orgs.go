@@ -28,7 +28,7 @@ type OrgStore interface {
 	InvitationByToken(ctx context.Context, hash []byte) (store.InvitationInfo, error)
 	AcceptInvitation(ctx context.Context, sessionID, userID uuid.UUID, email string, hash []byte) (store.Member, error)
 	RegisterInvited(ctx context.Context, r store.InvitedRegistration) (store.User, store.Member, error)
-	CreateOrganization(ctx context.Context, sessionID, userID uuid.UUID, name string, maxOrgs int) (store.Member, error)
+	CreateOrganization(ctx context.Context, sessionID, userID uuid.UUID, name string, rules store.NewOrgRules) (store.Member, error)
 	SwitchOrganization(ctx context.Context, sessionID, userID, org uuid.UUID) (store.Member, error)
 }
 

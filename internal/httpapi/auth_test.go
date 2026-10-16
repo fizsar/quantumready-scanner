@@ -33,7 +33,7 @@ type authAPI struct {
 	owner *pgxpool.Pool // test owner: reads what the API wrote
 }
 
-func newAuthAPI(t *testing.T, limits AuthLimits) *authAPI {
+func newAuthAPI(t *testing.T, limits AuthLimits, opts ...func(*Config)) *authAPI {
 	t.Helper()
 	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
 		_, err := migrations.Up(ctx, db)
@@ -41,11 +41,15 @@ func newAuthAPI(t *testing.T, limits AuthLimits) *authAPI {
 	})
 	// The API runs as qr_app, as in production.
 	app := store.NewStore(testdb.AsRole(t, pool, store.RoleApp))
-	return &authAPI{owner: pool, h: NewRouter(Config{
+	cfg := Config{
 		DB: fakePinger{}, Accounts: app, Orgs: app, PublicOrigin: testOrigin, AuthLimits: limits,
 		Async:  func(f func()) { f() },
 		Logger: slog.New(slog.NewTextHandler(testLog{t}, nil)),
-	})}
+	}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	return &authAPI{owner: pool, h: NewRouter(cfg)}
 }
 
 // testLog shows the API's error logs in the test output.

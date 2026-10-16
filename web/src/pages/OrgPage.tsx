@@ -342,8 +342,10 @@ function Switcher({ current, csrf, onDone }: { current: string; csrf: string; on
 
 function CreateOrg({ csrf, onDone }: { csrf: string; onDone: () => Promise<void> }) {
   const { lang, t } = useLang()
+  const { state } = useAuth()
   const f = useForm()
   const [name, setName] = useState('')
+  if (state.status === 'user' && !state.me.can_create_organizations) return <p className="muted small">{t('org.createClosed')}</p>
   const submit = (e: FormEvent) => {
     e.preventDefault()
     void f.run(async () => {

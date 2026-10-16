@@ -160,4 +160,5 @@ type User struct {
 	Lang            string
 	CreatedAt       time.Time
 	LastLoginAt     *time.Time
+	SignupVia       string
 }

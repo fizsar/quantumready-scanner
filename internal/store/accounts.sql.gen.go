@@ -248,7 +248,7 @@ func (q *Queries) EnqueueEmail(ctx context.Context, arg EnqueueEmailParams) erro
 
 const getSessionByToken = `-- name: GetSessionByToken :one
 SELECT s.id, s.user_id, s.csrf_token, s.active_org_id, s.last_seen_at, s.expires_at,
-       u.email, u.name, u.lang, u.email_verified_at
+       u.email, u.name, u.lang, u.email_verified_at, u.signup_via
 FROM sessions s JOIN users u ON u.id = s.user_id
 WHERE s.token_hash = $1 AND s.expires_at > now()
   AND s.last_seen_at > now() - make_interval(secs => $2::float8)
@@ -270,6 +270,7 @@ type GetSessionByTokenRow struct {
 	Name            *string
 	Lang            string
 	EmailVerifiedAt *time.Time
+	SignupVia       string
 }
 
 // A live session: not expired, and used within the idle timeout.
@@ -287,13 +288,14 @@ func (q *Queries) GetSessionByToken(ctx context.Context, arg GetSessionByTokenPa
 		&i.Name,
 		&i.Lang,
 		&i.EmailVerifiedAt,
+		&i.SignupVia,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
 
-SELECT id, email, email_verified_at, password_hash, name, lang, created_at, last_login_at FROM users WHERE email = $1
+SELECT id, email, email_verified_at, password_hash, name, lang, created_at, last_login_at, signup_via FROM users WHERE email = $1
 `
 
 // Accounts, sessions, email tokens, signup codes and the email outbox
@@ -311,12 +313,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Lang,
 		&i.CreatedAt,
 		&i.LastLoginAt,
+		&i.SignupVia,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, email_verified_at, password_hash, name, lang, created_at, last_login_at FROM users WHERE id = $1
+SELECT id, email, email_verified_at, password_hash, name, lang, created_at, last_login_at, signup_via FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -331,6 +334,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Lang,
 		&i.CreatedAt,
 		&i.LastLoginAt,
+		&i.SignupVia,
 	)
 	return i, err
 }
@@ -396,6 +400,15 @@ UPDATE users SET email_verified_at = coalesce(email_verified_at, now()) WHERE id
 
 func (q *Queries) MarkEmailVerified(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, markEmailVerified, id)
+	return err
+}
+
+const markSignupViaInvitation = `-- name: MarkSignupViaInvitation :exec
+UPDATE users SET signup_via = 'invitation' WHERE id = $1
+`
+
+func (q *Queries) MarkSignupViaInvitation(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markSignupViaInvitation, id)
 	return err
 }
 

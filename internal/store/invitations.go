@@ -15,6 +15,7 @@ var (
 	ErrAlreadyMember   = errors.New("store: already a member")
 	ErrInvitationEmail = errors.New("store: the invitation is for another email")
 	ErrLimit           = errors.New("store: limit reached")
+	ErrNewOrgsClosed   = errors.New("store: invited accounts cannot create organizations during the beta")
 )
 
 // InvitationTTL is how long an invitation link works.
@@ -33,12 +34,12 @@ type InvitationInfo struct {
 // invitationByToken returns a pending, unexpired invitation, or
 // ErrInvalidToken (unknown, used, revoked or expired).
 func invitationByToken(ctx context.Context, q *Queries, hash []byte) (InvitationInfo, error) {
+	// The function returns only pending, unexpired invitations.
 	var inv InvitationInfo
-	var accepted, revoked *time.Time
-	err := q.db.QueryRow(ctx, `SELECT id, organization_id, organization_name, email, role, inviter_email, expires_at, accepted_at, revoked_at
+	err := q.db.QueryRow(ctx, `SELECT id, organization_id, organization_name, email, role, inviter_email, expires_at
 		FROM invitation_by_token($1)`, hash).Scan(&inv.ID, &inv.OrganizationID, &inv.OrganizationName, &inv.Email, &inv.Role,
-		&inv.InviterEmail, &inv.ExpiresAt, &accepted, &revoked)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (accepted != nil || revoked != nil || !inv.ExpiresAt.After(time.Now()))) {
+		&inv.InviterEmail, &inv.ExpiresAt)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return InvitationInfo{}, ErrInvalidToken
 	}
 	return inv, err
@@ -204,17 +205,41 @@ func (s *Store) RegisterInvited(ctx context.Context, r InvitedRegistration) (u U
 		if err := q.MarkEmailVerified(ctx, u.ID); err != nil {
 			return err
 		}
+		if err := q.MarkSignupViaInvitation(ctx, u.ID); err != nil {
+			return err
+		}
+		u.SignupVia = SignupViaInvitation
 		m, err = joinByInvitation(ctx, q, inv, u.ID, r.Email)
 		return err
 	})
 	return u, m, err
 }
 
+// How an account was created (users.signup_via).
+const (
+	SignupViaCode       = "code"
+	SignupViaInvitation = "invitation"
+)
+
+// NewOrgRules limit who creates organizations.
+type NewOrgRules struct {
+	MaxOrgs          int  // memberships per user; 0 = no limit
+	InvitedMayCreate bool // accounts created by invitation may create organizations (off during the beta)
+}
+
 // CreateOrganization creates an organization owned by the user and makes it
-// the session's active one. ErrLimit when the user already
-// belongs to maxOrgs organizations.
-func (s *Store) CreateOrganization(ctx context.Context, sessionID, userID uuid.UUID, name string, maxOrgs int) (m Member, err error) {
+// the session's active one. ErrNewOrgsClosed for an invited account while
+// the beta rule holds; ErrLimit beyond MaxOrgs.
+func (s *Store) CreateOrganization(ctx context.Context, sessionID, userID uuid.UUID, name string, rules NewOrgRules) (m Member, err error) {
 	err = s.Tx(ctx, Tenant{UserID: &userID}, func(q *Queries) error {
+		u, err := q.GetUserByID(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if u.SignupVia == SignupViaInvitation && !rules.InvitedMayCreate {
+			return ErrNewOrgsClosed
+		}
+		maxOrgs := rules.MaxOrgs
 		orgs, err := q.ListUserOrganizations(ctx, userID)
 		if err != nil {
 			return err

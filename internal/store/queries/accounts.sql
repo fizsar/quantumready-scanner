@@ -25,7 +25,7 @@ RETURNING *;
 -- name: GetSessionByToken :one
 -- A live session: not expired, and used within the idle timeout.
 SELECT s.id, s.user_id, s.csrf_token, s.active_org_id, s.last_seen_at, s.expires_at,
-       u.email, u.name, u.lang, u.email_verified_at
+       u.email, u.name, u.lang, u.email_verified_at, u.signup_via
 FROM sessions s JOIN users u ON u.id = s.user_id
 WHERE s.token_hash = @token_hash AND s.expires_at > now()
   AND s.last_seen_at > now() - make_interval(secs => @idle_seconds::float8);
@@ -97,3 +97,6 @@ UPDATE email_outbox SET status = 'failed', last_error = @last_error WHERE id = @
 -- Sent and failed emails carry links with tokens: keep them only briefly.
 DELETE FROM email_outbox
 WHERE status IN ('sent', 'failed') AND created_at < now() - make_interval(secs => @older_than_seconds::float8);
+
+-- name: MarkSignupViaInvitation :exec
+UPDATE users SET signup_via = 'invitation' WHERE id = @id;

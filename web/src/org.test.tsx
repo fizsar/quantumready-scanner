@@ -10,6 +10,7 @@ const me = (orgs: Me['organizations'] = [{ id: 'oA', name: 'Acme', role: 'owner'
   organizations: orgs,
   active_org_id: orgs[0]?.id ?? null,
   csrf_token: 'csrf-1',
+  can_create_organizations: true,
 })
 const owner: Org = {
   id: 'oA', name: 'Acme', role: 'owner',
@@ -118,6 +119,13 @@ describe('organization page', () => {
     await userEvent.type(screen.getByLabelText('Name of a new organization'), 'Gamma')
     await userEvent.click(screen.getByRole('button', { name: 'Create organization' }))
     await waitFor(() => expect(call(fetch, 'POST', '/api/organizations?').body).toEqual({ name: 'Gamma' }))
+  })
+
+  it('invited account during the beta: no form to create organizations', async () => {
+    orgAPI(viewer, { me: { ...me([{ id: 'oA', name: 'Acme', role: 'viewer' }]), can_create_organizations: false } })
+    renderAt('/org')
+    expect(await screen.findByText(/las cuentas creadas por invitación no pueden crear organizaciones/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Crear organización' })).toBeNull()
   })
 
   it('without an organization, offers to create one', async () => {

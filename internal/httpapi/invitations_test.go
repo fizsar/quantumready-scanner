@@ -16,6 +16,36 @@ func tok(t *testing.T, a *authAPI, email string) string {
 	return a.lastToken(t, email, "invitation")
 }
 
+// During the beta, accounts that came in by invitation cannot create
+// organizations; code accounts can; the setting lifts it.
+func TestInvitedAccountsAndNewOrganizations(t *testing.T) {
+	for _, allowed := range []bool{false, true} {
+		a := newAuthAPI(t, AuthLimits{EmailIP: NewLimiter(100, 100)}, func(c *Config) { c.InvitedCanCreateOrgs = allowed })
+		ana, me := a.signedIn(t, "ana@example.com", "203.0.113.1")
+		if !me.CanCreateOrganizations {
+			t.Error("a code account cannot create organizations")
+		}
+		expect(t, ana.do(t, "POST", "/api/org/invitations", `{"email":"eva@example.com","role":"viewer"}`), http.StatusCreated, "")
+		anon := a.client("203.0.113.9")
+		expect(t, anon.do(t, "POST", "/api/auth/register",
+			js(map[string]string{"email": "eva@example.com", "password": goodPass, "invitation_token": tok(t, a, "eva@example.com")})), http.StatusCreated, "")
+		eva := a.client("203.0.113.5")
+		w := eva.login(t, "eva@example.com", goodPass)
+		var meE meView
+		_ = json.Unmarshal(w.Body.Bytes(), &meE)
+		if meE.CanCreateOrganizations != allowed {
+			t.Errorf("allowed=%v: can_create_organizations=%v", allowed, meE.CanCreateOrganizations)
+		}
+		w = eva.do(t, "POST", "/api/organizations", `{"name":"Eva SL"}`)
+		if allowed {
+			expect(t, w, http.StatusCreated, "")
+		} else {
+			expect(t, w, http.StatusForbidden, "new_organizations_closed")
+			expect(t, ana.do(t, "POST", "/api/organizations", `{"name":"Ana 2"}`), http.StatusCreated, "")
+		}
+	}
+}
+
 func TestInvitations(t *testing.T) {
 	a := newAuthAPI(t, AuthLimits{EmailIP: NewLimiter(100, 100)})
 	ana, me := a.signedIn(t, "ana@example.com", "203.0.113.1")

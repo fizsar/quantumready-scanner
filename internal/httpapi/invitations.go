@@ -256,7 +256,12 @@ func (a *api) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := session(r)
-	m, err := a.cfg.Orgs.CreateOrganization(r.Context(), s.ID, s.UserID, name, maxOrgsPerUser)
+	m, err := a.cfg.Orgs.CreateOrganization(r.Context(), s.ID, s.UserID, name,
+		store.NewOrgRules{MaxOrgs: maxOrgsPerUser, InvitedMayCreate: a.cfg.InvitedCanCreateOrgs})
+	if errors.Is(err, store.ErrNewOrgsClosed) {
+		writeError(w, r, http.StatusForbidden, "new_organizations_closed")
+		return
+	}
 	if errors.Is(err, store.ErrLimit) {
 		writeError(w, r, http.StatusConflict, "limit_reached")
 		return

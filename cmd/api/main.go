@@ -107,6 +107,8 @@ func run(logger *slog.Logger) error {
 	if origin != "" {
 		cfg.Accounts, cfg.Orgs = st, st
 	}
+	// Closed beta: invited accounts cannot create organizations unless this is "true".
+	cfg.InvitedCanCreateOrgs = os.Getenv("BETA_INVITED_CAN_CREATE_ORGS") == "true"
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           httpapi.NewRouter(cfg),

@@ -51,6 +51,9 @@ type Config struct {
 	Accounts AccountStore
 	// Orgs (with Accounts) enables /api/org.
 	Orgs OrgStore
+	// InvitedCanCreateOrgs lets accounts created by invitation create their
+	// own organizations (false during the closed beta).
+	InvitedCanCreateOrgs bool
 	// PublicOrigin is the site's origin ("https://quantumready.fizsar.com"):
 	// links in emails, and state-changing requests from browsers must come
 	// from it.

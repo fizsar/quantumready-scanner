@@ -325,19 +325,26 @@ type meView struct {
 	Organizations []orgView  `json:"organizations"`
 	ActiveOrgID   *uuid.UUID `json:"active_org_id"`
 	CSRFToken     string     `json:"csrf_token"`
+	// CanCreateOrganizations is false for invited accounts during the beta.
+	CanCreateOrganizations bool `json:"can_create_organizations"`
+}
+
+func (a *api) canCreateOrgs(signupVia string) bool {
+	return signupVia != store.SignupViaInvitation || a.cfg.InvitedCanCreateOrgs
 }
 
 type statusView struct {
 	Status string `json:"status"`
 }
 
-func (a *api) writeMe(w http.ResponseWriter, r *http.Request, u userView, activeOrg *uuid.UUID, csrf string) {
+func (a *api) writeMe(w http.ResponseWriter, r *http.Request, u userView, activeOrg *uuid.UUID, csrf, signupVia string) {
 	orgs, err := a.cfg.Accounts.UserOrganizations(r.Context(), u.ID)
 	if err != nil {
 		a.internal(w, r, "list organizations", err)
 		return
 	}
-	v := meView{User: u, Organizations: []orgView{}, ActiveOrgID: activeOrg, CSRFToken: csrf}
+	v := meView{User: u, Organizations: []orgView{}, ActiveOrgID: activeOrg, CSRFToken: csrf,
+		CanCreateOrganizations: a.cfg.Orgs != nil && a.canCreateOrgs(signupVia)}
 	for _, o := range orgs {
 		v.Organizations = append(v.Organizations, orgView{ID: o.ID, Name: o.Name, Role: o.Role})
 	}
@@ -540,13 +547,13 @@ func (a *api) login(w http.ResponseWriter, r *http.Request) {
 	}
 	setSessionCookie(w, token)
 	a.audit(r, nil, &u.ID, auditLogin)
-	a.writeMe(w, r, userView{ID: u.ID, Email: u.Email, Name: u.Name, Lang: u.Lang}, s.ActiveOrgID, csrf)
+	a.writeMe(w, r, userView{ID: u.ID, Email: u.Email, Name: u.Name, Lang: u.Lang}, s.ActiveOrgID, csrf, u.SignupVia)
 }
 
 // me: GET /api/auth/me.
 func (a *api) me(w http.ResponseWriter, r *http.Request) {
 	s := session(r)
-	a.writeMe(w, r, userView{ID: s.UserID, Email: s.Email, Name: s.Name, Lang: s.Lang}, s.ActiveOrgID, s.CsrfToken)
+	a.writeMe(w, r, userView{ID: s.UserID, Email: s.Email, Name: s.Name, Lang: s.Lang}, s.ActiveOrgID, s.CsrfToken, s.SignupVia)
 }
 
 // logout: POST /api/auth/logout.

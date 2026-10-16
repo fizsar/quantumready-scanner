@@ -121,6 +121,8 @@ export interface Me {
   organizations: { id: string; name: string; role: 'owner' | 'admin' | 'viewer' }[]
   active_org_id: string | null
   csrf_token: string
+  /** False for accounts created by invitation during the beta. */
+  can_create_organizations: boolean
 }
 
 const CSRF_HEADER = 'X-QR-CSRF'

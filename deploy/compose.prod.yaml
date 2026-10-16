@@ -90,6 +90,8 @@ services:
       # Accounts (/api/auth): off while empty (until milestone 3.7).
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
       MAIL_SUPPORT: ${MAIL_SUPPORT:-soporte@fizsar.com}
+      # Closed beta: invited accounts cannot create organizations ("true" lifts it).
+      BETA_INVITED_CAN_CREATE_ORGS: ${BETA_INVITED_CAN_CREATE_ORGS:-false}
     ports:
       - "127.0.0.1:8080:8080"
     networks:

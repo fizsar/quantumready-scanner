@@ -10,6 +10,7 @@ const me: Me = {
   organizations: [{ id: 'o1', name: 'Acme', role: 'owner' }],
   active_org_id: 'o1',
   csrf_token: 'csrf-123',
+  can_create_organizations: true,
 }
 
 const unauthenticated = () => json({ error: { code: 'unauthenticated', message: 'Tienes que iniciar sesión.' } }, 401)
