@@ -5,10 +5,12 @@ import { usePageMeta } from '../usePageMeta'
 import { useScan } from '../useScan'
 import { errorMessage } from '../verdict'
 
-export function ScanPage() {
+/** A scan result. org: one of the active organization's scans (/org/scans/:id). */
+export function ScanPage({ org = false }: { org?: boolean }) {
   const { id = '' } = useParams()
   const { lang, t } = useLang()
-  const { scan, error, reconnecting } = useScan(id, lang)
+  const { scan, error, reconnecting } = useScan(id, lang, org)
+  const back = org ? '/org' : '/'
   usePageMeta(t('meta.scan', { host: scan?.host ?? '…' }), true)
 
   if (error && !scan) {
@@ -20,7 +22,7 @@ export function ScanPage() {
         <p className="error" role="alert">
           {errorMessage(error, t)}
         </p>
-        <Link className="btn" to="/">
+        <Link className="btn" to={back}>
           {t('footer.newScan')}
         </Link>
       </section>
@@ -41,7 +43,7 @@ export function ScanPage() {
           {t('failed.title')}
         </h1>
         <p role="alert">{scan.error?.message}</p>
-        <Link className="btn" to="/">
+        <Link className="btn" to={back}>
           {t('failed.again')}
         </Link>
       </section>

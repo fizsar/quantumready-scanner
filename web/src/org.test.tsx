@@ -37,6 +37,8 @@ function orgAPI(org: Org | null, opts: { me?: Me; extra?: (url: string, init?: R
       return org ? json(org) : json({ error: { code: 'no_organization', message: 'No perteneces a ninguna organización.' } }, 403)
     if (url.startsWith('/api/org/members?')) return json({ members })
     if (url.startsWith('/api/org/invitations?') && method === 'GET') return json({ invitations: pending })
+    if (url.startsWith('/api/org/domains?') && method === 'GET') return json({ domains: [] })
+    if (url.startsWith('/api/org/scans?') && method === 'GET') return json({ scans: [] })
     return empty()
   })
 }

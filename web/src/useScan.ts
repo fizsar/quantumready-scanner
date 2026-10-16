@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ApiError, getScan, isFinished, pollDelay, type Lang, type ScanView } from './api'
+import { ApiError, getOrgScan, getScan, isFinished, pollDelay, type Lang, type ScanView } from './api'
 
 /** Give up polling after this many consecutive network errors. */
 const MAX_NETWORK_ERRORS = 10
@@ -14,9 +14,10 @@ export interface ScanState {
 /**
  * Loads a scan and polls it with a growing delay (see pollDelay) until it is
  * done or failed. A 4xx answer (e.g. 404) stops polling; network errors are
- * retried a few times. Changing lang reloads the texts.
+ * retried a few times. Changing lang reloads the texts. org: one of the
+ * active organization's scans (/api/org/scans) instead of a public one.
  */
-export function useScan(id: string, lang: Lang): ScanState {
+export function useScan(id: string, lang: Lang, org = false): ScanState {
   const [state, setState] = useState<ScanState>({ reconnecting: false })
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export function useScan(id: string, lang: Lang): ScanState {
 
     const tick = async () => {
       try {
-        const scan = await getScan(id, lang)
+        const scan = await (org ? getOrgScan : getScan)(id, lang)
         if (cancelled) return
         networkErrors = 0
         setState({ scan, reconnecting: false })
@@ -49,7 +50,7 @@ export function useScan(id: string, lang: Lang): ScanState {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [id, lang])
+  }, [id, lang, org])
 
   return state
 }

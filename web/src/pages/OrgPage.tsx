@@ -24,6 +24,7 @@ import { ErrorLine, Field, Panel } from '../components/Form'
 import { useLang } from '../i18n'
 import { asError, useForm } from '../useForm'
 import { usePageMeta } from '../usePageMeta'
+import { DomainsSection, OrgScansSection } from './OrgDomains'
 
 const ROLES: Role[] = ['owner', 'admin', 'viewer']
 
@@ -50,6 +51,7 @@ export function OrgPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loadError, setLoadError] = useState<ApiError | null>(null)
+  const [verified, setVerified] = useState<string[]>([])
   const csrf = state.status === 'user' ? state.me.csrf_token : ''
 
   const load = useCallback(
@@ -126,6 +128,8 @@ export function OrgPage() {
     <Panel title={org.name} wide>
       <p className="muted">{t('org.yourRole', { role: t(`account.role.${org.role}` as const) })}</p>
       {can('rename') && <Rename org={org} csrf={csrf} onDone={reloadAll} />}
+      <DomainsSection org={org} csrf={csrf} onChange={(ds) => setVerified(ds.filter((d) => d.verified).map((d) => d.name))} />
+      <OrgScansSection org={org} csrf={csrf} verified={verified} />
       <Members org={org} members={members} csrf={csrf} onChange={load} onLeft={reloadAll} />
       {can('invite') && <Invitations org={org} invitations={invitations} csrf={csrf} onChange={load} />}
       <Switcher key={org.id} current={org.id} csrf={csrf} onDone={reloadAll} />

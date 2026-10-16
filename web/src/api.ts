@@ -51,6 +51,7 @@ export interface ScanView {
   id: string
   host: string
   port: number
+  intensity?: 'basic' | 'full'
   status: ScanStatus
   retries: number
   created_at: string
@@ -217,6 +218,44 @@ export const registerInvited = (email: string, password: string, invitationToken
 export const createOrganization = (name: string, csrf: string, lang: Lang) => post<Org>('/api/organizations', lang, { name }, csrf)
 export const switchOrganization = (id: string, csrf: string, lang: Lang) =>
   post<Org>(`/api/organizations/${encodeURIComponent(id)}/switch`, lang, undefined, csrf)
+
+// --- Domains and full scans of the active organization.
+
+export interface Domain {
+  id: string
+  name: string
+  status: 'pending' | 'verified' | 'lost'
+  verified: boolean
+  verified_at?: string
+  last_checked_at?: string
+  lost_at?: string
+  grace_until?: string
+  check_pending: boolean
+  last_check_error?: { code: string; message: string }
+  record: { type: 'TXT'; name: string; value: string }
+}
+
+export interface ScanSummary {
+  id: string
+  host: string
+  status: ScanStatus
+  intensity: 'basic' | 'full'
+  created_at: string
+  finished_at?: string
+  score?: number
+  grade?: string
+}
+
+export const listDomains = (lang: Lang) => get<{ domains: Domain[] }>('/api/org/domains', lang).then((r) => r.domains)
+export const getDomain = (id: string, lang: Lang) => get<Domain>(`/api/org/domains/${encodeURIComponent(id)}`, lang)
+export const addDomain = (name: string, csrf: string, lang: Lang) => post<Domain>('/api/org/domains', lang, { name }, csrf)
+export const deleteDomain = (id: string, csrf: string, lang: Lang) =>
+  send<null>('DELETE', `/api/org/domains/${encodeURIComponent(id)}`, lang, undefined, csrf)
+export const verifyDomain = (id: string, csrf: string, lang: Lang) =>
+  post<Domain>(`/api/org/domains/${encodeURIComponent(id)}/verify`, lang, undefined, csrf)
+export const listOrgScans = (lang: Lang) => get<{ scans: ScanSummary[] }>('/api/org/scans', lang).then((r) => r.scans)
+export const createOrgScan = (host: string, csrf: string, lang: Lang) => post<ScanView>('/api/org/scans', lang, { host }, csrf)
+export const getOrgScan = (id: string, lang: Lang) => get<ScanView>(`/api/org/scans/${encodeURIComponent(id)}`, lang)
 
 export const isFinished = (s: ScanView) => s.status === 'done' || s.status === 'failed'
 

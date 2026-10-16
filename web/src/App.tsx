@@ -44,6 +44,7 @@ export default function App() {
           <Route path="/reset" element={<ResetPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/org" element={<OrgPage />} />
+          <Route path="/org/scans/:id" element={<ScanPage org />} />
           <Route path="/invite" element={<InvitePage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
