@@ -42,7 +42,7 @@ func newAuthAPI(t *testing.T, limits AuthLimits, opts ...func(*Config)) *authAPI
 	// The API runs as qr_app, as in production.
 	app := store.NewStore(testdb.AsRole(t, pool, store.RoleApp))
 	cfg := Config{
-		DB: fakePinger{}, Accounts: app, Orgs: app, PublicOrigin: testOrigin, AuthLimits: limits,
+		DB: fakePinger{}, Accounts: app, Orgs: app, Domains: app, PublicOrigin: testOrigin, AuthLimits: limits,
 		Async:  func(f func()) { f() },
 		Logger: slog.New(slog.NewTextHandler(testLog{t}, nil)),
 	}

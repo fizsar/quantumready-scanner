@@ -11,7 +11,7 @@ PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
 # Pinned by digest; bump tag and digest together (CI uses the same image).
 SQLC_IMAGE := sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537
 
-.PHONY: help dev signup-code test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down tlslab-test tlslab-scan
+.PHONY: help dev psl signup-code test lint build clean prod-up prod-down deploy sqlc check-compose test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down tlslab-test tlslab-scan
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -47,6 +47,9 @@ lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint
 	golangci-lint run ./...
 	npm --prefix web run lint
 	npm --prefix web run typecheck
+
+psl: ## Update the embedded Public Suffix List (newest commit at least 14 days old; see internal/domains)
+	internal/domains/update-psl.sh
 
 signup-code: .env ## Create a closed-beta signup code in the dev database: make signup-code NOTE="for Ana"
 	@set -a; . ./.env; set +a; go run ./cmd/qradmin signup-code -note "$(NOTE)"

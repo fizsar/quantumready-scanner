@@ -37,16 +37,19 @@ type DeletionTombstone struct {
 }
 
 type Domain struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	Name           string
-	Token          string
-	Status         string
-	VerifiedAt     *time.Time
-	LastCheckedAt  *time.Time
-	LostAt         *time.Time
-	BlockPublic    bool
-	CreatedAt      time.Time
+	ID               uuid.UUID
+	OrganizationID   uuid.UUID
+	Name             string
+	Token            string
+	Status           string
+	VerifiedAt       *time.Time
+	LastCheckedAt    *time.Time
+	LostAt           *time.Time
+	BlockPublic      bool
+	CreatedAt        time.Time
+	CheckRequestedAt *time.Time
+	CheckLeaseUntil  *time.Time
+	LastCheckError   *string
 }
 
 type EmailOutbox struct {

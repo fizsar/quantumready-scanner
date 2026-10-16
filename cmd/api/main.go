@@ -105,7 +105,7 @@ func run(logger *slog.Logger) error {
 		Logger:         logger,
 	}
 	if origin != "" {
-		cfg.Accounts, cfg.Orgs = st, st
+		cfg.Accounts, cfg.Orgs, cfg.Domains = st, st, st
 	}
 	// Closed beta: invited accounts cannot create organizations unless this is "true".
 	cfg.InvitedCanCreateOrgs = os.Getenv("BETA_INVITED_CAN_CREATE_ORGS") == "true"

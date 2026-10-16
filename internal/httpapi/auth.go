@@ -46,6 +46,8 @@ type AuthLimits struct {
 	PerAddress    *Limiter // emails sent to one address: 3/hour, silently skipped beyond
 	// OrgInvitations: invitations created per organization: 50/day.
 	OrgInvitations *Limiter
+	// DomainChecks: verification requests per domain: 10/hour.
+	DomainChecks *Limiter
 }
 
 // Session cookie and lifetimes.
@@ -89,6 +91,9 @@ func (a *api) authDefaults() {
 	}
 	if l.OrgInvitations == nil {
 		l.OrgInvitations = NewWindowLimiter(50, 24*time.Hour)
+	}
+	if l.DomainChecks == nil {
+		l.DomainChecks = NewWindowLimiter(10, time.Hour)
 	}
 	if a.cfg.Async == nil {
 		a.cfg.Async = func(f func()) { go f() }

@@ -24,11 +24,13 @@ type tenantWorld struct {
 	inviteTok  string
 	inviteTo   string
 	scan       uuid.UUID
+	domain     uuid.UUID
+	tag        string
 }
 
 func buildTenant(t *testing.T, a *authAPI, tag string, ipBase int) *tenantWorld {
 	t.Helper()
-	w := &tenantWorld{name: "Org " + tag, clients: map[string]*client{}, userIDs: map[string]uuid.UUID{}}
+	w := &tenantWorld{tag: tag, name: "Org " + tag, clients: map[string]*client{}, userIDs: map[string]uuid.UUID{}}
 	owner, me := a.signedIn(t, "owner-"+tag+"@example.com", fmt.Sprintf("203.0.113.%d", ipBase))
 	w.org = *me.ActiveOrgID
 	expect(t, owner.do(t, "PATCH", "/api/org", js(map[string]string{"name": w.name})), http.StatusNoContent, "")
@@ -50,6 +52,7 @@ func buildTenant(t *testing.T, a *authAPI, tag string, ipBase int) *tenantWorld 
 	_ = json.Unmarshal(r.Body.Bytes(), &iv)
 	w.invitation = iv.ID
 	w.inviteTok = a.lastToken(t, w.inviteTo, "invitation")
+	w.domain = addDomain(t, owner, "secret-"+tag+"-domain.com").ID
 	if err := a.owner.QueryRow(context.Background(), `INSERT INTO scans (host, port, organization_id, intensity, status)
 		VALUES ('secret-`+tag+`.example', 443, $1, 'full', 'queued') RETURNING id`, w.org).Scan(&w.scan); err != nil {
 		t.Fatal(err)
@@ -59,7 +62,7 @@ func buildTenant(t *testing.T, a *authAPI, tag string, ipBase int) *tenantWorld 
 
 // secrets are strings of w that must never appear in another tenant's answers.
 func (w *tenantWorld) secrets() []string {
-	s := []string{w.org.String(), w.name, w.invitation.String(), w.inviteTo, w.scan.String(), "secret-"}
+	s := []string{w.org.String(), w.name, w.invitation.String(), w.inviteTo, w.scan.String(), w.domain.String(), "secret-" + w.tag}
 	for _, id := range w.userIDs {
 		s = append(s, id.String())
 	}
@@ -75,7 +78,8 @@ func (a *authAPI) snapshot(t *testing.T) string {
 		(SELECT string_agg(id || ':' || name, ',' ORDER BY id) FROM organizations),
 		(SELECT string_agg(organization_id || ':' || user_id || ':' || role, ',' ORDER BY organization_id, user_id) FROM memberships),
 		(SELECT string_agg(id || ':' || coalesce(accepted_at::text, '') || ':' || coalesce(revoked_at::text, ''), ',' ORDER BY id) FROM invitations),
-		(SELECT string_agg(id || ':' || coalesce(organization_id::text, ''), ',' ORDER BY id) FROM scans))`).Scan(&s)
+		(SELECT string_agg(id || ':' || coalesce(organization_id::text, ''), ',' ORDER BY id) FROM scans),
+		(SELECT string_agg(id || ':' || organization_id || ':' || name || ':' || status || ':' || coalesce(check_requested_at::text, ''), ',' ORDER BY id) FROM domains))`).Scan(&s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,6 +115,10 @@ func TestIDOR(t *testing.T) {
 			}
 			check("DELETE invitation", c.do(t, "DELETE", "/api/org/invitations/"+to.invitation.String(), ""), 404, 403)
 			check("switch", c.do(t, "POST", "/api/organizations/"+to.org.String()+"/switch", ""), 404)
+			dom := "/api/org/domains/" + to.domain.String()
+			check("GET domain", c.do(t, "GET", dom, ""), 404)
+			check("DELETE domain", c.do(t, "DELETE", dom, ""), 404, 403)
+			check("verify domain", c.do(t, "POST", dom+"/verify", ""), 404, 403)
 			check("GET scan", c.do(t, "GET", "/api/scans/"+to.scan.String(), ""), 404)
 			check("accept invitation", c.do(t, "POST", "/api/invitations/accept", js(map[string]string{"token": to.inviteTok})), 403)
 			// The organization comes from the session, never from the request.
@@ -120,7 +128,7 @@ func TestIDOR(t *testing.T) {
 				q.Set("organization_id", to.org.String())
 				r.URL.RawQuery = q.Encode()
 			}
-			for _, path := range []string{"/api/org", "/api/org/members", "/api/org/invitations", "/api/auth/me"} {
+			for _, path := range []string{"/api/org", "/api/org/members", "/api/org/invitations", "/api/org/domains", "/api/auth/me"} {
 				check("GET "+path, c.do(t, "GET", path, "", tamper), 200, 403)
 			}
 			check("PATCH /api/org (tampered)", c.do(t, "PATCH", "/api/org", `{"name":"`+from.name+`"}`, tamper), 204, 403)

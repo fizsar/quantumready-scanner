@@ -28,7 +28,7 @@ func (q *Queries) AddMembership(ctx context.Context, arg AddMembershipParams) er
 }
 
 const createDomain = `-- name: CreateDomain :one
-INSERT INTO domains (organization_id, name, token) VALUES ($1, $2, $3) RETURNING id, organization_id, name, token, status, verified_at, last_checked_at, lost_at, block_public, created_at
+INSERT INTO domains (organization_id, name, token) VALUES ($1, $2, $3) RETURNING id, organization_id, name, token, status, verified_at, last_checked_at, lost_at, block_public, created_at, check_requested_at, check_lease_until, last_check_error
 `
 
 type CreateDomainParams struct {
@@ -51,6 +51,9 @@ func (q *Queries) CreateDomain(ctx context.Context, arg CreateDomainParams) (Dom
 		&i.LostAt,
 		&i.BlockPublic,
 		&i.CreatedAt,
+		&i.CheckRequestedAt,
+		&i.CheckLeaseUntil,
+		&i.LastCheckError,
 	)
 	return i, err
 }
@@ -113,7 +116,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getDomain = `-- name: GetDomain :one
-SELECT id, organization_id, name, token, status, verified_at, last_checked_at, lost_at, block_public, created_at FROM domains WHERE organization_id = $1 AND id = $2
+SELECT id, organization_id, name, token, status, verified_at, last_checked_at, lost_at, block_public, created_at, check_requested_at, check_lease_until, last_check_error FROM domains WHERE organization_id = $1 AND id = $2
 `
 
 type GetDomainParams struct {
@@ -135,6 +138,9 @@ func (q *Queries) GetDomain(ctx context.Context, arg GetDomainParams) (Domain, e
 		&i.LostAt,
 		&i.BlockPublic,
 		&i.CreatedAt,
+		&i.CheckRequestedAt,
+		&i.CheckLeaseUntil,
+		&i.LastCheckError,
 	)
 	return i, err
 }
@@ -229,7 +235,7 @@ func (q *Queries) InsertAudit(ctx context.Context, arg InsertAuditParams) error 
 }
 
 const listDomains = `-- name: ListDomains :many
-SELECT id, organization_id, name, token, status, verified_at, last_checked_at, lost_at, block_public, created_at FROM domains WHERE organization_id = $1 ORDER BY name
+SELECT id, organization_id, name, token, status, verified_at, last_checked_at, lost_at, block_public, created_at, check_requested_at, check_lease_until, last_check_error FROM domains WHERE organization_id = $1 ORDER BY name
 `
 
 func (q *Queries) ListDomains(ctx context.Context, organizationID uuid.UUID) ([]Domain, error) {
@@ -252,6 +258,9 @@ func (q *Queries) ListDomains(ctx context.Context, organizationID uuid.UUID) ([]
 			&i.LostAt,
 			&i.BlockPublic,
 			&i.CreatedAt,
+			&i.CheckRequestedAt,
+			&i.CheckLeaseUntil,
+			&i.LastCheckError,
 		); err != nil {
 			return nil, err
 		}

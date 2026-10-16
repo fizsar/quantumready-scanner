@@ -51,6 +51,8 @@ type Config struct {
 	Accounts AccountStore
 	// Orgs (with Accounts) enables /api/org.
 	Orgs OrgStore
+	// Domains (with Orgs) enables /api/org/domains.
+	Domains DomainStore
 	// InvitedCanCreateOrgs lets accounts created by invitation create their
 	// own organizations (false during the closed beta).
 	InvitedCanCreateOrgs bool
@@ -119,6 +121,13 @@ func NewRouter(cfg Config) http.Handler {
 				r.Post("/invitations", a.createInvitation)
 				r.Get("/invitations", a.listInvitations)
 				r.Delete("/invitations/{invitationID}", a.revokeInvitation)
+				if cfg.Domains != nil {
+					r.Get("/domains", a.listDomains)
+					r.Post("/domains", a.addDomain)
+					r.Get("/domains/{domainID}", a.getDomain)
+					r.Delete("/domains/{domainID}", a.deleteDomain)
+					r.Post("/domains/{domainID}/verify", a.verifyDomain)
+				}
 			})
 			r.Route("/organizations", func(r chi.Router) {
 				r.Use(a.loadSession, requireSession)
