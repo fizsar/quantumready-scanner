@@ -7,6 +7,7 @@ import {
   getDomain,
   listDomains,
   listOrgScans,
+  setDomainBlockPublic,
   verifyDomain,
   type Domain,
   type Org,
@@ -91,7 +92,15 @@ export function DomainsSection({ org, csrf, onChange }: { org: Org; csrf: string
       ) : (
         <ul className="member-list">
           {domains.map((d) => (
-            <DomainItem key={d.id} d={d} manage={manage} busy={f.busy} onCheck={() => check(d)} onRemove={() => remove(d)} />
+            <DomainItem
+              key={d.id}
+              d={d}
+              manage={manage}
+              busy={f.busy}
+              onCheck={() => check(d)}
+              onRemove={() => remove(d)}
+              onBlockPublic={(block) => void f.run(async () => replace(await setDomainBlockPublic(d.id, block, csrf, lang)))}
+            />
           ))}
         </ul>
       )}
@@ -108,8 +117,17 @@ export function DomainsSection({ org, csrf, onChange }: { org: Org; csrf: string
   )
 }
 
-function DomainItem(props: { d: Domain; manage: boolean; busy: boolean; onCheck: () => void; onRemove: () => void }) {
+function DomainItem(props: {
+  d: Domain
+  manage: boolean
+  busy: boolean
+  onCheck: () => void
+  onRemove: () => void
+  onBlockPublic: (block: boolean) => void
+}) {
   const { t } = useLang()
+  const blockId = useId()
+  const blockHelpId = useId()
   const date = useDate()
   const { d } = props
   const [copied, setCopied] = useState('')
@@ -175,6 +193,22 @@ function DomainItem(props: { d: Domain; manage: boolean; busy: boolean; onCheck:
           {d.last_checked_at ? t('domains.checkedAt', { date: date(d.last_checked_at) }) + ' ' : ''}
           {t('domains.keepRecord')}
         </p>
+      )}
+      {d.verified && props.manage && (
+        <div className="check">
+          <input
+            id={blockId}
+            type="checkbox"
+            checked={d.block_public}
+            disabled={props.busy}
+            aria-describedby={blockHelpId}
+            onChange={(e) => props.onBlockPublic(e.target.checked)}
+          />
+          <label htmlFor={blockId}>{t('domains.blockPublic')}</label>
+          <p id={blockHelpId} className="muted small">
+            {t('domains.blockPublicHelp')}
+          </p>
+        </div>
       )}
     </li>
   )

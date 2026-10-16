@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
-import { ApiError, createScan, getTargets } from '../api'
+import { Link, useNavigate } from 'react-router'
+import { solveAltcha } from '../altcha'
+import { ApiError, createScan, getAltcha, getTargets } from '../api'
 import { useLang } from '../i18n'
 import { usePageMeta } from '../usePageMeta'
 import { errorMessage } from '../verdict'
@@ -13,6 +14,8 @@ export function Home() {
   usePageMeta(t('meta.home'))
 
   const [targets, setTargets] = useState<string[] | null>(null)
+  const [mode, setMode] = useState({ open: false, proof: false })
+  const [proving, setProving] = useState(false)
   const [host, setHost] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
@@ -20,7 +23,7 @@ export function Home() {
   useEffect(() => {
     let cancelled = false
     getTargets()
-      .then((r) => !cancelled && setTargets(r.hosts))
+      .then((r) => !cancelled && (setTargets(r.hosts), setMode({ open: !!r.open, proof: !!r.proof })))
       .catch((e: unknown) => !cancelled && (setTargets([]), setError(e instanceof ApiError ? e : new ApiError(0, 'network', ''))))
     return () => {
       cancelled = true
@@ -31,9 +34,17 @@ export function Home() {
     setBusy(true)
     setError(null)
     try {
-      const s = await createScan(h, lang)
+      let proof: string | undefined
+      if (mode.proof) {
+        // Proof of work against abuse: a second or so in the browser.
+        setProving(true)
+        proof = await solveAltcha(await getAltcha())
+        setProving(false)
+      }
+      const s = await createScan(h, lang, proof)
       navigate(`/scans/${s.id}`)
     } catch (e) {
+      setProving(false)
       setError(e instanceof ApiError ? e : new ApiError(0, 'network', ''))
       setBusy(false)
     }
@@ -62,7 +73,7 @@ export function Home() {
         </h2>
         <p className="lead">{t('home.lead')}</p>
 
-        <p className="muted">{t('home.demo')}</p>
+        <p className="muted">{mode.open ? t('home.open') : t('home.demo')}</p>
         {targets === null ? (
           <p className="muted">{t('home.loadingTargets')}</p>
         ) : (
@@ -100,10 +111,19 @@ export function Home() {
               {busy ? t('home.submitting') : t('home.submit')}
             </button>
           </div>
+          {proving && (
+            <p className="progress small" role="status">
+              <span className="spinner" aria-hidden="true" />
+              {t('home.proving')}
+            </p>
+          )}
           <p id={errorId} className="error" role="alert">
             {error ? errorMessage(error, t) : ''}
           </p>
         </form>
+        <p className="muted small">
+          <Link to="/about-scans">{t('home.aboutScans')}</Link>
+        </p>
       </section>
     </div>
   )

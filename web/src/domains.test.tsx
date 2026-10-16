@@ -18,7 +18,7 @@ const owner: Org = {
 }
 const viewer: Org = { id: 'oA', name: 'Acme', role: 'viewer', permissions: ['view'] }
 const pendingDomain: Domain = {
-  id: 'd1', name: 'fizsar.com', status: 'pending', verified: false, check_pending: false,
+  id: 'd1', name: 'fizsar.com', status: 'pending', verified: false, check_pending: false, block_public: false,
   record: { type: 'TXT', name: '_quantumready.fizsar.com', value: 'qr-verify=abcdefghijklmnopqrstuvwxyz' },
 }
 const verifiedDomain: Domain = { ...pendingDomain, status: 'verified', verified: true, last_checked_at: '2026-10-16T10:00:00Z', verified_at: '2026-10-16T10:00:00Z' }

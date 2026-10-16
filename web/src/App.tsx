@@ -2,6 +2,7 @@ import { Link, Route, Routes } from 'react-router'
 import type { Lang } from './api'
 import { useAuth } from './auth'
 import { useLang } from './i18n'
+import { AboutScans } from './pages/AboutScans'
 import { AccountPage, ForgotPage, LoginPage, RegisterPage, ResetPage, VerifyPage } from './pages/AccountPages'
 import { Home } from './pages/Home'
 import { InvitePage } from './pages/InvitePage'
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/forgot" element={<ForgotPage />} />
           <Route path="/reset" element={<ResetPage />} />
           <Route path="/account" element={<AccountPage />} />
+          <Route path="/about-scans" element={<AboutScans />} />
           <Route path="/org" element={<OrgPage />} />
           <Route path="/org/scans/:id" element={<ScanPage org />} />
           <Route path="/invite" element={<InvitePage />} />
@@ -51,7 +53,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <a href="https://fizsar.com">← fizsar.com</a>
+        <a href="https://fizsar.com">← fizsar.com</a> · <Link to="/about-scans">{t('nav.about')}</Link>
       </footer>
     </div>
   )

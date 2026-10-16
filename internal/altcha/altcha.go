@@ -66,14 +66,14 @@ type Verifier struct {
 }
 
 // New returns a verifier. key must be at least 32 bytes; maxNumber sets the
-// difficulty (0: 100 000) and ttl how long a challenge can be answered (0:
+// difficulty (0: 50 000; about 1 s on average in a browser) and ttl how long a challenge can be answered (0:
 // 10 minutes).
 func New(key []byte, maxNumber int64, ttl time.Duration) (*Verifier, error) {
 	if len(key) < 32 {
 		return nil, errors.New("altcha: the HMAC key must have at least 32 bytes")
 	}
 	if maxNumber <= 0 {
-		maxNumber = 100_000
+		maxNumber = 50_000
 	}
 	if ttl <= 0 {
 		ttl = 10 * time.Minute

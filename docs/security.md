@@ -115,7 +115,7 @@ Definidos en `internal/org` (un test fija la matriz entera). La API decide con l
   - los escaneos reutilizados no cuentan.
 - **Prueba de trabajo** (`internal/altcha`, formato ALTCHA, autoalojada):
   - `GET /api/altcha` da un reto firmado con HMAC-SHA-256. La clave es `ALTCHA_HMAC_KEY`, de 32 bytes o más, y se genera en el VPS.
-  - El navegador busca `n` tal que SHA-256(sal + n) coincida con el reto. Son de media 50.000 hashes, alrededor de un segundo.
+  - El navegador busca `n` tal que SHA-256(sal + n) coincida con el reto. Son de media 25.000 hashes (dificultad 50.000): menos de un segundo de media y unos 2 s en el peor caso, medido con `crypto.subtle` en lotes.
   - Cada solución sirve para un solo escaneo, caduca a los 10 minutos (la caducidad va dentro de la sal firmada) y no se puede falsificar sin la clave (tests de falsificaciones).
   - Los retos están limitados por IP (60 por minuto). Sin clave, la API no arranca con el escaneo abierto.
   - No hay terceros ni cookies.

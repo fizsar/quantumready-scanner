@@ -1,6 +1,8 @@
 // Client for the QuantumReady API (docs/api.md). Same origin: in production
 // Caddy routes /api/*, in development Vite proxies it.
 
+import type { AltchaChallenge } from './altcha'
+
 export type Lang = 'es' | 'en'
 
 export type ScanStatus = 'queued' | 'running' | 'done' | 'failed'
@@ -98,15 +100,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-export function getTargets(): Promise<{ hosts: string[]; port: number }> {
+/** open: any domain can be scanned; proof: a proof of work is required. */
+export function getTargets(): Promise<{ hosts: string[]; port: number; open?: boolean; proof?: boolean }> {
   return request('/api/targets')
 }
 
-export function createScan(host: string, lang: Lang): Promise<ScanView> {
+export function getAltcha(): Promise<AltchaChallenge> {
+  return request('/api/altcha')
+}
+
+export function createScan(host: string, lang: Lang, altcha?: string): Promise<ScanView> {
   return request(`/api/scans?lang=${lang}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host }),
+    body: JSON.stringify(altcha ? { host, altcha } : { host }),
   })
 }
 
@@ -231,6 +238,7 @@ export interface Domain {
   lost_at?: string
   grace_until?: string
   check_pending: boolean
+  block_public: boolean
   last_check_error?: { code: string; message: string }
   record: { type: 'TXT'; name: string; value: string }
 }
@@ -251,6 +259,8 @@ export const getDomain = (id: string, lang: Lang) => get<Domain>(`/api/org/domai
 export const addDomain = (name: string, csrf: string, lang: Lang) => post<Domain>('/api/org/domains', lang, { name }, csrf)
 export const deleteDomain = (id: string, csrf: string, lang: Lang) =>
   send<null>('DELETE', `/api/org/domains/${encodeURIComponent(id)}`, lang, undefined, csrf)
+export const setDomainBlockPublic = (id: string, block: boolean, csrf: string, lang: Lang) =>
+  send<Domain>('PATCH', `/api/org/domains/${encodeURIComponent(id)}`, lang, { block_public: block }, csrf)
 export const verifyDomain = (id: string, csrf: string, lang: Lang) =>
   post<Domain>(`/api/org/domains/${encodeURIComponent(id)}/verify`, lang, undefined, csrf)
 export const listOrgScans = (lang: Lang) => get<{ scans: ScanSummary[] }>('/api/org/scans', lang).then((r) => r.scans)
