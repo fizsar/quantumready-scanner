@@ -21,7 +21,7 @@ Desde la Fase 3 los escaneos pertenecen a una organización (o a nadie: escaneos
 | Rol | Uso | RLS |
 |---|---|---|
 | `qr_app` | API | Sí. Sin permiso para modificar ni borrar escaneos |
-| `qr_worker` | Worker: solo la cola de escaneos (`scans`: leer y actualizar) y guardar hallazgos (`findings`: insertar) | Sí, sin `BYPASSRLS`: políticas explícitas en esas dos tablas para todas las organizaciones. **Sin acceso** a `users`, `sessions`, `auth_tokens`, organizaciones, dominios (llegará en el 3.4, solo lo necesario para re-verificar), auditoría ni emails |
+| `qr_worker` | Worker: la cola de escaneos (`scans`: leer y actualizar), guardar hallazgos (`findings`: insertar) y verificar dominios (`domains`: **solo** leer `id, name, token, status, verified_at, last_checked_at, lost_at, check_requested_at, check_lease_until` y actualizar las columnas de verificación) | Sí, sin `BYPASSRLS`: políticas explícitas en esas tablas para todas las organizaciones. **Sin acceso** a `users`, `sessions`, `auth_tokens`, organizaciones, a qué organización pertenece un dominio (`organization_id`), a crear, renombrar o borrar dominios, auditoría ni emails |
 | `qr_mailer` | Mailer (`cmd/mailer`, proceso aparte): enviar la cola de emails | Solo `email_outbox` (leer, actualizar, purgar). Cada email llega a la cola ya resuelto: destinatario, asunto y cuerpo; el mailer no lee nada más |
 | propietario (`POSTGRES_USER`) | Migraciones | No aplica |
 
@@ -80,6 +80,19 @@ Definidos en `internal/org` (un test fija la matriz entera). La API decide con l
   - `EXECUTE` revocado a `PUBLIC` y concedido solo a `qr_app` (`qr_worker` recibe *permission denied*).
   Necesita que el propietario de las migraciones no esté sujeto a RLS (superusuario, como en desarrollo, CI y producción); si no lo estuviera, falla cerrada (ninguna invitación es válida). **Hito 3.7**: las migraciones deben seguir ejecutándose con el propietario de la base de datos.
 - Si a alguien lo quitan de la organización activa, su sesión pasa a su primera organización en la siguiente petición; sin ninguna, **403** `no_organization`.
+
+## Dominios verificados (hito 3.4)
+
+- **Qué se puede añadir** (`internal/domains`): nombres reales normalizados (minúsculas, punycode). Se rechazan IPs, nombres de uso especial (`.local`, `.localhost`, `.test`, `.example`, `.invalid`, `.onion`, `.internal`, `.alt`, todo `arpa`…), dominios de nivel superior desconocidos y **sufijos públicos** según la Public Suffix List (secciones ICANN y privada: `com`, `co.uk`, `github.io`…). La lista va incrustada y fijada a un commit de github.com/publicsuffix/list con su SHA-256 (`psl_version.go`; un test comprueba el archivo); `make psl` la actualiza al commit más reciente con al menos 14 días.
+- **Comprobación del TXT** (`internal/dnscheck`), siempre en el worker:
+  - Se pregunta a los **servidores autoritativos** de la zona, sin recursión, y solo cuenta una respuesta autoritativa. Los resolvers públicos fijos (1.1.1.1, 9.9.9.9, 8.8.8.8) solo sirven para encontrar los NS y sus direcciones.
+  - Así no interviene ninguna caché: ni la del VPS (systemd-resolved), ni el DNS interno de Docker, ni la de un resolver. Una verificación refleja el registro tal como está ahora, y un registro recién borrado se detecta en la siguiente comprobación.
+  - **Solo DNS**: CNAMEs, como mucho 4 saltos; nunca HTTP ni nada más. Timeout de 3 s por consulta y 20 s por dominio. Se usa UDP, y TCP si la respuesta llega truncada.
+  - Las respuestas con otro ID o pregunta se descartan (tests con un servidor falso que miente).
+  - Las direcciones de los NS pasan el filtro anti-SSRF del escáner: un dominio no puede apuntar sus NS a la red interna para hacer que el worker la sondee.
+  - Si ningún servidor responde, es un **error temporal** (`dns_unavailable`, reintento en 5 min), nunca "registro ausente": una caída de DNS no quita la verificación.
+  - DNSSEC no se valida: un atacante en la ruta entre el VPS y los servidores autoritativos podría falsear la respuesta. Es un riesgo aceptado para este tipo de verificación, el mismo método que usan los proveedores habituales.
+- **Ciclo**: `pending` → (registro encontrado) `verified` → comprobación semanal → si falta, `lost` (los escaneos `full` siguen 14 días y se comprueba a diario) → si sigue faltando pasados los 14 días, `pending` otra vez: ya no está verificado, pero el historial se conserva. Si el registro vuelve, `verified`. Pedir la verificación (botón) la encola para el worker.
 
 ## Cuentas
 

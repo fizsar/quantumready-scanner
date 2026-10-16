@@ -32,9 +32,10 @@ func permissionDenied(err error) bool {
 	return errors.As(err, &pg) && pg.Code == "42501"
 }
 
-// The worker sees the scan queue of every organization and stores
-// findings, and nothing else: no accounts, sessions, tokens, organizations,
-// domains, audit log or emails. The mailer only touches the email outbox.
+// The worker sees the scan queue of every organization, stores findings and
+// reads/updates the verification columns of domains, and nothing else: no
+// accounts, sessions, tokens, organizations, which organization a domain
+// belongs to, audit log or emails. The mailer only touches the email outbox.
 func TestBackgroundRolesLeastPrivilege(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
@@ -45,13 +46,36 @@ func TestBackgroundRolesLeastPrivilege(t *testing.T) {
 	}
 
 	forbidden := []string{"users", "sessions", "auth_tokens", "signup_codes", "organizations", "memberships",
-		"invitations", "domains", "audit_log", "email_outbox", "deletion_tombstones"}
+		"invitations", "audit_log", "email_outbox", "deletion_tombstones"}
 	for _, table := range forbidden {
 		if err := asRole(t, w.s, RoleWorker, "SELECT 1 FROM "+table+" LIMIT 1"); !permissionDenied(err) {
 			t.Errorf("qr_worker reads %s: %v, want permission denied", table, err)
 		}
 	}
-	for _, table := range append(forbidden, "scans", "findings") {
+	// domains: only the verification columns (milestone 3.4).
+	for _, sql := range []string{
+		"SELECT organization_id FROM domains",
+		"SELECT block_public FROM domains",
+		"SELECT created_at FROM domains",
+		"SELECT * FROM domains",
+		"UPDATE domains SET name = 'x.example'",
+		"UPDATE domains SET token = 'x'",
+		"UPDATE domains SET organization_id = NULL",
+		"UPDATE domains SET block_public = true",
+		"INSERT INTO domains (organization_id, name, token) VALUES (gen_random_uuid(), 'x.example', 't')",
+		"DELETE FROM domains",
+	} {
+		if err := asRole(t, w.s, RoleWorker, sql); !permissionDenied(err) {
+			t.Errorf("qr_worker: %s: %v, want permission denied", sql, err)
+		}
+	}
+	if err := asRole(t, w.s, RoleWorker, "SELECT id, name, token, status, verified_at, last_checked_at, lost_at, check_requested_at, check_lease_until FROM domains"); err != nil {
+		t.Errorf("qr_worker cannot read the verification columns: %v", err)
+	}
+	if err := asRole(t, w.s, RoleWorker, "UPDATE domains SET last_checked_at = now(), status = status"); err != nil {
+		t.Errorf("qr_worker cannot record a check: %v", err)
+	}
+	for _, table := range append(forbidden, "domains", "scans", "findings") {
 		if table == "email_outbox" {
 			continue
 		}

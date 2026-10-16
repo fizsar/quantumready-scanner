@@ -26,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/fizsar/quantumready-saas/internal/dnscheck"
 	"github.com/fizsar/quantumready-saas/internal/scanner"
 	"github.com/fizsar/quantumready-saas/internal/store"
 	"github.com/fizsar/quantumready-saas/internal/worker"
@@ -62,7 +63,8 @@ func run(logger *slog.Logger) error {
 	if err := requirePlaintextDB(cfg.ConnConfig); err != nil {
 		return err
 	}
-	// Least privilege: scan queue and findings only (docs/security.md).
+	// Least privilege: scan queue, findings and the verification columns of
+	// domains (docs/security.md).
 	if err := store.UseRole(cfg, store.RoleWorker); err != nil {
 		return err
 	}
@@ -97,6 +99,10 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	// Domain verification: TXT records read from the authoritative servers.
+	checker := &worker.DomainChecker{Queue: store.NewStore(pool).Queries, DNS: &dnscheck.Checker{}, Logger: logger}
+	go checker.Run(ctx)
+
 	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency)
 	err = w.Run(ctx)
 	logger.Info("worker stopped")
