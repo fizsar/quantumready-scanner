@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"testing"
@@ -33,6 +34,11 @@ func orgWithOwners(t *testing.T, pool *pgxpool.Pool, n int) (org uuid.UUID, owne
 		owners = append(owners, u)
 	}
 	return org, owners
+}
+
+func make32(s string) []byte {
+	h := sha256.Sum256([]byte(s))
+	return h[:]
 }
 
 func TestLastOwner(t *testing.T) {
@@ -93,6 +99,19 @@ func TestLastOwner(t *testing.T) {
 	_ = pool.QueryRow(ctx, "SELECT count(*) FROM memberships WHERE organization_id = $1 AND role = 'owner'", org2).Scan(&owners2)
 	if owners2 != 1 {
 		t.Errorf("%d owners left", owners2)
+	}
+
+	// Members plus pending invitations stay within MaxMembers.
+	invite := func(email string) error {
+		_, err := st.Invite(ctx, tn, NewInvitation{Email: email, Role: "viewer", TokenHash: make32(email), TTL: time.Hour,
+			Mail: Email{To: email, Template: "invitation", Lang: "es", Subject: "s", Body: "b"}, MaxMembers: 2})
+		return err
+	}
+	if err := invite("x@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if err := invite("y@example.com"); !errors.Is(err, ErrLimit) {
+		t.Errorf("third member (one + one pending): %v", err)
 	}
 
 	// Deleting the organization still removes its members.

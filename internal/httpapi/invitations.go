@@ -17,6 +17,7 @@ import (
 // Organization limits.
 const (
 	maxPendingInvitations = 20 // per organization
+	maxMembers            = 50 // per organization, pending invitations included
 	maxOrgsPerUser        = 10 // memberships of one user, own organizations included
 )
 
@@ -69,7 +70,8 @@ func (a *api) createInvitation(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusForbidden, "forbidden")
 		return
 	}
-	if limited(w, r, a.cfg.AuthLimits.PerAddress.Reserve, email) {
+	if limited(w, r, a.cfg.AuthLimits.OrgInvitations.Reserve, m.OrgID.String()) ||
+		limited(w, r, a.cfg.AuthLimits.PerAddress.Reserve, email) {
 		return
 	}
 	token, hash, err := auth.NewToken()
@@ -85,7 +87,7 @@ func (a *api) createInvitation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row, err := a.cfg.Orgs.Invite(r.Context(), tenant(r), store.NewInvitation{Email: email, Role: req.Role, TokenHash: hash,
-		TTL: store.InvitationTTL, Mail: e, MaxPending: maxPendingInvitations})
+		TTL: store.InvitationTTL, Mail: e, MaxPending: maxPendingInvitations, MaxMembers: maxMembers})
 	switch {
 	case errors.Is(err, store.ErrAlreadyMember):
 		writeError(w, r, http.StatusConflict, "already_member")

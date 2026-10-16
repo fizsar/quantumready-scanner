@@ -67,6 +67,7 @@ type NewInvitation struct {
 	TTL         time.Duration
 	Mail        Email // the invitation email, with the link
 	MaxPending  int   // pending invitations per organization
+	MaxMembers  int   // members plus pending invitations
 }
 
 // Invite creates an invitation (replacing a pending one to the same
@@ -84,14 +85,18 @@ func (s *Store) Invite(ctx context.Context, t Tenant, n NewInvitation) (row Crea
 		if err := q.RevokePendingInvitationsFor(ctx, RevokePendingInvitationsForParams{OrganizationID: *t.OrgID, Email: n.Email}); err != nil {
 			return err
 		}
-		if n.MaxPending > 0 {
-			pending, err := q.ListPendingInvitations(ctx, *t.OrgID)
-			if err != nil {
-				return err
-			}
-			if len(pending) >= n.MaxPending {
-				return ErrLimit
-			}
+		pending, err := q.ListPendingInvitations(ctx, *t.OrgID)
+		if err != nil {
+			return err
+		}
+		members, err := q.ListMembers(ctx, *t.OrgID)
+		if err != nil {
+			return err
+		}
+		// Pending invitations count as members: accepting them can never
+		// exceed MaxMembers.
+		if (n.MaxPending > 0 && len(pending) >= n.MaxPending) || (n.MaxMembers > 0 && len(members)+len(pending) >= n.MaxMembers) {
+			return ErrLimit
 		}
 		if row, err = q.CreateInvitation(ctx, CreateInvitationParams{OrganizationID: *t.OrgID, Email: n.Email, Role: n.Role,
 			TokenHash: n.TokenHash, InvitedBy: t.UserID, ExpiresAt: time.Now().Add(n.TTL)}); err != nil {

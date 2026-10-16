@@ -44,6 +44,8 @@ type AuthLimits struct {
 	LoginFailures *Limiter // failed passwords per account email: 5 per 15 min
 	EmailIP       *Limiter // register, verify, resend, forgot, reset per client: 5/min, 30/day
 	PerAddress    *Limiter // emails sent to one address: 3/hour, silently skipped beyond
+	// OrgInvitations: invitations created per organization: 50/day.
+	OrgInvitations *Limiter
 }
 
 // Session cookie and lifetimes.
@@ -84,6 +86,9 @@ func (a *api) authDefaults() {
 	}
 	if l.PerAddress == nil {
 		l.PerAddress = NewWindowLimiter(3, time.Hour)
+	}
+	if l.OrgInvitations == nil {
+		l.OrgInvitations = NewWindowLimiter(50, 24*time.Hour)
 	}
 	if a.cfg.Async == nil {
 		a.cfg.Async = func(f func()) { go f() }

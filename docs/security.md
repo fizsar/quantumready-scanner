@@ -41,7 +41,20 @@ Cada servicio actúa con su rol desde que abre la conexión (`store.UseRole`: `S
 - **Prueba de mutación** (15/10/2026): quitando `SET LOCAL ROLE qr_app`, `TestTenantIsolation` falla en 13 comprobaciones (B ve los dominios, escaneos y hallazgos de A, borra su dominio, se asciende…); con RLS, todas pasan. Las barreras dependen de verdad de RLS.
 - **Mínimo privilegio** (`TestBackgroundRolesLeastPrivilege`): `qr_worker` no tiene `BYPASSRLS` y recibe *permission denied* al leer `users`, `sessions`, `auth_tokens`, organizaciones, membresías, invitaciones, dominios, auditoría, la cola de emails y la lista de borrados; puede reclamar y completar escaneos de cualquier organización, pero no crear ni borrar escaneos ni leer hallazgos. `qr_mailer` solo puede leer `email_outbox`. Además, los tests del worker y la prueba de extremo a extremo de la API ejecutan el worker **con su rol de producción**, así que cualquier consulta que necesite un permiso de más falla en los tests (así apareció que `COPY` no funciona bajo RLS: los hallazgos se insertan ahora con un único `INSERT … unnest`).
 - **Reutilización** (`TestReuseNeverCrossesIntensityOrTenant`): `basic` nunca responde a `full`, ni entre organizaciones; `full` sin organización se rechaza.
-- **Endpoints (hitos 3.3–3.4)**: cada endpoint con IDs de organización entra en una batería IDOR que lo llama con IDs de la otra organización y exige 404 y que no aparezcan en ningún listado. Los de cuentas (3.2) no reciben IDs: actúan sobre el usuario de la sesión.
+- **Batería IDOR** (`internal/httpapi/idor_test.go`, hito 3.3c): dos organizaciones completas (owner, admin, viewer, una invitación pendiente y un escaneo de organización). Desde cada miembro de una, en los dos sentidos: cambiar el rol y quitar a cada miembro de la otra, revocar su invitación, cambiarse a ella, leer su escaneo y aceptar su invitación → siempre 404 (o 403 cuando el rol ya no lo permite); poner el ID de la otra en `?organization_id=` o en una cabecera `X-Org-ID` no cambia nada. Además: una foto de `organizations`, `memberships`, `invitations` y `scans` antes y después demuestra que ninguna petición cruzada cambió nada, y ninguna respuesta (`/org`, miembros, invitaciones, `/me`, errores) contiene un identificador, nombre o email de la otra organización. `TestNoRoleEscalationAcrossOrganizations`: la owner de A, viewer en B, no puede nada en B con su sesión en B, y desde A sus cambios no tocan B. Cada endpoint nuevo con IDs (dominios y escaneos en el 3.4) se añade a esta batería.
+- **Prueba de mutación de la batería** (16/10/2026), estropeando a propósito una barrera cada vez:
+
+| Mutación | Resultado |
+|---|---|
+| Quitar a un miembro no comprueba que el afectado sea de la organización | detectada (19 comprobaciones fallan) |
+| Cambiar de organización sin comprobar la membresía | detectada (18) |
+| Aceptar una invitación sin comprobar el email | detectada (33) |
+| Listado de miembros sin el filtro `organization_id`, con RLS | no detectada: **RLS sola basta** |
+| RLS apagada (conexión de superusuario), filtros de la aplicación intactos | no detectada: **los filtros solos bastan** |
+| Sin filtro y sin RLS | detectada (72: aparecen los miembros de la otra organización) |
+
+  Es lo que se busca con dos barreras independientes: cualquiera de las dos sola protege, y la batería detecta cuando faltan las dos.
+- **Límites por organización**: 20 invitaciones pendientes, 50 miembros contando las pendientes (aceptar nunca lo supera), 50 invitaciones creadas al día (en memoria; 429 con `Retry-After`) y 10 organizaciones por usuario. Cada dirección recibe como mucho 3 emails por hora.
 
 ## Roles en una organización
 
