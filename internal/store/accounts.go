@@ -175,19 +175,25 @@ func (s *Store) ResetPassword(ctx context.Context, hash []byte, prepare func(Use
 		if err := q.DeleteUserSessions(ctx, DeleteUserSessionsParams{UserID: id}); err != nil {
 			return err
 		}
+		if err := q.InvalidateAuthTokens(ctx, InvalidateAuthTokensParams{UserID: id, Purpose: PurposeResetPassword}); err != nil {
+			return err
+		}
 		return enqueue(ctx, q, notify)
 	})
 	return u, err
 }
 
-// ChangePassword sets a new password hash, ends the user's other sessions
-// and queues the notification email.
+// ChangePassword sets a new password hash, ends the user's other sessions,
+// revokes pending reset links and queues the notification email.
 func (s *Store) ChangePassword(ctx context.Context, userID, keepSession uuid.UUID, newHash string, e Email) error {
 	return s.Tx(ctx, Tenant{UserID: &userID}, func(q *Queries) error {
 		if err := q.UpdateUserPassword(ctx, UpdateUserPasswordParams{ID: userID, PasswordHash: newHash}); err != nil {
 			return err
 		}
 		if err := q.DeleteUserSessions(ctx, DeleteUserSessionsParams{UserID: userID, Keep: &keepSession}); err != nil {
+			return err
+		}
+		if err := q.InvalidateAuthTokens(ctx, InvalidateAuthTokensParams{UserID: userID, Purpose: PurposeResetPassword}); err != nil {
 			return err
 		}
 		return enqueue(ctx, q, e)

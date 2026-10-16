@@ -426,6 +426,10 @@ func TestChangePassword(t *testing.T) {
 	expect(t, c1.login(t, "ana@example.com", goodPass), http.StatusOK, "")
 	expect(t, c2.login(t, "ana@example.com", goodPass), http.StatusOK, "")
 
+	// A reset link asked for before the change must die with it.
+	expect(t, c2.do(t, "POST", "/api/auth/forgot-password", `{"email":"ana@example.com"}`), http.StatusAccepted, "")
+	pending := a.lastToken(t, "ana@example.com", "reset_password")
+
 	change := func(cur, next string) *httptest.ResponseRecorder {
 		return c1.do(t, "POST", "/api/auth/change-password", js(map[string]string{"current_password": cur, "new_password": next}))
 	}
@@ -444,6 +448,8 @@ func TestChangePassword(t *testing.T) {
 	if a.count(t, "ana@example.com", "password_changed") != 1 {
 		t.Error("no password_changed email")
 	}
+	expect(t, c2.do(t, "POST", "/api/auth/reset-password", js(map[string]string{"token": pending, "password": goodPass})),
+		http.StatusBadRequest, "invalid_token")
 	anon := a.client("203.0.113.62")
 	expect(t, anon.do(t, "POST", "/api/auth/change-password", `{}`), http.StatusUnauthorized, "unauthenticated")
 }
@@ -472,6 +478,37 @@ func TestOriginAndSessionChecks(t *testing.T) {
 	expect(t, w, http.StatusUnauthorized, "unauthenticated")
 	if !strings.Contains(w.Header().Get("Set-Cookie"), "Max-Age=0") {
 		t.Errorf("dead cookie not cleared: %v", w.Header())
+	}
+}
+
+// The Origin check guards every route, POST /api/scans included, and lets
+// non-browser clients (curl, scripts: no Origin, no Sec-Fetch-Site) through.
+func TestCheckOrigin(t *testing.T) {
+	h := checkOrigin(testOrigin)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	cases := []struct {
+		method string
+		hdr    map[string]string
+		want   int
+	}{
+		{"POST", nil, http.StatusNoContent},                                         // curl
+		{"POST", map[string]string{"Sec-Fetch-Site": "none"}, http.StatusNoContent}, // typed by the user
+		{"POST", map[string]string{"Origin": testOrigin, "Sec-Fetch-Site": "same-origin"}, http.StatusNoContent},
+		{"POST", map[string]string{"Origin": "https://evil.example"}, http.StatusForbidden},
+		{"POST", map[string]string{"Sec-Fetch-Site": "cross-site"}, http.StatusForbidden},
+		{"POST", map[string]string{"Sec-Fetch-Site": "same-site"}, http.StatusForbidden}, // fizsar.com is not this origin
+		{"DELETE", map[string]string{"Origin": "https://evil.example"}, http.StatusForbidden},
+		{"GET", map[string]string{"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"}, http.StatusNoContent},
+	}
+	for _, tc := range cases {
+		r := httptest.NewRequest(tc.method, "/api/scans", strings.NewReader(`{"host":"fizsar.com"}`))
+		for k, v := range tc.hdr {
+			r.Header.Set(k, v)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != tc.want {
+			t.Errorf("%s %v: %d, want %d", tc.method, tc.hdr, w.Code, tc.want)
+		}
 	}
 }
 
