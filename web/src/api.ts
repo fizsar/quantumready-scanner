@@ -125,11 +125,13 @@ export interface Me {
 
 const CSRF_HEADER = 'X-QR-CSRF'
 
-function post<T>(path: string, lang: Lang, body?: unknown, csrf?: string): Promise<T> {
+function send<T>(method: string, path: string, lang: Lang, body?: unknown, csrf?: string): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (csrf) headers[CSRF_HEADER] = csrf
-  return request(`${path}?lang=${lang}`, { method: 'POST', headers, body: JSON.stringify(body ?? {}), credentials: 'same-origin' })
+  return request(`${path}?lang=${lang}`, { method, headers, body: JSON.stringify(body ?? {}), credentials: 'same-origin' })
 }
+
+const post = <T,>(path: string, lang: Lang, body?: unknown, csrf?: string) => send<T>('POST', path, lang, body, csrf)
 
 export const getMe = (lang: Lang): Promise<Me> => request(`/api/auth/me?lang=${lang}`, { credentials: 'same-origin' })
 
@@ -151,6 +153,68 @@ export const resetPassword = (token: string, password: string, lang: Lang) =>
 export const logout = (csrf: string, lang: Lang) => post<null>('/api/auth/logout', lang, undefined, csrf)
 export const changePassword = (current: string, next: string, csrf: string, lang: Lang) =>
   post<null>('/api/auth/change-password', lang, { current_password: current, new_password: next }, csrf)
+
+// --- Organizations (/api/org: always the session's active organization).
+
+export type Role = 'owner' | 'admin' | 'viewer'
+export type OrgAction = 'view' | 'rename' | 'invite' | 'revoke_invitation' | 'change_role' | 'remove_member' | 'manage_domains'
+
+export interface Org {
+  id: string
+  name: string
+  role: Role
+  permissions: OrgAction[]
+}
+
+export interface Member {
+  user_id: string
+  email: string
+  name?: string
+  role: Role
+  joined_at: string
+  you: boolean
+}
+
+export interface Invitation {
+  id: string
+  email: string
+  role: Role
+  inviter_email?: string
+  created_at: string
+  expires_at: string
+  expired: boolean
+}
+
+export interface InvitationPreview {
+  organization: string
+  email: string
+  role: Role
+  inviter_email?: string
+  expires_at: string
+}
+
+const get = <T,>(path: string, lang: Lang): Promise<T> => request(`${path}?lang=${lang}`, { credentials: 'same-origin' })
+
+export const getOrg = (lang: Lang) => get<Org>('/api/org', lang)
+export const renameOrg = (name: string, csrf: string, lang: Lang) => send<null>('PATCH', '/api/org', lang, { name }, csrf)
+export const listMembers = (lang: Lang) => get<{ members: Member[] }>('/api/org/members', lang).then((r) => r.members)
+export const changeRole = (userId: string, role: Role, csrf: string, lang: Lang) =>
+  send<null>('PATCH', `/api/org/members/${encodeURIComponent(userId)}`, lang, { role }, csrf)
+export const removeMember = (userId: string, csrf: string, lang: Lang) =>
+  send<null>('DELETE', `/api/org/members/${encodeURIComponent(userId)}`, lang, undefined, csrf)
+export const leaveOrg = (csrf: string, lang: Lang) => post<null>('/api/org/leave', lang, undefined, csrf)
+export const listInvitations = (lang: Lang) => get<{ invitations: Invitation[] }>('/api/org/invitations', lang).then((r) => r.invitations)
+export const createInvitation = (email: string, role: Role, csrf: string, lang: Lang) =>
+  post<Invitation>('/api/org/invitations', lang, { email, role, lang }, csrf)
+export const revokeInvitation = (id: string, csrf: string, lang: Lang) =>
+  send<null>('DELETE', `/api/org/invitations/${encodeURIComponent(id)}`, lang, undefined, csrf)
+export const previewInvitation = (token: string, lang: Lang) => post<InvitationPreview>('/api/invitations/preview', lang, { token })
+export const acceptInvitation = (token: string, csrf: string, lang: Lang) => post<Org>('/api/invitations/accept', lang, { token }, csrf)
+export const registerInvited = (email: string, password: string, invitationToken: string, lang: Lang) =>
+  post<{ status: string }>('/api/auth/register', lang, { email, password, invitation_token: invitationToken, lang })
+export const createOrganization = (name: string, csrf: string, lang: Lang) => post<Org>('/api/organizations', lang, { name }, csrf)
+export const switchOrganization = (id: string, csrf: string, lang: Lang) =>
+  post<Org>(`/api/organizations/${encodeURIComponent(id)}/switch`, lang, undefined, csrf)
 
 export const isFinished = (s: ScanView) => s.status === 'done' || s.status === 'failed'
 

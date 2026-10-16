@@ -4,6 +4,8 @@ import { useAuth } from './auth'
 import { useLang } from './i18n'
 import { AccountPage, ForgotPage, LoginPage, RegisterPage, ResetPage, VerifyPage } from './pages/AccountPages'
 import { Home } from './pages/Home'
+import { InvitePage } from './pages/InvitePage'
+import { OrgPage } from './pages/OrgPage'
 import { ScanPage } from './pages/ScanPage'
 import { usePageMeta } from './usePageMeta'
 
@@ -41,6 +43,8 @@ export default function App() {
           <Route path="/forgot" element={<ForgotPage />} />
           <Route path="/reset" element={<ResetPage />} />
           <Route path="/account" element={<AccountPage />} />
+          <Route path="/org" element={<OrgPage />} />
+          <Route path="/invite" element={<InvitePage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
@@ -57,9 +61,14 @@ function AccountLink() {
   const { state } = useAuth()
   if (state.status === 'loading') return null
   return state.status === 'user' ? (
-    <Link to="/account" className="nav-link">
-      {t('nav.account')}
-    </Link>
+    <>
+      <Link to="/org" className="nav-link">
+        {t('nav.org')}
+      </Link>
+      <Link to="/account" className="nav-link">
+        {t('nav.account')}
+      </Link>
+    </>
   ) : (
     <Link to="/login" className="nav-link">
       {t('nav.login')}

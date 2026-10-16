@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import {
   ApiError,
@@ -11,92 +11,10 @@ import {
   verifyEmail,
 } from '../api'
 import { authErrorMessage, useAuth, useHashToken } from '../auth'
+import { ErrorLine, Field, Panel } from '../components/Form'
 import { useLang } from '../i18n'
+import { asError, useForm } from '../useForm'
 import { usePageMeta } from '../usePageMeta'
-
-const asError = (e: unknown) => (e instanceof ApiError ? e : new ApiError(0, 'network', ''))
-
-function Field(props: {
-  label: string
-  type?: string
-  value: string
-  onChange: (v: string) => void
-  autoComplete?: string
-  help?: string
-  required?: boolean
-  maxLength?: number
-  invalid?: boolean
-  errorId?: string
-}) {
-  const id = useId()
-  const helpId = useId()
-  const described = [props.help ? helpId : '', props.invalid && props.errorId ? props.errorId : ''].filter(Boolean).join(' ')
-  return (
-    <div className="field">
-      <label htmlFor={id} className="label">
-        {props.label}
-      </label>
-      <input
-        id={id}
-        className="input"
-        type={props.type ?? 'text'}
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        autoComplete={props.autoComplete}
-        required={props.required}
-        maxLength={props.maxLength}
-        spellCheck={false}
-        aria-invalid={props.invalid || undefined}
-        aria-describedby={described || undefined}
-      />
-      {props.help && (
-        <p id={helpId} className="muted small">
-          {props.help}
-        </p>
-      )}
-    </div>
-  )
-}
-
-/** A titled terminal panel for the account pages. */
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="terminal auth" aria-labelledby="auth-title">
-      <h1 id="auth-title" className="h-title">
-        {title}
-      </h1>
-      {children}
-    </section>
-  )
-}
-
-/** Form state shared by the pages: busy flag, error and its alert. */
-function useForm() {
-  const errorId = useId()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<ApiError | null>(null)
-  const run = async (f: () => Promise<void>) => {
-    setBusy(true)
-    setError(null)
-    try {
-      await f()
-    } catch (e) {
-      setError(asError(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-  return { busy, error, setError, run, errorId }
-}
-
-function ErrorLine({ id, error }: { id: string; error: ApiError | null }) {
-  const { t } = useLang()
-  return (
-    <p id={id} className="error" role="alert">
-      {error ? authErrorMessage(error, t) : ''}
-    </p>
-  )
-}
 
 export function LoginPage() {
   const { lang, t } = useLang()

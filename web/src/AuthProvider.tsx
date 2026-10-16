@@ -34,6 +34,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'anon' })
   }, [state, lang])
 
-  const value = useMemo(() => ({ state, signedIn, signedOut, logout }), [state, signedIn, signedOut, logout])
+  const refresh = useCallback(async () => {
+    try {
+      setState({ status: 'user', me: await getMe(lang) })
+    } catch {
+      setState({ status: 'anon' })
+    }
+  }, [lang])
+
+  const value = useMemo(() => ({ state, signedIn, signedOut, logout, refresh }), [state, signedIn, signedOut, logout, refresh])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

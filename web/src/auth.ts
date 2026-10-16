@@ -12,6 +12,8 @@ export interface AuthValue {
   /** Forgets the session locally (after a 401, a password reset…). */
   signedOut: () => void
   logout: () => Promise<void>
+  /** Reloads the session (organizations changed). */
+  refresh: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthValue | null>(null)
