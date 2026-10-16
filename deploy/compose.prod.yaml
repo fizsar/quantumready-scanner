@@ -90,6 +90,9 @@ services:
       # Accounts (/api/auth): off while empty (until milestone 3.7).
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
       MAIL_SUPPORT: ${MAIL_SUPPORT:-soporte@fizsar.com}
+      # Public scanning of any domain: off until the security review (needs ALTCHA_HMAC_KEY).
+      PUBLIC_SCAN_OPEN: ${PUBLIC_SCAN_OPEN:-false}
+      ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
       # Closed beta: invited accounts cannot create organizations ("true" lifts it).
       BETA_INVITED_CAN_CREATE_ORGS: ${BETA_INVITED_CAN_CREATE_ORGS:-false}
     ports:

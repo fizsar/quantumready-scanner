@@ -24,7 +24,7 @@ Pide un escaneo. Cuerpo (máx. 1 KiB, `Content-Type: application/json`, campos d
 
 ### Escaneo público abierto (hito 3.5, `PUBLIC_SCAN_OPEN`)
 
-`GET /api/targets` añade `"open"` (cualquier dominio) y `"proof"` (hace falta la prueba de trabajo). Abierto, `POST /api/scans` acepta cualquier dominio (siempre `basic`, público) con `{"host", "altcha"}`. Errores además de los anteriores: **400** `domain_ip`, `domain_reserved`, `domain_unknown_tld`, `domain_public_suffix`, `proof_failed`; **403** `scan_not_allowed` (excluido por el operador u opt-out del dueño: la misma respuesta); **429** `domain_rate_limited` (10 al día por dominio registrable) y `busy` (30 por minuto y 1.000 al día en total), con `Retry-After`.
+`GET /api/targets` añade `"open"` (cualquier dominio) y `"proof"` (hace falta la prueba de trabajo). `GET /api/altcha` da el reto (`{algorithm, challenge, maxnumber, salt, signature}`, formato ALTCHA; 60 por minuto por IP); la solución es el JSON `{algorithm, challenge, number, salt, signature}` en base64, de un solo uso y válida 10 minutos. Abierto, `POST /api/scans` acepta cualquier dominio (siempre `basic`, público) con `{"host", "altcha"}`. Errores además de los anteriores: **400** `domain_ip`, `domain_reserved`, `domain_unknown_tld`, `domain_public_suffix`, `proof_failed`; **403** `scan_not_allowed` (excluido por el operador u opt-out del dueño: la misma respuesta); **429** `domain_rate_limited` (10 al día por dominio registrable) y `busy` (30 por minuto y 1.000 al día en total), con `Retry-After`.
 
 ## `GET /api/scans/{id}`
 

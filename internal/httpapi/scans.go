@@ -45,7 +45,7 @@ type createScanRequest struct {
 // is required.
 func (a *api) listTargets(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort,
-		"open": a.cfg.PublicScanOpen, "proof": a.cfg.PublicScanOpen && a.cfg.Proof != nil})
+		"open": a.cfg.PublicScanOpen, "proof": a.cfg.PublicScanOpen && a.cfg.Altcha != nil})
 }
 
 // slot is one rate-limit reservation, given back if no scan is started.
@@ -97,8 +97,8 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if a.cfg.PublicScanOpen && a.cfg.Proof != nil {
-		if err := a.cfg.Proof.Verify(req.Altcha); err != nil {
+	if a.cfg.PublicScanOpen && a.cfg.Altcha != nil {
+		if err := a.cfg.Altcha.Verify(req.Altcha); err != nil {
 			writeError(w, r, http.StatusBadRequest, "proof_failed")
 			return
 		}
@@ -346,4 +346,18 @@ func (a *api) view(r *http.Request, t store.Tenant, sc store.Scan) (*scanView, e
 	}
 	v.Report = rep
 	return v, nil
+}
+
+// altchaChallenge: GET /api/altcha, a proof-of-work challenge for POST
+// /api/scans (open public scanning).
+func (a *api) altchaChallenge(w http.ResponseWriter, r *http.Request) {
+	if limited(w, r, a.cfg.PublicLimits.Challenge.Reserve, rateKey(clientAddr(r, a.cfg.TrustedProxies))) {
+		return
+	}
+	c, err := a.cfg.Altcha.Challenge()
+	if err != nil {
+		a.internal(w, r, "altcha challenge", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
 }

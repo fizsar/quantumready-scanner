@@ -113,6 +113,12 @@ Definidos en `internal/org` (un test fija la matriz entera). La API decide con l
   - por dominio registrable: 10 al día;
   - globales: 30 por minuto y 1.000 al día;
   - los escaneos reutilizados no cuentan.
+- **Prueba de trabajo** (`internal/altcha`, formato ALTCHA, autoalojada):
+  - `GET /api/altcha` da un reto firmado con HMAC-SHA-256. La clave es `ALTCHA_HMAC_KEY`, de 32 bytes o más, y se genera en el VPS.
+  - El navegador busca `n` tal que SHA-256(sal + n) coincida con el reto. Son de media 50.000 hashes, alrededor de un segundo.
+  - Cada solución sirve para un solo escaneo, caduca a los 10 minutos (la caducidad va dentro de la sal firmada) y no se puede falsificar sin la clave (tests de falsificaciones).
+  - Los retos están limitados por IP (60 por minuto). Sin clave, la API no arranca con el escaneo abierto.
+  - No hay terceros ni cookies.
 - **Exclusiones**: hay dos vías. La lista del operador (`qradmin exclude add|remove|list`, tabla `scan_exclusions`, que ningún rol de servicio puede leer) y el **opt-out del dueño verificado** (`PATCH /api/org/domains/{id}` con `block_public`; solo cuenta mientras el dominio está verificado, incluida la gracia). Las dos cubren los subdominios y dan la **misma** respuesta (403 `scan_not_allowed`).
 - **La función `public_scan_blocked`** (`SECURITY DEFINER`, con el mismo endurecimiento que `invitation_by_token` y su test) solo devuelve sí o no. Así una petición pública no puede saber qué organización tiene el dominio, ni si alguien lo ha verificado.
 - **Un escaneo público nunca devuelve ni reutiliza el de una organización.** `TestOpenPublicScans` lo comprueba con un dominio verificado por una organización que tiene un escaneo `full` reciente: la respuesta pública es idéntica a la de un dominio cualquiera (salvo id, fechas y host), es un escaneo nuevo `basic` sin organización, y la URL pública del escaneo de la organización da 404. Prueba de mutación (16/10/2026):

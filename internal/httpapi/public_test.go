@@ -2,14 +2,20 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/fizsar/quantumready-saas/internal/altcha"
 )
 
 func openPublic(limits PublicLimits) func(*Config) {
@@ -106,6 +112,48 @@ func TestOpenPublicScans(t *testing.T) {
 	}
 	a.join(t, "carl@example.com", orgA, "viewer")
 	expect(t, carl.do(t, "PATCH", "/api/org/domains/"+ver.ID.String(), `{"block_public":true}`), http.StatusForbidden, "forbidden")
+}
+
+// solveAltcha does what the browser does with GET /api/altcha.
+func solveAltcha(t *testing.T, body []byte) string {
+	t.Helper()
+	var c altcha.Challenge
+	if err := json.Unmarshal(body, &c); err != nil {
+		t.Fatal(err)
+	}
+	for n := int64(0); n <= c.MaxNumber; n++ {
+		h := sha256.Sum256([]byte(c.Salt + strconv.FormatInt(n, 10)))
+		if hex.EncodeToString(h[:]) == c.Challenge {
+			b, _ := json.Marshal(map[string]any{"algorithm": c.Algorithm, "challenge": c.Challenge, "number": n, "salt": c.Salt, "signature": c.Signature})
+			return base64.StdEncoding.EncodeToString(b)
+		}
+	}
+	t.Fatal("unsolvable challenge")
+	return ""
+}
+
+func TestPublicScanProofOfWork(t *testing.T) {
+	v, _ := altcha.New([]byte(strings.Repeat("k", 32)), 300, time.Minute)
+	a := newAuthAPI(t, AuthLimits{}, openPublic(PublicLimits{Challenge: NewLimiter(3, 100)}), func(c *Config) { c.Altcha = v })
+	c := a.client("198.51.100.9")
+	if w := c.do(t, "GET", "/api/targets", ""); !strings.Contains(w.Body.String(), `"proof":true`) {
+		t.Errorf("targets: %s", w.Body)
+	}
+	scan := func(host, proof string) *httptestRecorder {
+		return c.do(t, "POST", "/api/scans", js(map[string]string{"host": host, "altcha": proof}))
+	}
+	expect(t, scan("example.org", ""), http.StatusBadRequest, "proof_failed")
+	w := c.do(t, "GET", "/api/altcha", "")
+	expect(t, w, http.StatusOK, "")
+	proof := solveAltcha(t, w.Body.Bytes())
+	expect(t, scan("example.org", proof), http.StatusAccepted, "")
+	expect(t, scan("example.net", proof), http.StatusBadRequest, "proof_failed") // one scan per solution
+	// Demo (allowlisted) hosts need it too once scanning is open.
+	expect(t, scan("fizsar.com", "x"), http.StatusBadRequest, "proof_failed")
+	// Challenges are rate limited per client.
+	c.do(t, "GET", "/api/altcha", "")
+	c.do(t, "GET", "/api/altcha", "")
+	expect(t, c.do(t, "GET", "/api/altcha", ""), http.StatusTooManyRequests, "too_many_attempts")
 }
 
 func TestPublicScanLimits(t *testing.T) {

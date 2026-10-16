@@ -13,6 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/fizsar/quantumready-saas/internal/altcha"
 )
 
 const defaultPingTimeout = 2 * time.Second
@@ -49,9 +51,9 @@ type Config struct {
 	// PublicScanOpen lets anyone scan any domain (basic). False: only the
 	// Allowlist (PUBLIC_SCAN_OPEN; opened after the security review).
 	PublicScanOpen bool
-	// Proof checks the proof of work (ALTCHA) of an open public scan; nil:
-	// none required (cmd/api refuses to open without it).
-	Proof ProofChecker
+	// Altcha issues and checks the proof of work of open public scans (GET
+	// /api/altcha); nil: none required (cmd/api refuses to open without it).
+	Altcha *altcha.Verifier
 	// PublicLimits apply to open public scans, on top of Limiter (per IP).
 	PublicLimits PublicLimits
 
@@ -79,15 +81,11 @@ type Config struct {
 	Logger *slog.Logger
 }
 
-// ProofChecker verifies a client's proof of work (internal/altcha).
-type ProofChecker interface {
-	Verify(payload string) error
-}
-
 // PublicLimits of open public scanning. Nil fields take the defaults.
 type PublicLimits struct {
 	PerDomain *Limiter // new scans per registrable domain: 10/day
 	Global    *Limiter // new public scans in all: 30/min, 1000/day
+	Challenge *Limiter // ALTCHA challenges per client: 60/min, 2000/day
 }
 
 type api struct{ cfg Config }
@@ -112,6 +110,9 @@ func NewRouter(cfg Config) http.Handler {
 	if cfg.PublicLimits.Global == nil {
 		cfg.PublicLimits.Global = NewLimiter(30, 1000)
 	}
+	if cfg.PublicLimits.Challenge == nil {
+		cfg.PublicLimits.Challenge = NewLimiter(60, 2000)
+	}
 	a := &api{cfg: cfg}
 	a.authDefaults()
 
@@ -133,6 +134,9 @@ func NewRouter(cfg Config) http.Handler {
 			r.Get("/targets", a.listTargets)
 			r.Post("/scans", a.createScan)
 			r.Get("/scans/{id}", a.getScan)
+			if cfg.Altcha != nil {
+				r.Get("/altcha", a.altchaChallenge)
+			}
 		}
 		if cfg.Accounts != nil && cfg.Orgs != nil {
 			r.Route("/org", func(r chi.Router) {

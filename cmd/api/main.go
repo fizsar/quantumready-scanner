@@ -68,6 +68,13 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	openScans, proof, err := publicScanConfig(os.Getenv)
+	if err != nil {
+		return err
+	}
+	if openScans {
+		logger.Warn("PUBLIC_SCAN_OPEN: anyone can scan any domain (basic), with a proof of work")
+	}
 	if origin == "" {
 		logger.Warn("PUBLIC_ORIGIN is empty: accounts (/api/auth) are disabled")
 	}
@@ -101,6 +108,8 @@ func run(logger *slog.Logger) error {
 		Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
 		TargetCooldown: lim.cooldown,
 		PublicOrigin:   origin,
+		PublicScanOpen: openScans,
+		Altcha:         proof,
 		Support:        os.Getenv("MAIL_SUPPORT"),
 		Logger:         logger,
 	}
