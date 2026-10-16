@@ -58,8 +58,9 @@ func Actions(role string) []Action {
 	return out
 }
 
-// CanRemove: owners remove anyone, admins only viewers. Leaving (removing
-// yourself) is always allowed, subject to the last-owner rule.
+// CanRemove reports whether actor may remove a member with role target:
+// owners remove anyone, admins only viewers. Leaving (removing yourself) is
+// always allowed, subject to the last-owner rule.
 func CanRemove(actor, target string, self bool) bool {
 	if self {
 		return true
@@ -73,8 +74,8 @@ func CanRemove(actor, target string, self bool) bool {
 	return false
 }
 
-// CanInviteAs: nobody invites with more power than they have, and owners
-// are made by promotion, never by invitation.
+// CanInviteAs reports whether actor may invite someone as role. Owners are
+// made by promotion, never by invitation.
 func CanInviteAs(actor, role string) bool {
 	return Can(actor, Invite) && (role == Admin || role == Viewer)
 }
