@@ -260,13 +260,22 @@ func (a *api) later(r *http.Request, what string, f func(ctx context.Context) er
 }
 
 func (a *api) render(template, lang, to, link string, validFor time.Duration) (store.Email, error) {
-	vf := ""
-	if validFor >= time.Hour {
-		vf = mail.ValidFor(lang, int(validFor.Hours()), 0)
-	} else if validFor > 0 {
-		vf = mail.ValidFor(lang, 0, int(validFor.Minutes()))
+	return a.renderData(template, lang, to, validFor, mail.Data{Link: link})
+}
+
+// renderData fills d with the validity, site and support address, and renders.
+func (a *api) renderData(template, lang, to string, validFor time.Duration, d mail.Data) (store.Email, error) {
+	const day = 24 * time.Hour
+	switch {
+	case validFor > day && validFor%day == 0:
+		d.ValidFor = strconv.Itoa(int(validFor/day)) + map[string]string{"es": " días", "en": " days"}[lang]
+	case validFor >= time.Hour:
+		d.ValidFor = mail.ValidFor(lang, int(validFor.Hours()), 0)
+	case validFor > 0:
+		d.ValidFor = mail.ValidFor(lang, 0, int(validFor.Minutes()))
 	}
-	return mail.Render(template, lang, to, mail.Data{Link: link, ValidFor: vf, SiteURL: a.cfg.PublicOrigin, Support: a.cfg.Support})
+	d.SiteURL, d.Support = a.cfg.PublicOrigin, a.cfg.Support
+	return mail.Render(template, lang, to, d)
 }
 
 // link builds an email link. The token goes in the fragment, which browsers
@@ -339,6 +348,9 @@ type registerRequest struct {
 	Organization string `json:"organization"`
 	Lang         string `json:"lang"`
 	SignupCode   string `json:"signup_code"`
+	// InvitationToken replaces the signup code: the user joins the inviting
+	// organization (no own one) and the address counts as verified.
+	InvitationToken string `json:"invitation_token"`
 }
 
 // register: POST /api/auth/register. A taken email gets the same 202 as a
@@ -375,6 +387,10 @@ func (a *api) register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, code)
 		return
 	}
+	if req.InvitationToken != "" && a.cfg.Orgs != nil {
+		a.registerInvited(w, r, email, req.Password, lang, name, req.InvitationToken)
+		return
+	}
 	code := strings.TrimSpace(req.SignupCode)
 	if code == "" {
 		writeError(w, r, http.StatusBadRequest, "invalid_signup_code")
@@ -406,20 +422,7 @@ func (a *api) register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "invalid_signup_code")
 		return
 	case errors.Is(err, store.ErrEmailTaken):
-		a.later(r, "account exists email", func(ctx context.Context) error {
-			if ok, _ := a.cfg.AuthLimits.PerAddress.Reserve(email); !ok {
-				return nil
-			}
-			u, err := a.cfg.Accounts.UserByEmail(ctx, email)
-			if err != nil {
-				return err
-			}
-			e, err := a.render(mail.AccountExists, u.Lang, email, "", 0)
-			if err != nil {
-				return err
-			}
-			return a.cfg.Accounts.EnqueueEmail(ctx, e)
-		})
+		a.accountExists(r, email)
 	case err != nil:
 		a.internal(w, r, "register", err)
 		return
@@ -428,6 +431,26 @@ func (a *api) register(w http.ResponseWriter, r *http.Request) {
 		a.audit(r, &org.ID, &u.ID, auditRegister)
 	}
 	writeJSON(w, http.StatusAccepted, statusView{"check_email"})
+}
+
+// accountExists tells the owner of email, after the response, that someone
+// tried to sign up with it (the response itself is the same as for a new
+// account).
+func (a *api) accountExists(r *http.Request, email string) {
+	a.later(r, "account exists email", func(ctx context.Context) error {
+		if ok, _ := a.cfg.AuthLimits.PerAddress.Reserve(email); !ok {
+			return nil
+		}
+		u, err := a.cfg.Accounts.UserByEmail(ctx, email)
+		if err != nil {
+			return err
+		}
+		e, err := a.render(mail.AccountExists, u.Lang, email, "", 0)
+		if err != nil {
+			return err
+		}
+		return a.cfg.Accounts.EnqueueEmail(ctx, e)
+	})
 }
 
 func (a *api) ipKey(r *http.Request) string {

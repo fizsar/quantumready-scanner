@@ -28,7 +28,8 @@ var testCfg = SMTPConfig{Host: "127.0.0.1", Port: 25, Security: "none",
 	From: "QuantumReady <no-reply@quantumready.fizsar.com>", ReplyTo: "soporte@fizsar.com"}
 
 func TestRenderEveryTemplate(t *testing.T) {
-	d := Data{Link: "https://q.example/verify?token=abc", ValidFor: "24 horas", SiteURL: "https://q.example", Support: "soporte@fizsar.com"}
+	d := Data{Link: "https://q.example/verify?token=abc", ValidFor: "24 horas", SiteURL: "https://q.example", Support: "soporte@fizsar.com",
+		Inviter: "ana@example.com", OrgName: "Acme", Role: "lectura"}
 	for name := range catalog {
 		for _, lang := range []string{"es", "en"} {
 			e, err := Render(name, lang, "ana@example.com", d)
@@ -38,7 +39,7 @@ func TestRenderEveryTemplate(t *testing.T) {
 			if e.To != "ana@example.com" || e.Template != name || e.Lang != lang || e.Subject == "" || strings.Contains(e.Body, "{{") || strings.Contains(e.Body, "<no value>") {
 				t.Errorf("%s/%s: %+v", name, lang, e)
 			}
-			if (name == VerifyEmail || name == ResetPassword) && !strings.Contains(e.Body, d.Link) {
+			if (name == VerifyEmail || name == ResetPassword || name == Invitation) && !strings.Contains(e.Body, d.Link) {
 				t.Errorf("%s/%s: link missing", name, lang)
 			}
 		}

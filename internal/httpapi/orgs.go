@@ -21,6 +21,15 @@ type OrgStore interface {
 	Members(ctx context.Context, t store.Tenant) ([]store.ListMembersRow, error)
 	RenameOrganization(ctx context.Context, t store.Tenant, name string) error
 	ChangeMember(ctx context.Context, t store.Tenant, target uuid.UUID, decide store.MemberDecision) error
+
+	Invite(ctx context.Context, t store.Tenant, n store.NewInvitation) (store.CreateInvitationRow, error)
+	Invitations(ctx context.Context, t store.Tenant) ([]store.ListPendingInvitationsRow, error)
+	RevokeInvitation(ctx context.Context, t store.Tenant, id uuid.UUID) error
+	InvitationByToken(ctx context.Context, hash []byte) (store.InvitationInfo, error)
+	AcceptInvitation(ctx context.Context, sessionID, userID uuid.UUID, email string, hash []byte) (store.Member, error)
+	RegisterInvited(ctx context.Context, r store.InvitedRegistration) (store.User, store.Member, error)
+	CreateOrganization(ctx context.Context, sessionID, userID uuid.UUID, name string, maxOrgs int) (store.Member, error)
+	SwitchOrganization(ctx context.Context, sessionID, userID, org uuid.UUID) (store.Member, error)
 }
 
 // Audit actions.

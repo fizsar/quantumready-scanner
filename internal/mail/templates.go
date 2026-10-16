@@ -18,6 +18,7 @@ const (
 	AccountExists   = "account_exists"
 	ResetPassword   = "reset_password"
 	PasswordChanged = "password_changed"
+	Invitation      = "invitation"
 )
 
 // Data fills a template. Link is an absolute URL to the site.
@@ -26,6 +27,10 @@ type Data struct {
 	ValidFor string // e.g. "24 horas" / "24 hours"
 	SiteURL  string
 	Support  string // support address
+	// Invitations.
+	Inviter string // inviter's email
+	OrgName string
+	Role    string // localized role name
 }
 
 type text struct{ subject, body string }
@@ -132,6 +137,42 @@ If it was not you, change it now at {{.SiteURL}}/forgot and write to us at {{.Su
 
 —
 QuantumReady · {{.SiteURL}}`},
+	},
+	Invitation: {
+		"es": {"Te han invitado a una organización en QuantumReady", `Hola:
+
+{{.Inviter}} te invita a unirte a «{{.OrgName}}» en QuantumReady con el rol {{.Role}}.
+
+QuantumReady revisa si las webs de una organización están preparadas para la criptografía post-cuántica.
+
+Para aceptar, abre este enlace (si no tienes cuenta, podrás crearla ahí):
+
+{{.Link}}
+
+El enlace caduca en {{.ValidFor}} y solo sirve una vez.
+
+Si no esperabas esta invitación, ignora este mensaje.
+
+—
+QuantumReady · {{.SiteURL}}
+Dudas: {{.Support}}`},
+		"en": {"You have been invited to an organization on QuantumReady", `Hello,
+
+{{.Inviter}} invites you to join "{{.OrgName}}" on QuantumReady as {{.Role}}.
+
+QuantumReady checks whether an organization's websites are ready for post-quantum cryptography.
+
+To accept, open this link (if you have no account, you can create one there):
+
+{{.Link}}
+
+The link expires in {{.ValidFor}} and works only once.
+
+If you were not expecting this invitation, ignore this message.
+
+—
+QuantumReady · {{.SiteURL}}
+Questions: {{.Support}}`},
 	},
 }
 

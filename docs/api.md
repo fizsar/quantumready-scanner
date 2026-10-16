@@ -80,6 +80,19 @@ Con sesión (y CSRF en lo que cambia algo). Actúan siempre sobre la **organizac
 | `PATCH /org/members/{userID}` | `role` | **204** (owner) |
 | `DELETE /org/members/{userID}` | — | **204** (owner: cualquiera; admin: viewers; uno mismo: salir) |
 | `POST /org/leave` | — | **204**; la sesión pasa a otra organización del usuario |
+| `POST /org/invitations` | `email`, `role` (`admin`/`viewer`), opcional `lang` | **201** `{id, email, role, created_at, expires_at}` y email con `PUBLIC_ORIGIN/invite#token=…` (7 días, un solo uso). Sustituye a la pendiente para la misma dirección. **409** `already_member`, `limit_reached` (20 pendientes) |
+| `GET /org/invitations` | — | `{"invitations": [{id, email, role, inviter_email, created_at, expires_at, expired}]}` (owner, admin) |
+| `DELETE /org/invitations/{id}` | — | **204**; **404** si no está pendiente |
+
+Fuera de `/org`:
+
+| Endpoint | Cuerpo | Respuesta |
+|---|---|---|
+| `POST /invitations/preview` | `token` | Sin sesión. `{organization, email, role, inviter_email, expires_at}`; **400** `invalid_token` (usada, revocada, caducada o desconocida) |
+| `POST /invitations/accept` | `token` (sesión, CSRF) | **200** como `GET /org`; pasa a ser la organización activa. **403** `invitation_other_email` si la sesión no es de la dirección invitada |
+| `POST /auth/register` | `invitation_token` en vez de `signup_code` | **201** `{"status":"registered"}`: cuenta ya confirmada (el enlace llegó a esa dirección), sin organización propia. Si la dirección ya tiene cuenta, **202** como siempre y la invitación no se gasta |
+| `POST /organizations` | `name` (sesión, CSRF) | **201**: organización nueva, el usuario es owner y pasa a ser la activa. **409** `limit_reached` (10 organizaciones por usuario) |
+| `POST /organizations/{orgID}/switch` | — (sesión, CSRF) | **200** como `GET /org`; **404** si no es miembro |
 
 ## Errores
 

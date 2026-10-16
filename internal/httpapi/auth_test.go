@@ -90,7 +90,7 @@ func (a *authAPI) outbox(t *testing.T) []sentEmail {
 // lastToken is the token of the newest email of template to whom.
 func (a *authAPI) lastToken(t *testing.T, to, template string) string {
 	t.Helper()
-	re := regexp.MustCompile(regexp.QuoteMeta(testOrigin) + `/(verify|reset)#token=([A-Za-z0-9_-]+)`)
+	re := regexp.MustCompile(regexp.QuoteMeta(testOrigin) + `/(verify|reset|invite)#token=([A-Za-z0-9_-]+)`)
 	tok := ""
 	for _, e := range a.outbox(t) {
 		if e.to == to && e.template == template {

@@ -56,6 +56,9 @@ var messages = map[string]map[string]string{
 	"forbidden":               {"es": "Tu rol en esta organización no permite hacer esto.", "en": "Your role in this organization does not allow this."},
 	"no_organization":         {"es": "No perteneces a ninguna organización.", "en": "You do not belong to any organization."},
 	"last_owner":              {"es": "La organización necesita al menos un propietario: nombra antes a otro.", "en": "The organization needs at least one owner: make someone else owner first."},
+	"already_member":          {"es": "Esa dirección ya es miembro de la organización.", "en": "That address is already a member of the organization."},
+	"limit_reached":           {"es": "Has llegado al límite permitido. Revoca o borra algo antes de añadir más.", "en": "You have reached the limit. Revoke or remove something before adding more."},
+	"invitation_other_email":  {"es": "Esta invitación es para otra dirección de email. Entra con la cuenta de esa dirección.", "en": "This invitation is for another email address. Sign in with that address's account."},
 	"invalid_role":            {"es": "El rol no es válido (owner, admin o viewer).", "en": "The role is not valid (owner, admin or viewer)."},
 	"wrong_password":          {"es": "La contraseña actual no es correcta.", "en": "The current password is not correct."},
 

@@ -113,6 +113,19 @@ func NewRouter(cfg Config) http.Handler {
 				r.Patch("/members/{userID}", a.changeRole)
 				r.Delete("/members/{userID}", a.removeMember)
 				r.Post("/leave", a.leaveOrg)
+				r.Post("/invitations", a.createInvitation)
+				r.Get("/invitations", a.listInvitations)
+				r.Delete("/invitations/{invitationID}", a.revokeInvitation)
+			})
+			r.Route("/organizations", func(r chi.Router) {
+				r.Use(a.loadSession, requireSession)
+				r.Post("/", a.createOrganization)
+				r.Post("/{orgID}/switch", a.switchOrganization)
+			})
+			r.Route("/invitations", func(r chi.Router) {
+				r.Use(a.loadSession)
+				r.Post("/preview", a.previewInvitation)
+				r.With(requireSession).Post("/accept", a.acceptInvitation)
 			})
 		}
 		if cfg.Accounts != nil {
