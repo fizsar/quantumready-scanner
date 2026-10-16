@@ -1,11 +1,15 @@
 name: Release
 
-# Publishes the images to GHCR after CI passes on a push to main.
+# Publishes the images to GHCR after CI passes on a push to main or showcase
+# (the recruiter showcase, deployed from a branch off production; see
+# CLAUDE.md). Both get the same Trivy gate and an immutable sha-<commit> tag;
+# only main moves :latest. workflow_run runs this file as it is on the
+# default branch, so changes here take effect once they are on main.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-    branches: [main]
+    branches: [main, showcase]
 
 permissions: {}
 
@@ -100,8 +104,13 @@ jobs:
       - name: Push
         env:
           TAG: ${{ steps.meta.outputs.tag }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          docker tag "$IMAGE:$TAG" "$IMAGE:latest"
           docker push "$IMAGE:$TAG"
-          docker push "$IMAGE:latest"
-          echo "Pushed \`$IMAGE:$TAG\` and \`:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$BRANCH" = main ]; then
+            docker tag "$IMAGE:$TAG" "$IMAGE:latest"
+            docker push "$IMAGE:latest"
+            echo "Pushed \`$IMAGE:$TAG\` and \`:latest\` (main)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Pushed \`$IMAGE:$TAG\` ($BRANCH; \`:latest\` unchanged)" >> "$GITHUB_STEP_SUMMARY"
+          fi

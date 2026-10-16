@@ -4,6 +4,11 @@
 #   deploy/deploy.sh sha-14226c7   # a specific build (preferred)
 #   deploy/deploy.sh latest        # whatever main last published
 #
+# Only commits of origin/main or origin/showcase can be deployed: those are
+# the branches whose CI-tested builds release.yml publishes (showcase never
+# moves :latest). QR_DEPLOY_DRY_RUN=1 stops after that check, without SSH
+# (deploy/test-deploy-ref.sh).
+#
 # Copies deploy/compose.prod.yaml *from that commit* to /opt/quantumready,
 # sets QR_TAG in the VPS .env, pulls, starts (migrations run first) and checks
 # health locally on the VPS and from outside. Rollback = run it again with the
@@ -21,12 +26,26 @@ if [[ ! $TAG =~ ^(sha-[0-9a-f]{7,40}|latest)$ ]]; then
 fi
 
 cd "$(git rev-parse --show-toplevel)"
+git fetch -q origin
 if [[ $TAG == latest ]]; then
-	git fetch -q origin main
 	ref=origin/main
 else
 	ref=${TAG#sha-}
-	git cat-file -e "$ref^{commit}" 2>/dev/null || git fetch -q origin main
+	if ! git cat-file -e "$ref^{commit}" 2>/dev/null; then
+		echo "refusing to deploy $TAG: commit $ref not found (not pushed, or a typo)" >&2
+		exit 1
+	fi
+fi
+commit=$(git rev-parse "$ref^{commit}")
+on_branch() { git merge-base --is-ancestor "$commit" "origin/$1" 2>/dev/null; }
+if ! on_branch main && ! on_branch showcase; then
+	echo "refusing to deploy $TAG: commit ${commit:0:7} is not on origin/main nor origin/showcase;" >&2
+	echo "only those branches' builds are published (release.yml). Push it to one of them first." >&2
+	exit 1
+fi
+if [[ ${QR_DEPLOY_DRY_RUN:-} == 1 ]]; then
+	echo "==> dry run: $TAG (${commit:0:7}) can be deployed"
+	exit 0
 fi
 
 echo "==> $HOST: deploying $TAG (compose from $(git rev-parse --short "$ref"))"
