@@ -38,8 +38,14 @@ func (s *Store) Enqueue(ctx context.Context, host string, port int32) (Scan, err
 // Claim leases the next scan for lease. The returned Scan carries the lease
 // token needed to complete or fail it.
 func (s *Store) Claim(ctx context.Context, lease time.Duration) (Scan, error) {
+	return s.ClaimCapped(ctx, lease, 0)
+}
+
+// ClaimCapped is Claim with a global cap: ErrNoScan while maxPerMinute scans
+// have started in the last minute (0: no cap).
+func (s *Store) ClaimCapped(ctx context.Context, lease time.Duration, maxPerMinute int) (Scan, error) {
 	token := uuid.New()
-	sc, err := s.ClaimScan(ctx, ClaimScanParams{LeaseToken: &token, LeaseSeconds: lease.Seconds()})
+	sc, err := s.ClaimScan(ctx, ClaimScanParams{LeaseToken: &token, LeaseSeconds: lease.Seconds(), MaxPerMinute: int32(maxPerMinute)}) //nolint:gosec // validated small
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Scan{}, ErrNoScan
 	}

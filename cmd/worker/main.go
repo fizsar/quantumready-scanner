@@ -72,6 +72,10 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	perMinute, err := maxScansPerMinute(os.Getenv)
+	if err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -88,8 +92,9 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	w, err := worker.New(store.NewStore(pool), scanner.New(scanOpts), worker.Config{
-		Concurrency: concurrency,
-		Logger:      logger,
+		Concurrency:  concurrency,
+		MaxPerMinute: perMinute,
+		Logger:       logger,
 		Heartbeat: func(oldest time.Time) {
 			if err := writeHeartbeat(hbPath, oldest); err != nil {
 				logger.Warn("worker: cannot write heartbeat", "err", err)
@@ -103,7 +108,7 @@ func run(logger *slog.Logger) error {
 	checker := &worker.DomainChecker{Queue: store.NewStore(pool).Queries, DNS: &dnscheck.Checker{}, Logger: logger}
 	go checker.Run(ctx)
 
-	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency)
+	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency, "max_scans_per_minute", perMinute)
 	err = w.Run(ctx)
 	logger.Info("worker stopped")
 	return err
@@ -131,6 +136,21 @@ func requirePlaintextDB(c *pgx.ConnConfig) error {
 			"(GODEBUG tlssha1=1, rsa1024min=0), which would also weaken a TLS connection to PostgreSQL")
 	}
 	return nil
+}
+
+// maxScansPerMinute is WORKER_MAX_SCANS_PER_MINUTE: scans started per
+// minute by all workers together (default 20, 1–600), so the server's
+// address never looks like an Internet sweep.
+func maxScansPerMinute(getenv func(string) string) (int, error) {
+	v := getenv("WORKER_MAX_SCANS_PER_MINUTE")
+	if v == "" {
+		return 20, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 || n > 600 {
+		return 0, fmt.Errorf("WORKER_MAX_SCANS_PER_MINUTE must be an integer between 1 and 600, got %q", v)
+	}
+	return n, nil
 }
 
 func envInt(key string, def int) (int, error) {

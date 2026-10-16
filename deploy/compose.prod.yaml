@@ -127,6 +127,8 @@ services:
     environment:
       DATABASE_URL: *database-url
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      # Scans started per minute by all workers together (good Internet citizen).
+      WORKER_MAX_SCANS_PER_MINUTE: ${WORKER_MAX_SCANS_PER_MINUTE:-20}
     tmpfs:
       - /tmp # heartbeat file for the healthcheck
     networks: [backend, egress]

@@ -79,3 +79,16 @@ func TestEnvInt(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxScansPerMinute(t *testing.T) {
+	for v, want := range map[string]int{"": 20, "1": 1, "600": 600} {
+		if n, err := maxScansPerMinute(func(string) string { return v }); err != nil || n != want {
+			t.Errorf("%q: %d %v", v, n, err)
+		}
+	}
+	for _, v := range []string{"0", "601", "x", "-3"} {
+		if _, err := maxScansPerMinute(func(string) string { return v }); err == nil {
+			t.Errorf("%q accepted", v)
+		}
+	}
+}

@@ -24,6 +24,10 @@ WHERE id = (
     WHERE ((s.status = 'queued' AND (s.not_before IS NULL OR s.not_before <= now()))
            OR (s.status = 'running' AND s.lease_until < now()))
       AND s.attempts < s.max_attempts
+      -- Good Internet citizen: at most @max_per_minute scans start per minute
+      -- across all workers (0: no cap), so the server never looks like a sweep.
+      AND ($3::int = 0
+           OR (SELECT count(*) FROM scans x WHERE x.started_at > now() - interval '1 minute') < $3::int)
     ORDER BY s.created_at
     LIMIT 1
     FOR UPDATE SKIP LOCKED
@@ -34,13 +38,14 @@ RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease
 type ClaimScanParams struct {
 	LeaseToken   *uuid.UUID
 	LeaseSeconds float64
+	MaxPerMinute int32
 }
 
 // Leases the oldest queued scan that is due (not_before passed), or a running
 // one whose lease expired (its worker died), to the caller. SKIP LOCKED lets
 // workers claim concurrently without waiting on each other or taking the same row.
 func (q *Queries) ClaimScan(ctx context.Context, arg ClaimScanParams) (Scan, error) {
-	row := q.db.QueryRow(ctx, claimScan, arg.LeaseToken, arg.LeaseSeconds)
+	row := q.db.QueryRow(ctx, claimScan, arg.LeaseToken, arg.LeaseSeconds, arg.MaxPerMinute)
 	var i Scan
 	err := row.Scan(
 		&i.ID,

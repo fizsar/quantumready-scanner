@@ -1,0 +1,8 @@
+# QuantumReady (quantumready.fizsar.com): security contact, RFC 9116.
+# To report a vulnerability, or to ask us not to scan your domain, write to
+# the address below. How the scanner works: https://quantumready.fizsar.com/about-scans
+Contact: mailto:soporte@fizsar.com
+Expires: 2027-04-16T00:00:00Z
+Preferred-Languages: es, en
+Canonical: https://quantumready.fizsar.com/.well-known/security.txt
+Policy: https://quantumready.fizsar.com/about-scans

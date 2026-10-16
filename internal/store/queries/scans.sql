@@ -18,6 +18,10 @@ WHERE id = (
     WHERE ((s.status = 'queued' AND (s.not_before IS NULL OR s.not_before <= now()))
            OR (s.status = 'running' AND s.lease_until < now()))
       AND s.attempts < s.max_attempts
+      -- Good Internet citizen: at most @max_per_minute scans start per minute
+      -- across all workers (0: no cap), so the server never looks like a sweep.
+      AND (@max_per_minute::int = 0
+           OR (SELECT count(*) FROM scans x WHERE x.started_at > now() - interval '1 minute') < @max_per_minute::int)
     ORDER BY s.created_at
     LIMIT 1
     FOR UPDATE SKIP LOCKED

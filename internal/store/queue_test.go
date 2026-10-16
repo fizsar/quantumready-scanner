@@ -248,6 +248,31 @@ func TestFail(t *testing.T) {
 }
 
 // publicBasic is EnqueueOrReuse for a public basic scan (the phase 2 behaviour).
+// The global cap counts every scan started in the last minute, by any worker.
+func TestClaimCapped(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	for _, h := range []string{"a.example", "b.example", "c.example"} {
+		if _, _, err := publicBasic(ctx, s, h, time.Minute); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range 2 {
+		if _, err := s.ClaimCapped(ctx, time.Minute, 2); err != nil {
+			t.Fatalf("claim %d: %v", i, err)
+		}
+	}
+	if _, err := s.ClaimCapped(ctx, time.Minute, 2); !errors.Is(err, ErrNoScan) {
+		t.Errorf("third claim within the minute: %v, want ErrNoScan", err)
+	}
+	if _, err := s.pool.Exec(ctx, "UPDATE scans SET started_at = now() - interval '61 seconds' WHERE started_at IS NOT NULL"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ClaimCapped(ctx, time.Minute, 2); err != nil {
+		t.Errorf("after a minute: %v", err)
+	}
+}
+
 func publicBasic(ctx context.Context, s *Store, host string, cooldown time.Duration) (Scan, bool, error) {
 	return s.EnqueueOrReuse(ctx, Public, ScanRequest{Host: host, Port: 443, Intensity: IntensityBasic, Cooldown: cooldown})
 }

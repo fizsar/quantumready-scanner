@@ -44,6 +44,9 @@ type Config struct {
 	// MaxRetries is how many times a transient error is retried. Default 1;
 	// negative disables retries.
 	MaxRetries int
+	// MaxPerMinute caps the scans started per minute across all workers (0: no
+	// cap; cmd/worker sets WORKER_MAX_SCANS_PER_MINUTE, default 20).
+	MaxPerMinute int
 	// PollInterval is the wait when the queue is empty. Default 1 s.
 	PollInterval time.Duration
 	// ShutdownTimeout bounds the wait for in-flight scans on stop. Scans still
@@ -169,7 +172,7 @@ func (w *Worker) ProcessOne(ctx context.Context) (bool, error) {
 		w.cfg.Logger.Warn("worker: scans failed after exhausting their attempts", "ids", ids)
 	}
 
-	sc, err := w.st.Claim(ctx, w.cfg.Lease)
+	sc, err := w.st.ClaimCapped(ctx, w.cfg.Lease, w.cfg.MaxPerMinute)
 	if errors.Is(err, store.ErrNoScan) {
 		return false, nil
 	}
