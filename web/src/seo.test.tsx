@@ -13,10 +13,10 @@ const meta = (attr: 'name' | 'property', key: string) => page.head.querySelector
 
 describe('index.html', () => {
   it('has a real title, description and canonical', () => {
-    expect(page.title).toBe('QuantumReady · Auditoría post-cuántica de tu web')
+    expect(page.title).toBe('QuantumReady · Post-quantum audit of your website')
     expect(meta('name', 'description').length).toBeGreaterThan(80)
     expect(page.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(SITE + '/')
-    expect(page.documentElement.lang).toBe('es')
+    expect(page.documentElement.lang).toBe('en') // the metadata language; the app switches it on load
   })
 
   it('has Open Graph and Twitter Card tags pointing at the 1200×630 image', () => {
@@ -26,7 +26,8 @@ describe('index.html', () => {
       ['og:image', SITE + '/og.png'],
       ['og:image:width', '1200'],
       ['og:image:height', '630'],
-      ['og:locale', 'es_ES'],
+      ['og:locale', 'en_GB'],
+      ['og:locale:alternate', 'es_ES'],
     ]) {
       expect(meta('property', key), key).toBe(want)
     }
@@ -37,8 +38,9 @@ describe('index.html', () => {
   })
 
   it('claims nothing it cannot back', () => {
-    // "certificado" only ever as the website's TLS certificate, never as a seal.
-    expect(indexHtml).not.toMatch(/certificad[oa]s?(?! TLS)|garantiz|certified|guarantee/i)
+    // "certificate" only ever as the website's TLS certificate, never as a seal or a promise.
+    expect(indexHtml).not.toMatch(/certified|certifies|guarantee|warrant|certificad|garantiz/i)
+    expect(indexHtml).not.toMatch(/(?<!TLS )certificate/i)
   })
 
   it('has valid JSON-LD for a WebApplication', () => {
@@ -49,7 +51,8 @@ describe('index.html', () => {
     expect(data['@type']).toBe('WebApplication')
     expect(data.name).toBe('QuantumReady')
     expect(data.url).toBe(SITE + '/')
-    expect(data.inLanguage).toEqual(['es', 'en'])
+    expect(data.inLanguage).toEqual(['en', 'es'])
+    expect(data.creator).toEqual({ '@type': 'Person', name: 'fizsar', url: 'https://fizsar.com/' })
   })
 
   it('keeps the CSP: the only inline script is the JSON-LD data block', () => {
