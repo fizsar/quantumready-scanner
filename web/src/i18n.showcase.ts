@@ -148,6 +148,15 @@ const es = {
   'arch.see.report': 'Un informe real con «Bajo el capó» abierto',
   'arch.see.reportText': ': lo que el escáner ofreció a fizsar.com y lo que respondió.',
 
+  'hna.title': 'Ese dominio todavía no se puede escanear',
+  'hna.why':
+    'QuantumReady está en beta cerrada. El escaneo de cualquier dominio llegará con medidas contra el abuso, para que nadie pueda usarlo para sondear webs ajenas. Por ahora solo se analizan los dominios de demostración.',
+  'hna.meanwhile': 'Mientras tanto, puedes ver un análisis real:',
+  'hna.scan': 'Escanear {host}',
+  'hna.examples': 'Ver ejemplos de informes',
+  'hna.architecture': 'Cómo funciona por dentro',
+  'hna.contact': '¿Quieres analizar tu dominio o tienes dudas? Escribe a',
+
   'links.label': 'Más sobre QuantumReady',
   'links.examples': 'Ejemplos',
   'links.architecture': 'Arquitectura',
@@ -337,6 +346,15 @@ const en: Record<ShowcaseKey, string> = {
   'arch.see.examplesText': ': fizsar.com and three lab servers.',
   'arch.see.report': 'A real report with “Under the hood” open',
   'arch.see.reportText': ': what the scanner offered fizsar.com and what it answered.',
+
+  'hna.title': 'That domain cannot be scanned yet',
+  'hna.why':
+    'QuantumReady is in a closed beta. Scanning any domain will come together with measures against abuse, so that nobody can use it to probe other people’s websites. For now, only the demo domains are scanned.',
+  'hna.meanwhile': 'Meanwhile, you can see a real analysis:',
+  'hna.scan': 'Scan {host}',
+  'hna.examples': 'See example reports',
+  'hna.architecture': 'How it works inside',
+  'hna.contact': 'Want to analyse your domain, or have questions? Write to',
 
   'links.label': 'More about QuantumReady',
   'links.examples': 'Examples',

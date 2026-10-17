@@ -177,8 +177,12 @@ func TestCreateScanRejects(t *testing.T) {
 	}
 
 	e := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"example.com"}`, reqOpts{lang: "en-US,en;q=0.9"}), 403, "host_not_allowed")
-	if !strings.HasPrefix(e.Message, "For now") {
+	if e.Message != "Scanning any domain will come with the beta. For now, only the demo domains can be scanned." {
 		t.Errorf("English message = %q", e.Message)
+	}
+	esMsg := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"example.com"}`, reqOpts{lang: "es"}), 403, "host_not_allowed")
+	if !strings.Contains(esMsg.Message, "llegará con la beta") {
+		t.Errorf("Spanish message = %q", esMsg.Message)
 	}
 	es := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"fizsar.com:8443"}`, reqOpts{lang: "es"}), 400, "port_not_allowed")
 	en := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"fizsar.com:8443"}`, reqOpts{lang: "en"}), 400, "port_not_allowed")
@@ -191,6 +195,32 @@ func TestCreateScanRejects(t *testing.T) {
 	wantError(t, a.do(t, "OPTIONS", "/api/scans", "", reqOpts{}), 405, "method_not_allowed")
 	wantError(t, a.do(t, "DELETE", "/api/scans/"+uuid.NewString(), "", reqOpts{}), 405, "method_not_allowed")
 	wantError(t, a.do(t, "GET", "/api/nope", "", reqOpts{}), 404, "not_found")
+}
+
+// TestHostNotAllowedRevealsNothing: the 403 body is only the code and a fixed
+// message. No allowlisted host, no setting name, no internal detail; the demo
+// domains are public through GET /api/targets, and only there.
+func TestHostNotAllowedRevealsNothing(t *testing.T) {
+	a := newScanAPI(t, nil, "fizsar.com,quantumready.fizsar.com,secret-demo.example.org")
+	for _, lang := range []string{"es", "en"} {
+		rec := a.do(t, "POST", "/api/scans", `{"host":"example.com"}`, reqOpts{lang: lang})
+		if rec.Code != 403 {
+			t.Fatalf("%s: %d", lang, rec.Code)
+		}
+		var body map[string]map[string]string
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if len(body) != 1 || len(body["error"]) != 2 || body["error"]["code"] != "host_not_allowed" {
+			t.Errorf("%s: body %s, want only error.code and error.message", lang, rec.Body)
+		}
+		raw := strings.ToLower(rec.Body.String())
+		for _, leak := range []string{"fizsar", "secret-demo", "example.com", "allowlist", "scan_", "trusted", "proxy", "rate", "limit", "config", ".go", "goroutine", "postgres"} {
+			if strings.Contains(raw, leak) {
+				t.Errorf("%s: 403 body mentions %q: %s", lang, leak, rec.Body)
+			}
+		}
+	}
 }
 
 func TestRateLimit(t *testing.T) {

@@ -151,7 +151,6 @@ describe('home page', () => {
   it.each([
     [400, 'port_not_allowed', 'Por ahora solo se escanea el puerto 443'],
     [400, 'invalid_host', 'Ese dominio no parece válido'],
-    [403, 'host_not_allowed', 'solo se pueden escanear los dominios de demostración'],
     [413, 'body_too_large', 'El texto es demasiado largo'],
   ])('%i %s: friendly message', async (status, code, text) => {
     stubFetch((url) => (url === '/api/targets' ? json({ hosts: ['fizsar.com'], port: 443 }) : json({ error: { code, message: 'x' } }, status)))
