@@ -40,14 +40,7 @@ func (f *fixtureStore) ListFindings(_ context.Context, id uuid.UUID) ([]store.Fi
 // they get a valid one: the fixture shows what the TLS setup alone earns.
 func labScan(t *testing.T, server, host string) (store.Scan, []store.Finding) {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "scoring", "testdata", "lab", server+".json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var r scanner.Result
-	if err := json.Unmarshal(b, &r); err != nil {
-		t.Fatal(err)
-	}
+	r := readResult(t, filepath.Join("..", "scoring", "testdata", "lab", server+".json"))
 	r.Host = host
 	r.Certificate = &scanner.Certificate{
 		Subject: host, SANs: []string{host}, Issuer: "YE1", IssuerOrg: []string{"Let's Encrypt"},
@@ -55,8 +48,32 @@ func labScan(t *testing.T, server, host string) (store.Scan, []store.Finding) {
 		ValidityDays: 90, DaysToExpiry: 46, KeyAlgorithm: "ECDSA", KeySize: 256, Curve: "P-256",
 		SignatureAlgorithm: "ECDSA-SHA384", Trusted: true, HostnameMatch: true, SCTsEmbedded: 2,
 	}
-	s := scoring.Evaluate(&r)
-	result, _ := json.Marshal(&r)
+	return storedScan(server, host, r)
+}
+
+// realScan is a scan of one of our own domains, kept as the scanner wrote it
+// (cmd/qrscan -json, the "scan" part), certificate included.
+func realScan(t *testing.T, host string) (store.Scan, []store.Finding) {
+	t.Helper()
+	return storedScan(host, host, readResult(t, filepath.Join("testdata", host+".json")))
+}
+
+func readResult(t *testing.T, path string) *scanner.Result {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r scanner.Result
+	if err := json.Unmarshal(b, &r); err != nil {
+		t.Fatal(err)
+	}
+	return &r
+}
+
+func storedScan(server, host string, r *scanner.Result) (store.Scan, []store.Finding) {
+	s := scoring.Evaluate(r)
+	result, _ := json.Marshal(r)
 	scoringJSON, _ := json.Marshal(s)
 	created := time.Date(2026, 10, 15, 9, 30, 0, 0, time.UTC)
 	finished := created.Add(9 * time.Second)
@@ -71,9 +88,9 @@ func labScan(t *testing.T, server, host string) (store.Scan, []store.Finding) {
 	return sc, fs
 }
 
-// TestLabFixtures checks the API view of two lab servers and, with
-// QR_WRITE_WEB_FIXTURES=1, writes it for the web tests and screenshots
-// (web/src/test/lab/<server>.<lang>.json).
+// TestLabFixtures checks the API view of two lab servers and of a real scan of
+// fizsar.com and, with QR_WRITE_WEB_FIXTURES=1, writes it for the web tests
+// and screenshots (web/src/test/lab/<server>.<lang>.json).
 func TestLabFixtures(t *testing.T) {
 	st := &fixtureStore{scans: map[uuid.UUID]store.Scan{}, findings: map[uuid.UUID][]store.Finding{}}
 	servers := map[string]string{"export": "export.tlslab.test", "kyber": "kyber.tlslab.test"}
@@ -82,7 +99,9 @@ func TestLabFixtures(t *testing.T) {
 		sc, fs := labScan(t, server, host)
 		st.scans[sc.ID], st.findings[sc.ID], ids[server] = sc, fs, sc.ID
 	}
-	allow, err := ParseAllowlist("export.tlslab.test kyber.tlslab.test")
+	sc, fs := realScan(t, "fizsar.com")
+	st.scans[sc.ID], st.findings[sc.ID], ids["fizsar"] = sc, fs, sc.ID
+	allow, err := ParseAllowlist("export.tlslab.test kyber.tlslab.test fizsar.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +121,8 @@ func TestLabFixtures(t *testing.T) {
 			for _, f := range v.Report.Findings {
 				got = append(got, f.Code)
 			}
-			want := map[string][]string{"export": {"SUITE_NULL", "SUITE_EXPORT", "DH_WEAK"}, "kyber": {"KEX_EXPERIMENTAL_PQC_ONLY"}}[server]
+			want := map[string][]string{"export": {"SUITE_NULL", "SUITE_EXPORT", "DH_WEAK"}, "kyber": {"KEX_EXPERIMENTAL_PQC_ONLY"},
+				"fizsar": {"KEX_HYBRID_PREFERRED", "CERT_VALID"}}[server]
 			for _, c := range want {
 				if !slices.Contains(got, c) {
 					t.Errorf("%s/%s: %s missing from %v", server, lang, c, got)

@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import type { Finding, Report as ReportData, ScanView } from '../api'
 import { useLang } from '../i18n'
 import { headline } from '../verdict'
+import { UnderTheHood } from './UnderTheHood'
 
 export function Report({ scan, report }: { scan: ScanView; report: ReportData }) {
   const { lang, t } = useLang()
@@ -91,6 +92,8 @@ export function Report({ scan, report }: { scan: ScanView; report: ReportData })
           ))}
         </ul>
       </section>
+
+      <UnderTheHood scan={scan} />
 
       <footer className="report-footer">
         <span>{t('footer.scanned', { date })}</span>
