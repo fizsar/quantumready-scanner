@@ -113,14 +113,15 @@ const es = {
     'El resto premia TLS 1.3 (los grupos híbridos solo existen ahí), el secreto hacia adelante, tener más de un grupo híbrido y un certificado válido con renovación automatizada, porque pasar a certificados post-cuánticos exigirá reemitirlos todos.',
   'arch.scoring.p3':
     'Lo que está roto hoy limita la letra aunque sume puntos: SSLv2, suites sin cifrado o EXPORT, o un certificado no válido dejan una F. Un TLS clásico bien configurado y sin nada roto nunca baja de D.',
-  'arch.scoring.p4': 'Es determinista, y cada regla cita su referencia: un RFC, un CVE o una recomendación del NIST.',
+  'arch.scoring.p4':
+    'Es determinista, y cada regla cita su fuente: un RFC, un CVE, un borrador del IETF, una publicación del NIST o una votación del CA/Browser Forum. Un test comprueba que ninguna se queda sin ella.',
   'arch.security.title': 'Seguridad del propio servicio',
   'arch.security.ssrf':
     'Anti-SSRF: el escáner resuelve el nombre y rechaza el dominio entero si alguna de sus direcciones es privada, reservada o local. Luego se conecta a la IP ya validada, nunca al nombre, para que una segunda respuesta DNS no pueda desviarlo, y la comprueba otra vez en el propio socket antes de conectar.',
   'arch.security.containers':
     'Contenedores endurecidos: ninguno corre como root, todos tienen el sistema de archivos de solo lectura, sin capacidades de Linux y con no-new-privileges. Solo Caddy da la cara a Internet; la base de datos está en una red interna, y el worker sale a Internet por una red propia desde la que no llega a Caddy ni a la API.',
   'arch.security.supply':
-    'Cadena de suministro: las acciones de GitHub están fijadas por SHA. Cada imagen pasa por Trivy antes de publicarse: la publicación se bloquea si hay vulnerabilidades críticas y las altas quedan a la vista en el informe. Las imágenes se publican en GHCR con una etiqueta inmutable por commit, y se despliega siempre por esa etiqueta.',
+    'Cadena de suministro: las acciones de GitHub están fijadas por SHA. Cada imagen pasa por Trivy antes de publicarse: cualquier vulnerabilidad alta o crítica que ya tenga corrección bloquea la publicación. Las excepciones quedan documentadas con su motivo y caducan; al caducar, vuelven a bloquear. Las imágenes se publican en GHCR con una etiqueta inmutable por commit, y se despliega siempre por esa etiqueta.',
   'arch.quality.title': 'Calidad',
   'arch.quality.lab':
     'Laboratorio TLS con 9 servidores deliberadamente vulnerables (SSLv2, SSLv3, EXPORT, DH débil, curvas antiguas, Kyber experimental…), solo en una red Docker interna sin salida a Internet: nunca se prueba contra terceros.',
@@ -255,14 +256,15 @@ const en: Record<ShowcaseKey, string> = {
     'The rest rewards TLS 1.3 (hybrid groups only exist there), forward secrecy, having more than one hybrid group, and a valid certificate with automated renewal, because moving to post-quantum certificates will mean reissuing all of them.',
   'arch.scoring.p3':
     'What is broken today caps the grade whatever the points: SSLv2, suites without encryption or EXPORT suites, or an invalid certificate mean an F. A well-configured classical TLS setup with nothing broken never goes below D.',
-  'arch.scoring.p4': 'It is deterministic, and every rule cites its reference: an RFC, a CVE or a NIST recommendation.',
+  'arch.scoring.p4':
+    'It is deterministic, and every rule cites its source: an RFC, a CVE, an IETF draft, a NIST publication or a CA/Browser Forum ballot. A test checks none is missing one.',
   'arch.security.title': 'Security of the service itself',
   'arch.security.ssrf':
     'Anti-SSRF: the scanner resolves the name and refuses the whole domain if any of its addresses is private, reserved or local. It then connects to the validated IP, never to the name, so a second DNS answer cannot divert it, and checks the address again on the socket itself before connecting.',
   'arch.security.containers':
     'Hardened containers: none runs as root, all have a read-only file system, no Linux capabilities and no-new-privileges. Only Caddy faces the Internet; the database sits on an internal network, and the worker reaches the Internet through its own network, from which it cannot reach Caddy or the API.',
   'arch.security.supply':
-    'Supply chain: GitHub Actions are pinned by SHA. Every image goes through Trivy before it is published: publishing is blocked on critical vulnerabilities and high ones are shown in the report. Images are published to GHCR with an immutable tag per commit, and deployments always use that tag.',
+    'Supply chain: GitHub Actions are pinned by SHA. Every image goes through Trivy before it is published: any high or critical vulnerability that already has a fix blocks the release. Exceptions are documented with their reason and expire; once expired, they block again. Images are published to GHCR with an immutable tag per commit, and deployments always use that tag.',
   'arch.quality.title': 'Quality',
   'arch.quality.lab':
     'A TLS lab with 9 deliberately vulnerable servers (SSLv2, SSLv3, EXPORT, weak DH, old curves, experimental Kyber…), only on an internal Docker network with no way out to the Internet: third parties are never probed.',

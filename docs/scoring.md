@@ -108,6 +108,47 @@ Pruebas: `internal/scoring/lab_test.go` puntúa el resultado real de los 9 servi
 
 Cada hallazgo tiene `code` estable, `axis` (`quantum`/`current`), `severity` (`critical`, `high`, `medium`, `low`, `info`, `pass`), `category` y `params`. En base de datos solo se guardan código y parámetros; los textos ES/EN (título, explicación, remediación) viven en `internal/scoring/catalog.go`, así que se pueden corregir sin migrar datos. Un test comprueba que todos los códigos tienen texto en ambos idiomas y que ningún marcador queda sin rellenar.
 
+### Referencias por hallazgo
+
+La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/scoring/references_test.go`) comprueba que cada código del catálogo tiene aquí una fila con al menos un RFC, CVE, borrador del IETF, publicación del NIST/FIPS o votación del CA/Browser Forum, y que no sobra ninguna fila. Quedan fuera tres códigos que no juzgan al servidor, sino que dicen que el escaneo no pudo comprobar algo (no puntúan, ver «Lo que no puntúa»): `SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN` y `CERT_MISSING`.
+
+| Código | Referencia |
+|---|---|
+| `KEX_HYBRID_PREFERRED`, `KEX_HYBRID_NOT_PREFERRED`, `KEX_SINGLE_HYBRID`, `KEX_MULTIPLE_HYBRIDS` | draft-ietf-tls-ecdhe-mlkem (X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024); FIPS 203 (ML-KEM) |
+| `KEX_NO_HYBRID` | draft-ietf-tls-ecdhe-mlkem; FIPS 203 |
+| `KEX_PURE_MLKEM`, `KEX_MULTIPLE_PQC` | FIPS 203; draft-ietf-tls-mlkem |
+| `KEX_EXPERIMENTAL_PQC_ONLY`, `KEX_EXPERIMENTAL_PQC_EXTRA` | draft-tls-westerbaan-xyber768d00 (borrador previo, sustituido por draft-ietf-tls-ecdhe-mlkem) |
+| `TLS13_SUPPORTED`, `TLS13_MISSING` | RFC 8446; draft-ietf-tls-ecdhe-mlkem (los grupos híbridos solo existen en TLS 1.3) |
+| `TLS13_SUITES_AEAD` | RFC 8446, sección 9.1 y apéndice B.4 |
+| `SUITE_INTEGRITY_ONLY` | RFC 9150 |
+| `SUITE_CCM8` | RFC 6655; RFC 8446 |
+| `SUITE_MODERN_AEAD` | NIST SP 800-232 (Ascon) |
+| `SUITE_NULL` | RFC 5246, apéndice C |
+| `SUITE_EXPORT` | CVE-2015-0204 (FREAK); CVE-2015-4000 (Logjam) |
+| `SUITE_ANON` | RFC 5246, apéndice F.1.1.1 |
+| `SUITE_DES` | RFC 5469; FIPS 46-3 (retirado) |
+| `SUITE_RC4` | RFC 7465 |
+| `SUITE_3DES` | CVE-2016-2183 (Sweet32) |
+| `SUITE_CBC` | CVE-2013-0169 (Lucky Thirteen); RFC 7457 |
+| `SYM_AES128` | NIST SP 800-57 Part 1 Rev. 5 (AES-128 da 128 bits de seguridad) |
+| `PROTO_SSL2` | RFC 6176; CVE-2016-0800 (DROWN) |
+| `PROTO_SSL3` | RFC 7568; CVE-2014-3566 (POODLE) |
+| `PROTO_LEGACY_TLS` | RFC 8996 |
+| `FS_ALL`, `FS_PARTIAL`, `FS_NONE` | RFC 9325 (BCP 195) |
+| `DH_WEAK` | CVE-2015-4000 (Logjam) |
+| `DH_SMALL`, `DH_OK` | NIST SP 800-131A Rev. 2; RFC 7919 |
+| `GROUP_WEAK_CURVES` | RFC 8422; RFC 9847 |
+| `GROUPS_EXTRA` | RFC 7919 (ffdhe); RFC 8734 (brainpool en TLS 1.3); RFC 7748 (x448) |
+| `CERT_VALID`, `CERT_UNTRUSTED`, `CERT_SELF_SIGNED` | RFC 5280, sección 6 (validación de la cadena) |
+| `CERT_EXPIRED`, `CERT_NOT_YET_VALID`, `CERT_EXPIRES_SOON` | RFC 5280, sección 4.1.2.5 (validez) |
+| `CERT_HOSTNAME_MISMATCH` | RFC 9525 |
+| `CERT_WEAK_KEY` | NIST SP 800-131A Rev. 2 |
+| `CERT_WEAK_SIGNATURE` | RFC 9155; NIST SP 800-131A Rev. 2 |
+| `CERT_CLASSICAL_SIGNATURE` | FIPS 204 (ML-DSA); FIPS 205 (SLH-DSA) |
+| `CERT_CT`, `CERT_CT_MISSING` | RFC 6962 |
+| `CERT_AUTOMATED_ACME`, `CERT_NOT_AUTOMATED` | RFC 8555 (ACME) |
+| `CERT_AUTOMATED_SHORT` | CA/Browser Forum, votación SC-081 (validez máxima de 47 días en 2029) |
+
 ## Versionado del modelo
 
 Cada resultado lleva `scoring_version`. **Cambiar pesos, umbrales, topes o las reglas que emiten hallazgos obliga a subir `scoring.Version`** (formato `AAAA.N`: `2026.1`, `2026.2`…), para que una nota guardada se interprete siempre con el modelo con que se calculó. Corregir la redacción de un texto no cambia la versión. La columna para guardarla llega con la tabla `scans` (hito 2.3).
@@ -134,7 +175,7 @@ Model version **2026.1**. `internal/scoring` turns a scan into a **post-quantum 
 
 **Never scored**: what crypto/tls cannot evaluate (shown separately, tested), probe errors (`SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN`), and informational findings (classical signature, AES-128/Grover, Certificate Transparency with embedded vs handshake SCTs).
 
-**Findings** store only `code` and `params`; ES/EN texts live in `catalog.go` and are tested for completeness.
+**Findings** store only `code` and `params`; ES/EN texts live in `catalog.go` and are tested for completeness. **References**: the source of every finding (RFC, CVE, IETF draft, NIST/FIPS or CA/Browser Forum ballot) is in the "Referencias por hallazgo" table above; `TestEveryFindingHasAReference` checks every catalog code has one, except the three that only say a check could not be made (`SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN`, `CERT_MISSING`).
 
 **Versioning**: every result carries `scoring_version`. Changing weights, thresholds, caps or finding rules **requires bumping `scoring.Version`** (`YYYY.N`); rewording a text does not. The column to store it arrives with the `scans` table (milestone 2.3).
 
