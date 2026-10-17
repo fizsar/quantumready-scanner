@@ -69,22 +69,17 @@ describe('Under the hood panel', () => {
   })
 
   it('opens on load when the link points at it', async () => {
-    window.history.replaceState(null, '', '/scans/x#under-the-hood')
-    try {
-      stubFetch(() => json(scans.fizsar.en))
-      render(
-        <MemoryRouter initialEntries={['/scans/x']}>
-          <LangProvider initial="en">
-            <App />
-          </LangProvider>
-        </MemoryRouter>,
-      )
-      const toggle = await screen.findByRole('button', { name: 'Under the hood' })
-      expect(toggle.getAttribute('aria-expanded')).toBe('true')
-      expect(toggle.closest('section')?.id).toBe('under-the-hood')
-    } finally {
-      window.history.replaceState(null, '', '/')
-    }
+    stubFetch(() => json(scans.fizsar.en))
+    render(
+      <MemoryRouter initialEntries={['/scans/x#under-the-hood']}>
+        <LangProvider initial="en">
+          <App />
+        </LangProvider>
+      </MemoryRouter>,
+    )
+    const toggle = await screen.findByRole('button', { name: 'Under the hood' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(toggle.closest('section')?.id).toBe('under-the-hood')
   })
 
   for (const name of ['fizsar', 'export', 'kyber'] as const) {

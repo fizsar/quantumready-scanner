@@ -6,6 +6,7 @@ import App from './App'
 import { showcaseDict } from './i18n.showcase'
 import { LangProvider } from './LangProvider'
 import { stubFetch, json } from './test/fixtures'
+import { forbiddenProse, strip } from './test/forbidden'
 
 function renderAt(path: string, lang: Lang) {
   stubFetch(() => json({ hosts: ['fizsar.com'], port: 443 }))
@@ -24,21 +25,7 @@ const sections = {
   en: ['The path of a scan', 'Scanning engine', 'Scoring model (2026.2)', 'Security of the service itself', 'Quality', 'Operations', /In development/, 'Code'],
 }
 
-// What the page must never say: exact software versions, concrete limits,
-// proxy settings, bucket names, the server's location or address.
-const forbidden: RegExp[] = [
-  /\b(Go|Golang|PostgreSQL|Postgres|Caddy|nginx|React|Node|Vite|Trivy|Alpine|Debian|distroless|restic|testssl\.sh)\s*v?\d/i,
-  /\bv?\d+\.\d+\.\d+\b/, // any x.y.z
-  /TRUSTED_PROXIES|X-Forwarded-For|trusted prox|proxies de confianza/i,
-  /fizsar-qr|backblaze|\bb2\b|bucket|eu-central|s3\./i,
-  /\bOVH\b|canad|beauharnois|149\.56|\bVPS\b/i,
-  /\d+\s*(\/|por |per )\s*(min|minuto|minute|día|day|hora|hour)/i,
-  /\b\d+\s*(s|ms|seg|segundos|seconds)\b/i, // timeouts
-  /\b(48|60)\b/, // raw probe budget, scan timeout
-  /RATE_LIMIT|SCAN_ALLOWLIST|SCAN_INTENSITY|QR_[A-Z]/,
-]
-// Allowed numbers with dots: protocol versions and the scoring model.
-const strip = (s: string) => s.replace(/\b(TLS|SSL) ?v?\d(\.\d)?/g, '').replace(/2026\.2/g, '')
+const forbidden = forbiddenProse
 
 describe('/architecture', () => {
   for (const lang of ['es', 'en'] as const) {
@@ -114,10 +101,14 @@ describe('/architecture', () => {
     expect(hrefs).toContain('/architecture') // footer link
     const internal = [...new Set(hrefs.filter((h) => h.startsWith('/')))]
     for (const h of hrefs.filter((h) => !h.startsWith('/') && !h.startsWith('#'))) expect(h, h).toMatch(/^(https:\/\/fizsar\.com\/?|mailto:soporte@fizsar\.com)$/)
+    expect(internal).toEqual(expect.arrayContaining(['/examples', '/examples#fizsar-under-the-hood']))
     for (const h of internal) {
       cleanup()
       renderAt(h, 'es')
-      expect(screen.queryByRole('heading', { name: 'Esta página no existe' }), h).toBeNull()
+      const h1 = await screen.findByRole('heading', { level: 1 }) // pages may load lazily
+      expect(h1.textContent, h).not.toBe('Esta página no existe')
+      const id = h.split('#')[1]
+      if (id) expect(document.getElementById(id), h).not.toBeNull()
     }
   })
 
@@ -125,5 +116,6 @@ describe('/architecture', () => {
     renderAt('/', 'en')
     const footer = await screen.findByRole('contentinfo')
     expect(within(footer).getByRole('link', { name: 'Architecture' }).getAttribute('href')).toBe('/architecture')
+    expect(within(footer).getByRole('link', { name: 'Examples' }).getAttribute('href')).toBe('/examples')
   })
 })

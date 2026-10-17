@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError, createScan, getTargets } from '../api'
+import { ShowcaseHomeLinks } from '../components/ShowcaseLinks'
 import { useLang } from '../i18n'
 import { usePageMeta } from '../usePageMeta'
 import { errorMessage } from '../verdict'
@@ -105,6 +106,7 @@ export function Home() {
           </p>
         </form>
       </section>
+      <ShowcaseHomeLinks />
     </div>
   )
 }

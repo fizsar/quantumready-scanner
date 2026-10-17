@@ -1,4 +1,6 @@
 import { useId } from 'react'
+import { Link } from 'react-router'
+import { uthAnchor } from '../exampleAnchors'
 import { useShowcaseT, type ShowcaseKey } from '../i18n.showcase'
 import { usePageMeta } from '../usePageMeta'
 import './Architecture.css'
@@ -74,6 +76,19 @@ export function Architecture() {
       >
         <p className="muted">{t('arch.dev.lead')}</p>
         {list(['arch.dev.accounts', 'arch.dev.domains', 'arch.dev.public', 'arch.dev.idor'])}
+      </Section>
+
+      <Section id="arch-see" title={t('arch.see.title')}>
+        <ul className="arch-list">
+          <li>
+            <Link to="/examples">{t('arch.see.examples')}</Link>
+            {t('arch.see.examplesText')}
+          </li>
+          <li>
+            <Link to={`/examples#${uthAnchor('fizsar')}`}>{t('arch.see.report')}</Link>
+            {t('arch.see.reportText')}
+          </li>
+        </ul>
       </Section>
 
       <Section id="arch-contact" title={t('arch.contact.title')}>

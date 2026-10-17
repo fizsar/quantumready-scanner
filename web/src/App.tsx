@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Link, Route, Routes } from 'react-router'
 import type { Lang } from './api'
 import { useLang } from './i18n'
@@ -5,6 +6,9 @@ import { useShowcaseT } from './i18n.showcase'
 import { Architecture } from './pages/Architecture'
 import { Home } from './pages/Home'
 import './showcase.css'
+
+// The example reports (fixtures) load only on /examples.
+const Examples = lazy(() => import('./pages/Examples'))
 import { ScanPage } from './pages/ScanPage'
 import { usePageMeta } from './usePageMeta'
 
@@ -34,6 +38,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/scans/:id" element={<ScanPage />} />
           <Route path="/architecture" element={<Architecture />} />
+          <Route path="/examples" element={<Suspense><Examples /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
@@ -48,7 +53,12 @@ export default function App() {
 
 function ShowcaseFooterLinks() {
   const { t } = useShowcaseT()
-  return <Link to="/architecture">{t('footer.architecture')}</Link>
+  return (
+    <>
+      <Link to="/examples">{t('links.examples')}</Link>
+      <Link to="/architecture">{t('footer.architecture')}</Link>
+    </>
+  )
 }
 
 function LangSwitch() {

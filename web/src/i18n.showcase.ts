@@ -142,6 +142,49 @@ const es = {
   'arch.dev.idor': 'Pruebas de acceso entre organizaciones, validadas con pruebas de mutación.',
   'arch.contact.title': 'Código',
   'arch.contact.text': 'Código disponible para revisión técnica bajo petición:',
+  'arch.see.title': 'Verlo en marcha',
+  'arch.see.examples': 'Ejemplos de informes',
+  'arch.see.examplesText': ': fizsar.com y dos servidores del laboratorio.',
+  'arch.see.report': 'Un informe real con «Bajo el capó» abierto',
+  'arch.see.reportText': ': lo que el escáner ofreció a fizsar.com y lo que respondió.',
+
+  'links.label': 'Más sobre QuantumReady',
+  'links.examples': 'Ejemplos',
+  'links.architecture': 'Arquitectura',
+
+  'examples.meta.title': 'Ejemplos · QuantumReady',
+  'examples.meta.description':
+    'Informes reales de QuantumReady: fizsar.com, con intercambio de claves post-cuántico, y dos servidores de laboratorio aislados con configuraciones antiguas o rotas.',
+  'examples.title': 'Ejemplos',
+  'examples.lead':
+    'Informes reales, con el mismo formato que verás al escanear tu web: uno de fizsar.com y dos de servidores de laboratorio configurados mal a propósito.',
+  'examples.labNote':
+    'Los servidores de laboratorio viven en una red Docker interna, sin salida a Internet. Allí no hay certificados reales, así que su informe lleva uno válido simulado: la nota juzga solo la configuración de TLS.',
+  'examples.nav': 'Ejemplos en esta página',
+  'examples.heading': '{host} · {grade} · {score}',
+  'examples.lab': 'Servidor de laboratorio aislado; no es un sitio real',
+  'examples.real': 'Escaneo real del {date}',
+  'examples.labDate': 'Escaneado en el laboratorio el {date}',
+  'examples.uthLink': 'Abrir «Bajo el capó» de este informe',
+  'examples.config': 'Cómo está configurado',
+  'examples.why': 'Por qué saca esta nota',
+  'examples.fix': 'Qué tendría que cambiar',
+  'examples.fizsar.config':
+    'TLS 1.2 y 1.3. Ante la oferta de un navegador actual elige el intercambio híbrido X25519MLKEM768. Certificado ECDSA de Let’s Encrypt que se renueva solo.',
+  'examples.fizsar.why':
+    'El tráfico ya va protegido frente a «cosechar ahora, descifrar después», y el resto está bien hecho. Pierde 5 puntos porque acepta un solo grupo híbrido.',
+  'examples.fizsar.fix':
+    'Para llegar a 100, aceptar también SecP256r1MLKEM768. El servidor web que usa todavía no permite activarlo.',
+  'examples.kyber.config':
+    'Solo TLS 1.3, con X25519Kyber768Draft00 (un borrador de intercambio post-cuántico anterior al estándar ML-KEM) y x25519 clásico.',
+  'examples.kyber.why':
+    'Los navegadores ya no ofrecen ese borrador, así que la conexión acaba en x25519: no hay protección post-cuántica real y el intercambio de claves, la mitad de la nota, se queda en 0. Lo demás está bien: TLS 1.3, secreto hacia adelante y certificado.',
+  'examples.kyber.fix': 'Actualizar el software TLS a uno con ML-KEM estándar y activar X25519MLKEM768.',
+  'examples.export.config':
+    'TLS 1.0 a 1.2 con suites EXPORT de 40 bits, DES simple, suites sin cifrado y anónimas, y un grupo Diffie-Hellman de 512 bits. Sin TLS 1.3.',
+  'examples.export.why':
+    'Cualquiera puede degradar esas conexiones o leerlas, así que la letra se queda en F. Solo puntúa el certificado: sin TLS 1.3 no hay intercambio post-cuántico posible.',
+  'examples.export.fix': 'Retirar todas esas suites, dejar TLS 1.2 y 1.3 con suites AEAD y activar X25519MLKEM768.',
 }
 
 export type ShowcaseKey = keyof typeof es
@@ -284,6 +327,48 @@ const en: Record<ShowcaseKey, string> = {
   'arch.dev.idor': 'Cross-organization access tests, validated with mutation testing.',
   'arch.contact.title': 'Code',
   'arch.contact.text': 'Code available for technical review on request:',
+  'arch.see.title': 'See it working',
+  'arch.see.examples': 'Example reports',
+  'arch.see.examplesText': ': fizsar.com and two lab servers.',
+  'arch.see.report': 'A real report with “Under the hood” open',
+  'arch.see.reportText': ': what the scanner offered fizsar.com and what it answered.',
+
+  'links.label': 'More about QuantumReady',
+  'links.examples': 'Examples',
+  'links.architecture': 'Architecture',
+
+  'examples.meta.title': 'Examples · QuantumReady',
+  'examples.meta.description':
+    'Real QuantumReady reports: fizsar.com, with post-quantum key exchange, and two isolated lab servers with outdated or broken setups.',
+  'examples.title': 'Examples',
+  'examples.lead':
+    'Real reports, in the same format you get when you scan your website: one of fizsar.com and two of lab servers misconfigured on purpose.',
+  'examples.labNote':
+    'The lab servers live on an internal Docker network with no way out to the Internet. There are no real certificates there, so their report carries a simulated valid one: the grade judges the TLS setup only.',
+  'examples.nav': 'Examples on this page',
+  'examples.heading': '{host} · {grade} · {score}',
+  'examples.lab': 'Isolated lab server; not a real website',
+  'examples.real': 'Real scan of {date}',
+  'examples.labDate': 'Scanned in the lab on {date}',
+  'examples.uthLink': 'Open this report’s “Under the hood”',
+  'examples.config': 'How it is set up',
+  'examples.why': 'Why it gets this grade',
+  'examples.fix': 'What it would need to change',
+  'examples.fizsar.config':
+    'TLS 1.2 and 1.3. Given a current browser’s offer it chooses the hybrid X25519MLKEM768 key exchange. ECDSA certificate from Let’s Encrypt, renewed automatically.',
+  'examples.fizsar.why':
+    'Its traffic is already protected against “harvest now, decrypt later”, and the rest is done right. It loses 5 points for accepting a single hybrid group.',
+  'examples.fizsar.fix': 'To reach 100, also accept SecP256r1MLKEM768. The web server it uses cannot enable it yet.',
+  'examples.kyber.config':
+    'TLS 1.3 only, with X25519Kyber768Draft00 (a post-quantum key exchange draft that predates the ML-KEM standard) and classical x25519.',
+  'examples.kyber.why':
+    'Browsers no longer offer that draft, so connections end up on x25519: there is no real post-quantum protection and the key exchange, half of the score, stays at 0. The rest is fine: TLS 1.3, forward secrecy and the certificate.',
+  'examples.kyber.fix': 'Update the TLS software to one with standard ML-KEM and enable X25519MLKEM768.',
+  'examples.export.config':
+    'TLS 1.0 to 1.2 with 40-bit EXPORT suites, single DES, suites without encryption and anonymous ones, and a 512-bit Diffie-Hellman group. No TLS 1.3.',
+  'examples.export.why':
+    'Anyone can downgrade those connections or read them, so the grade stays at F. Only the certificate scores: without TLS 1.3 no post-quantum key exchange is possible.',
+  'examples.export.fix': 'Remove all those suites, keep TLS 1.2 and 1.3 with AEAD suites and enable X25519MLKEM768.',
 }
 
 export const showcaseDict: Record<Lang, Record<ShowcaseKey, string>> = { es, en }

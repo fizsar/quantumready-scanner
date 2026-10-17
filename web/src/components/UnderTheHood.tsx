@@ -1,4 +1,5 @@
-import { useId, useState } from 'react'
+import { createContext, useContext, useEffect, useId, useState } from 'react'
+import { useLocation } from 'react-router'
 import type { ScanView } from '../api'
 import { useShowcaseT, type ShowcaseKey } from '../i18n.showcase'
 import { downloadJSON, hex, parseError, probeRows, resultOf, suitesByVersion, versionsTried, type Offer, type Reply, type ScanResult } from '../underTheHood'
@@ -6,25 +7,42 @@ import './UnderTheHood.css'
 
 type T = (key: ShowcaseKey, vars?: Record<string, string | number>) => string
 
-/** Anchor of the panel: a link to …/scans/<id>#under-the-hood opens it. */
-const ANCHOR = 'under-the-hood'
+// Heading levels inside the panel, one and two below its title.
+const Levels = createContext({ Sub: 'h3' as 'h3' | 'h4', Sub2: 'h4' as 'h4' | 'h5' })
 
-/** Collapsible panel with the scanner facts of a finished scan; closed by default. */
-export function UnderTheHood({ scan }: { scan: ScanView }) {
+/**
+ * Collapsible panel with the scanner facts of a finished scan; closed by
+ * default. A link to #<anchor> (…/scans/<id>#under-the-hood) opens it and
+ * scrolls to it. level 2 when the report is nested under a page heading.
+ */
+export function UnderTheHood({ scan, anchor = 'under-the-hood', level = 1 }: { scan: ScanView; anchor?: string; level?: 1 | 2 }) {
   const { lang, t } = useShowcaseT()
-  const [open, setOpen] = useState(() => window.location.hash === '#' + ANCHOR)
+  const { hash } = useLocation()
+  const linked = hash === '#' + anchor
+  const [open, setOpen] = useState(linked)
+  // A link to the anchor followed while the page is shown opens it too.
+  const [wasLinked, setWasLinked] = useState(linked)
+  if (linked !== wasLinked) {
+    setWasLinked(linked)
+    if (linked) setOpen(true)
+  }
   const id = useId()
+  useEffect(() => {
+    if (linked) document.getElementById(anchor)?.scrollIntoView?.()
+  }, [linked, anchor])
   const r = scan.report && resultOf(scan.report)
   if (!r) return null
   const num = new Intl.NumberFormat(lang === 'es' ? 'es-ES' : 'en-GB', { maximumFractionDigits: 1 })
+  const H = level === 1 ? 'h2' : 'h3'
 
   return (
-    <section id={ANCHOR} className="panel uth" aria-labelledby={`${id}-h`}>
-      <h2 id={`${id}-h`} className="h-section uth-heading">
+    <section id={anchor} className="panel uth" aria-labelledby={`${id}-h`}>
+      <H id={`${id}-h`} className="h-section uth-heading">
         <button type="button" className="uth-toggle" aria-expanded={open} aria-controls={`${id}-body`} onClick={() => setOpen(!open)}>
           {t('uth.title')}
         </button>
-      </h2>
+      </H>
+      <Levels.Provider value={level === 1 ? { Sub: 'h3', Sub2: 'h4' } : { Sub: 'h4', Sub2: 'h5' }}>
       <div id={`${id}-body`} className="uth-body" hidden={!open}>
         <p className="muted small">{t('uth.lead')}</p>
         <div className="uth-download">
@@ -44,14 +62,16 @@ export function UnderTheHood({ scan }: { scan: ScanView }) {
         <Suites r={r} t={t} />
         <Probes r={r} t={t} />
       </div>
+      </Levels.Provider>
     </section>
   )
 }
 
 function ScanFacts({ r, t, duration }: { r: ScanResult; t: T; duration: string }) {
+  const { Sub } = useContext(Levels)
   return (
     <section className="uth-section" aria-label={t('uth.scan.title')}>
-      <h3 className="uth-h">{t('uth.scan.title')}</h3>
+      <Sub className="uth-h">{t('uth.scan.title')}</Sub>
       <dl className="uth-facts">
         <dt>{t('uth.scan.duration')}</dt>
         <dd>{duration}</dd>
@@ -83,11 +103,12 @@ function ScanFacts({ r, t, duration }: { r: ScanResult; t: T; duration: string }
 }
 
 function Versions({ r, t }: { r: ScanResult; t: T }) {
+  const { Sub } = useContext(Levels)
   const tried = versionsTried(r)
   const accepted = tried.filter((v) => v.accepted).map((v) => v.version)
   return (
     <section className="uth-section" aria-label={t('uth.versions.title')}>
-      <h3 className="uth-h">{t('uth.versions.title')}</h3>
+      <Sub className="uth-h">{t('uth.versions.title')}</Sub>
       <p>{t('uth.versions.tried', { list: tried.map((v) => v.version).join(', ') })}</p>
       <p>{t('uth.versions.accepted', { list: accepted.join(', ') || t('uth.none') })}</p>
     </section>
@@ -95,11 +116,12 @@ function Versions({ r, t }: { r: ScanResult; t: T }) {
 }
 
 function Groups({ r, t }: { r: ScanResult; t: T }) {
+  const { Sub } = useContext(Levels)
   const kx = r.key_exchange
   const names = (l: { name: string }[] | null | undefined) => (l ?? []).map((g) => g.name).join(', ')
   return (
     <section className="uth-section" aria-label={t('uth.groups.title')}>
-      <h3 className="uth-h">{t('uth.groups.title')}</h3>
+      <Sub className="uth-h">{t('uth.groups.title')}</Sub>
       <p>{t('uth.groups.offered', { list: (kx.offered ?? []).join(', ') })}</p>
       <p>{kx.selected ? t('uth.groups.selected', { group: kx.selected }) : t('uth.groups.selectedNone')}</p>
       <div className="uth-scroll">
@@ -133,15 +155,16 @@ function Groups({ r, t }: { r: ScanResult; t: T }) {
 }
 
 function Suites({ r, t }: { r: ScanResult; t: T }) {
+  const { Sub, Sub2 } = useContext(Levels)
   const versions = suitesByVersion(r)
   return (
     <section className="uth-section" aria-label={t('uth.suites.title')}>
-      <h3 className="uth-h">{t('uth.suites.title')}</h3>
+      <Sub className="uth-h">{t('uth.suites.title')}</Sub>
       <p className="muted small">{t('uth.suites.lead')}</p>
       {versions.length === 0 && <p>{t('uth.suites.none')}</p>}
       {versions.map((v) => (
         <div key={v.version} className="uth-suites">
-          <h4 className="uth-h4">{v.version}</h4>
+          <Sub2 className="uth-h4">{v.version}</Sub2>
           <div className="uth-scroll">
             <table className="uth-table">
               <thead>
@@ -189,10 +212,11 @@ function Suites({ r, t }: { r: ScanResult; t: T }) {
 }
 
 function Probes({ r, t }: { r: ScanResult; t: T }) {
+  const { Sub } = useContext(Levels)
   const rows = probeRows(r)
   return (
     <section className="uth-section" aria-label={t('uth.probes.title')}>
-      <h3 className="uth-h">{t('uth.probes.title')}</h3>
+      <Sub className="uth-h">{t('uth.probes.title')}</Sub>
       <p className="muted small">{t('uth.probes.lead')}</p>
       <ol className="uth-probes">
         {rows.map((p, i) => (

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -75,8 +76,9 @@ func storedScan(server, host string, r *scanner.Result) (store.Scan, []store.Fin
 	s := scoring.Evaluate(r)
 	result, _ := json.Marshal(r)
 	scoringJSON, _ := json.Marshal(s)
-	created := time.Date(2026, 10, 15, 9, 30, 0, 0, time.UTC)
-	finished := created.Add(9 * time.Second)
+	// The real times of the scan: /examples shows the date.
+	created := r.StartedAt.UTC().Truncate(time.Second)
+	finished := created.Add(time.Duration(r.DurationMS) * time.Millisecond).Truncate(time.Second)
 	sc := store.Scan{ID: uuid.NewSHA1(uuid.NameSpaceURL, []byte(server)), Host: host, Port: 443, Status: "done",
 		CreatedAt: created, StartedAt: &created, FinishedAt: &finished, Result: result, Scoring: scoringJSON}
 	var fs []store.Finding
@@ -89,9 +91,16 @@ func storedScan(server, host string, r *scanner.Result) (store.Scan, []store.Fin
 }
 
 // TestLabFixtures checks the API view of two lab servers and of a real scan of
-// fizsar.com and, with QR_WRITE_WEB_FIXTURES=1, writes it for the web tests
-// and screenshots (web/src/test/lab/<server>.<lang>.json).
+// fizsar.com against web/src/test/lab/<server>.<lang>.json, which the web
+// tests and /examples use: the fixtures must be what the API returns today,
+// scored with the current model. A model change that moves a score fails here
+// (pinned below) and leaves the files to regenerate with QR_WRITE_WEB_FIXTURES=1.
 func TestLabFixtures(t *testing.T) {
+	// Grade and score shown on /examples; its texts explain these numbers.
+	pinned := map[string]struct {
+		grade string
+		score int
+	}{"fizsar": {"A", 95}, "kyber": {"D", 45}, "export": {"F", 20}}
 	st := &fixtureStore{scans: map[uuid.UUID]store.Scan{}, findings: map[uuid.UUID][]store.Finding{}}
 	servers := map[string]string{"export": "export.tlslab.test", "kyber": "kyber.tlslab.test"}
 	ids := map[string]uuid.UUID{}
@@ -138,16 +147,22 @@ func TestLabFixtures(t *testing.T) {
 			if v.Report.ScoringVersion != scoring.Version || v.Lang != lang {
 				t.Errorf("%s/%s: version %s, lang %s", server, lang, v.Report.ScoringVersion, v.Lang)
 			}
+			if p := pinned[server]; v.Report.Grade != p.grade || v.Report.Score != p.score {
+				t.Errorf("%s/%s: %s · %d with the current model, /examples explains %s · %d", server, lang,
+					v.Report.Grade, v.Report.Score, p.grade, p.score)
+			}
+			var pretty json.RawMessage = rec.Body.Bytes()
+			out, _ := json.MarshalIndent(pretty, "", "  ")
+			out = append(out, '\n')
+			path := filepath.Join("..", "..", "web", "src", "test", "lab", server+"."+lang+".json")
 			if os.Getenv("QR_WRITE_WEB_FIXTURES") == "1" {
-				dir := filepath.Join("..", "..", "web", "src", "test", "lab")
-				if err := os.MkdirAll(dir, 0o750); err != nil {
+				if err := os.WriteFile(path, out, 0o600); err != nil {
 					t.Fatal(err)
 				}
-				var pretty json.RawMessage = rec.Body.Bytes()
-				out, _ := json.MarshalIndent(pretty, "", "  ")
-				if err := os.WriteFile(filepath.Join(dir, server+"."+lang+".json"), append(out, '\n'), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				continue
+			}
+			if old, err := os.ReadFile(path); err != nil || !bytes.Equal(old, out) {
+				t.Errorf("%s differs from what the API returns now (%v): regenerate with QR_WRITE_WEB_FIXTURES=1", path, err)
 			}
 		}
 	}

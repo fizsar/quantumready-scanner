@@ -1,23 +1,34 @@
+import { useId } from 'react'
 import { Link } from 'react-router'
 import type { Finding, Report as ReportData, ScanView } from '../api'
 import { useLang } from '../i18n'
 import { headline } from '../verdict'
 import { UnderTheHood } from './UnderTheHood'
 
-export function Report({ scan, report }: { scan: ScanView; report: ReportData }) {
+type Level = 1 | 2
+
+/**
+ * A finished scan's report. level 2 nests it under a page heading (several
+ * reports on /examples); ids are unique per report. uthAnchor is the id of
+ * its "Under the hood" panel, which a link to #<uthAnchor> opens.
+ */
+export function Report({ scan, report, level = 1, uthAnchor }: { scan: ScanView; report: ReportData; level?: Level; uthAnchor?: string }) {
   const { lang, t } = useLang()
+  const uid = useId()
   const verdict = headline(report)
   const when = scan.finished_at ?? scan.created_at
   const date = new Intl.DateTimeFormat(lang === 'es' ? 'es-ES' : 'en-GB', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(when))
+  const H = level === 1 ? 'h1' : 'h2'
+  const H2 = level === 1 ? 'h2' : 'h3'
 
   return (
-    <article className="report" aria-labelledby="verdict">
+    <article className="report" aria-labelledby={`${uid}-verdict`}>
       <p className="prompt">
         <span className="user">guest@quantumready</span>:<span className="path">~</span>$ ./scan {scan.host}
       </p>
-      <h1 id="verdict" className={`verdict tone-${verdict.tone}`}>
+      <H id={`${uid}-verdict`} className={`verdict tone-${verdict.tone}`}>
         {t(verdict.key)}
-      </h1>
+      </H>
 
       <section className="summary" aria-label={t('grade.label')}>
         <div className={`grade grade-${report.grade}`}>
@@ -41,14 +52,14 @@ export function Report({ scan, report }: { scan: ScanView; report: ReportData })
       </section>
 
       <div className="axes">
-        <Axis axis="quantum" level={report.quantum_risk.label} findings={report.findings} />
-        <Axis axis="current" level={report.current_risk.label} findings={report.findings} />
+        <Axis uid={uid} h={level} axis="quantum" level={report.quantum_risk.label} findings={report.findings} />
+        <Axis uid={uid} h={level} axis="current" level={report.current_risk.label} findings={report.findings} />
       </div>
 
-      <section className="panel" aria-labelledby="breakdown">
-        <h2 id="breakdown" className="h-section">
+      <section className="panel" aria-labelledby={`${uid}-breakdown`}>
+        <H2 id={`${uid}-breakdown`} className="h-section">
           {t('breakdown.title')}
-        </h2>
+        </H2>
         <ul className="blocks">
           {report.blocks.map((b) => (
             <li key={b.id} className="block">
@@ -81,10 +92,10 @@ export function Report({ scan, report }: { scan: ScanView; report: ReportData })
         </ul>
       </section>
 
-      <section className="panel" aria-labelledby="noteval">
-        <h2 id="noteval" className="h-section">
+      <section className="panel" aria-labelledby={`${uid}-noteval`}>
+        <H2 id={`${uid}-noteval`} className="h-section">
           {t('noteval.title')}
-        </h2>
+        </H2>
         <p className="muted">{t('noteval.lead')}</p>
         <ul className="noteval">
           {report.not_evaluated.map((n) => (
@@ -93,7 +104,7 @@ export function Report({ scan, report }: { scan: ScanView; report: ReportData })
         </ul>
       </section>
 
-      <UnderTheHood scan={scan} />
+      <UnderTheHood scan={scan} anchor={uthAnchor} level={level} />
 
       <footer className="report-footer">
         <span>{t('footer.scanned', { date })}</span>
@@ -104,25 +115,27 @@ export function Report({ scan, report }: { scan: ScanView; report: ReportData })
   )
 }
 
-function Axis({ axis, level, findings }: { axis: 'quantum' | 'current'; level: string; findings: Finding[] }) {
+function Axis({ uid, h, axis, level, findings }: { uid: string; h: Level; axis: 'quantum' | 'current'; level: string; findings: Finding[] }) {
   const { t } = useLang()
   const mine = findings.filter((f) => f.axis === axis) // already sorted by severity
   // Risks (and informational notes) first; what is done right at the end, apart.
   const risks = mine.filter((f) => f.severity !== 'pass')
   const good = mine.filter((f) => f.severity === 'pass')
-  const id = `axis-${axis}`
+  const id = `${uid}-axis-${axis}`
+  const H2 = h === 1 ? 'h2' : 'h3'
+  const H3 = h === 1 ? 'h3' : 'h4'
   return (
     <section className="panel axis" aria-labelledby={id}>
-      <h2 id={id} className="h-section">
+      <H2 id={id} className="h-section">
         {t(`axis.${axis}.title`)} <span className="level">{t('axis.level', { level })}</span>
-      </h2>
+      </H2>
       <p className="muted small">{t(`axis.${axis}.help`)}</p>
       {risks.length > 0 ? <FindingList findings={risks} /> : <p className="no-risks">{t('axis.noRisks')}</p>}
       {good.length > 0 && (
         <div className="good" role="group" aria-labelledby={`${id}-good`}>
-          <h3 id={`${id}-good`} className="h-good">
+          <H3 id={`${id}-good`} className="h-good">
             {t('axis.good')}
-          </h3>
+          </H3>
           <FindingList findings={good} />
         </div>
       )}
