@@ -67,6 +67,80 @@ const es = {
   'uth.reply.closed': 'Cierre de la conexión',
   'uth.reply.timeout': 'Tiempo agotado',
   'uth.reply.refused': 'Rechazada, sin más detalle',
+
+  'footer.architecture': 'Arquitectura',
+  'arch.meta.title': 'Arquitectura · QuantumReady',
+  'arch.meta.description':
+    'Cómo funciona QuantumReady por dentro: el flujo de un escaneo, el motor TLS con ClientHello en crudo, el modelo de puntuación, la seguridad del servicio, las pruebas y la operación.',
+  'arch.title': 'Arquitectura',
+  'arch.lead': 'Cómo funciona QuantumReady por dentro, a alto nivel.',
+  'arch.flow.title': 'El flujo de un escaneo',
+  'arch.flow.svgTitle': 'Flujo de un escaneo en QuantumReady',
+  'arch.flow.svgDesc':
+    'El navegador se conecta a Caddy, que reparte entre la web (nginx) y la API (Go). La API guarda el escaneo en PostgreSQL, que hace de cola. Un worker lo reclama, ejecuta el escáner y guarda el resultado. El escáner solo se conecta al puerto 443 del servidor objetivo.',
+  'arch.flow.browser': 'Navegador',
+  'arch.flow.caddy': 'Caddy',
+  'arch.flow.caddySub': 'TLS y reparto',
+  'arch.flow.web': 'web',
+  'arch.flow.webSub': 'nginx, estáticos',
+  'arch.flow.api': 'API',
+  'arch.flow.apiSub': 'Go',
+  'arch.flow.db': 'PostgreSQL',
+  'arch.flow.dbSub': 'datos y cola',
+  'arch.flow.worker': 'worker',
+  'arch.flow.workerSub': 'Go, proceso aparte',
+  'arch.flow.scanner': 'escáner',
+  'arch.flow.scannerSub': 'crypto/tls + en crudo',
+  'arch.flow.target': 'servidor objetivo',
+  'arch.flow.targetSub': 'puerto 443',
+  'arch.flow.step1': 'El navegador solo habla con Caddy, que termina TLS y envía las rutas de la API a la API (Go) y el resto a la web (nginx).',
+  'arch.flow.step2': 'La API valida el dominio y guarda el escaneo en PostgreSQL, que hace también de cola: no hay un broker de mensajes aparte.',
+  'arch.flow.step3': 'Un worker, en otro proceso, reclama el escaneo con una concesión de tiempo limitado, ejecuta el escáner y guarda el resultado y su puntuación. Si muere a mitad, otro lo retoma.',
+  'arch.flow.step4': 'El escáner solo se conecta al puerto 443 del servidor objetivo.',
+  'arch.engine.title': 'Motor de escaneo',
+  'arch.engine.p1':
+    'La biblioteca estándar de Go (crypto/tls) hace los handshakes completos: uno con la oferta de un navegador actual, uno por versión de TLS y uno por grupo de intercambio de claves. Así se ve qué elige el servidor de verdad y si acepta los grupos híbridos post-cuánticos.',
+  'arch.engine.p2':
+    'Pero crypto/tls solo ofrece lo que considera seguro: no sabe pedir SSLv2 ni SSLv3, ni suites sin cifrado, EXPORT, anónimas o DES, ni la mayoría de los grupos. Para ver lo que acepta un servidor mal configurado, el escáner construye además ClientHello en crudo, byte a byte, con los registros de suites y grupos de IANA.',
+  'arch.engine.p3':
+    'Detecta las versiones de SSLv2 a TLS 1.3, las suites aceptadas en cada versión, los grupos clásicos y los híbridos post-cuánticos como X25519MLKEM768, el tamaño de los parámetros Diffie-Hellman y el certificado.',
+  'arch.engine.p4':
+    'Solo hace handshakes: no pide ninguna página, en las sondas en crudo no envía nada después del ClientHello (lee la primera respuesta y cierra) y no intenta explotar nada.',
+  'arch.scoring.title': 'Modelo de puntuación (2026.2)',
+  'arch.scoring.p1':
+    'Una nota de 0 a 100 y una letra de A a F. La mitad de los puntos depende de que el servidor elija un intercambio de claves híbrido con ML-KEM cuando se conecta un navegador actual: es lo que protege hoy el tráfico frente a «cosechar ahora, descifrar después».',
+  'arch.scoring.p2':
+    'El resto premia TLS 1.3 (los grupos híbridos solo existen ahí), el secreto hacia adelante, tener más de un grupo híbrido y un certificado válido con renovación automatizada, porque pasar a certificados post-cuánticos exigirá reemitirlos todos.',
+  'arch.scoring.p3':
+    'Lo que está roto hoy limita la letra aunque sume puntos: SSLv2, suites sin cifrado o EXPORT, o un certificado no válido dejan una F. Un TLS clásico bien configurado y sin nada roto nunca baja de D.',
+  'arch.scoring.p4': 'Es determinista, y cada regla cita su referencia: un RFC, un CVE o una recomendación del NIST.',
+  'arch.security.title': 'Seguridad del propio servicio',
+  'arch.security.ssrf':
+    'Anti-SSRF: el escáner resuelve el nombre y rechaza el dominio entero si alguna de sus direcciones es privada, reservada o local. Luego se conecta a la IP ya validada, nunca al nombre, para que una segunda respuesta DNS no pueda desviarlo, y la comprueba otra vez en el propio socket antes de conectar.',
+  'arch.security.containers':
+    'Contenedores endurecidos: ninguno corre como root, todos tienen el sistema de archivos de solo lectura, sin capacidades de Linux y con no-new-privileges. Solo Caddy da la cara a Internet; la base de datos está en una red interna, y el worker sale a Internet por una red propia desde la que no llega a Caddy ni a la API.',
+  'arch.security.supply':
+    'Cadena de suministro: las acciones de GitHub están fijadas por SHA. Cada imagen pasa por Trivy antes de publicarse: la publicación se bloquea si hay vulnerabilidades críticas y las altas quedan a la vista en el informe. Las imágenes se publican en GHCR con una etiqueta inmutable por commit, y se despliega siempre por esa etiqueta.',
+  'arch.quality.title': 'Calidad',
+  'arch.quality.lab':
+    'Laboratorio TLS con 9 servidores deliberadamente vulnerables (SSLv2, SSLv3, EXPORT, DH débil, curvas antiguas, Kyber experimental…), solo en una red Docker interna sin salida a Internet: nunca se prueba contra terceros.',
+  'arch.quality.testssl': 'Los resultados del escáner contra esos servidores se comparan con los de testssl.sh, una herramienta de referencia.',
+  'arch.quality.fuzz': 'El código que lee las respuestas de los servidores se prueba con fuzzing: toda respuesta es una entrada no fiable.',
+  'arch.ops.title': 'Operación',
+  'arch.ops.backup':
+    'Copia diaria de la base de datos, cifrada, en un almacenamiento externo al servidor. La clave con la que se sube no tiene permiso para borrar.',
+  'arch.ops.restore': 'Cada mes, un ensayo automático restaura la última copia en una base de datos desechable y compara las filas de cada tabla con las de la copia.',
+  'arch.ops.alerts': 'Si una copia o un ensayo falla o no llega a tiempo, salta una alerta.',
+  'arch.ops.deploy': 'Cada despliegue comprueba la salud de los servicios al terminar; volver atrás es desplegar la etiqueta anterior.',
+  'arch.dev.title': 'En desarrollo',
+  'arch.dev.badge': 'en desarrollo',
+  'arch.dev.lead': 'Esto existe en la rama principal, pero aún no está en producción:',
+  'arch.dev.accounts': 'Cuentas y organizaciones, aisladas entre sí con Row Level Security de PostgreSQL.',
+  'arch.dev.domains': 'Verificación de la propiedad de cada dominio con un registro DNS TXT.',
+  'arch.dev.public': 'Escaneo público de cualquier dominio, con prueba de trabajo contra abusos.',
+  'arch.dev.idor': 'Pruebas de acceso entre organizaciones, validadas con pruebas de mutación.',
+  'arch.contact.title': 'Código',
+  'arch.contact.text': 'Código disponible para revisión técnica bajo petición:',
 }
 
 export type ShowcaseKey = keyof typeof es
@@ -135,6 +209,79 @@ const en: Record<ShowcaseKey, string> = {
   'uth.reply.closed': 'Connection closed',
   'uth.reply.timeout': 'Timed out',
   'uth.reply.refused': 'Refused, no further detail',
+
+  'footer.architecture': 'Architecture',
+  'arch.meta.title': 'Architecture · QuantumReady',
+  'arch.meta.description':
+    'How QuantumReady works inside: the path of a scan, the TLS engine with raw ClientHello probes, the scoring model, the security of the service, testing and operations.',
+  'arch.title': 'Architecture',
+  'arch.lead': 'How QuantumReady works inside, at a high level.',
+  'arch.flow.title': 'The path of a scan',
+  'arch.flow.svgTitle': 'The path of a scan in QuantumReady',
+  'arch.flow.svgDesc':
+    'The browser connects to Caddy, which routes to the website (nginx) and the API (Go). The API stores the scan in PostgreSQL, which also serves as the queue. A worker claims it, runs the scanner and stores the result. The scanner only connects to port 443 of the target server.',
+  'arch.flow.browser': 'Browser',
+  'arch.flow.caddy': 'Caddy',
+  'arch.flow.caddySub': 'TLS and routing',
+  'arch.flow.web': 'web',
+  'arch.flow.webSub': 'nginx, static',
+  'arch.flow.api': 'API',
+  'arch.flow.apiSub': 'Go',
+  'arch.flow.db': 'PostgreSQL',
+  'arch.flow.dbSub': 'data and queue',
+  'arch.flow.worker': 'worker',
+  'arch.flow.workerSub': 'Go, own process',
+  'arch.flow.scanner': 'scanner',
+  'arch.flow.scannerSub': 'crypto/tls + raw',
+  'arch.flow.target': 'target server',
+  'arch.flow.targetSub': 'port 443',
+  'arch.flow.step1': 'The browser only talks to Caddy, which terminates TLS and sends API routes to the API (Go) and everything else to the website (nginx).',
+  'arch.flow.step2': 'The API validates the domain and stores the scan in PostgreSQL, which is also the queue: there is no separate message broker.',
+  'arch.flow.step3': 'A worker, in a separate process, claims the scan with a time-limited lease, runs the scanner and stores the result and its score. If it dies halfway, another one picks the scan up.',
+  'arch.flow.step4': 'The scanner only connects to port 443 of the target server.',
+  'arch.engine.title': 'Scanning engine',
+  'arch.engine.p1':
+    "Go's standard library (crypto/tls) performs full handshakes: one with a current browser's offer, one per TLS version and one per key exchange group. That shows what the server really chooses and whether it accepts the hybrid post-quantum groups.",
+  'arch.engine.p2':
+    "But crypto/tls only offers what it considers safe: it cannot ask for SSLv2 or SSLv3, for suites without encryption, EXPORT, anonymous or DES suites, or for most groups. To see what a misconfigured server accepts, the scanner also builds raw ClientHello messages, byte by byte, from IANA's suite and group registries.",
+  'arch.engine.p3':
+    'It detects the versions from SSLv2 to TLS 1.3, the suites accepted in each version, classical groups and hybrid post-quantum ones such as X25519MLKEM768, the size of the Diffie-Hellman parameters and the certificate.',
+  'arch.engine.p4':
+    'It only performs handshakes: it never requests a page, its raw probes send nothing after the ClientHello (they read the first answer and close), and it never tries to exploit anything.',
+  'arch.scoring.title': 'Scoring model (2026.2)',
+  'arch.scoring.p1':
+    "A score from 0 to 100 and a grade from A to F. Half of the points depend on the server choosing a hybrid key exchange with ML-KEM when a current browser connects: that is what protects today's traffic against “harvest now, decrypt later”.",
+  'arch.scoring.p2':
+    'The rest rewards TLS 1.3 (hybrid groups only exist there), forward secrecy, having more than one hybrid group, and a valid certificate with automated renewal, because moving to post-quantum certificates will mean reissuing all of them.',
+  'arch.scoring.p3':
+    'What is broken today caps the grade whatever the points: SSLv2, suites without encryption or EXPORT suites, or an invalid certificate mean an F. A well-configured classical TLS setup with nothing broken never goes below D.',
+  'arch.scoring.p4': 'It is deterministic, and every rule cites its reference: an RFC, a CVE or a NIST recommendation.',
+  'arch.security.title': 'Security of the service itself',
+  'arch.security.ssrf':
+    'Anti-SSRF: the scanner resolves the name and refuses the whole domain if any of its addresses is private, reserved or local. It then connects to the validated IP, never to the name, so a second DNS answer cannot divert it, and checks the address again on the socket itself before connecting.',
+  'arch.security.containers':
+    'Hardened containers: none runs as root, all have a read-only file system, no Linux capabilities and no-new-privileges. Only Caddy faces the Internet; the database sits on an internal network, and the worker reaches the Internet through its own network, from which it cannot reach Caddy or the API.',
+  'arch.security.supply':
+    'Supply chain: GitHub Actions are pinned by SHA. Every image goes through Trivy before it is published: publishing is blocked on critical vulnerabilities and high ones are shown in the report. Images are published to GHCR with an immutable tag per commit, and deployments always use that tag.',
+  'arch.quality.title': 'Quality',
+  'arch.quality.lab':
+    'A TLS lab with 9 deliberately vulnerable servers (SSLv2, SSLv3, EXPORT, weak DH, old curves, experimental Kyber…), only on an internal Docker network with no way out to the Internet: third parties are never probed.',
+  'arch.quality.testssl': "The scanner's results against those servers are compared with those of testssl.sh, a reference tool.",
+  'arch.quality.fuzz': "The code that reads servers' answers is fuzzed: every answer is untrusted input.",
+  'arch.ops.title': 'Operations',
+  'arch.ops.backup': 'A daily encrypted backup of the database, stored outside the server. The key that uploads it has no permission to delete.',
+  'arch.ops.restore': 'Every month, an automatic drill restores the latest backup into a throwaway database and compares each table’s rows with the backup.',
+  'arch.ops.alerts': 'If a backup or a drill fails or does not arrive on time, an alert goes off.',
+  'arch.ops.deploy': 'Every deployment checks the health of the services at the end; rolling back means deploying the previous tag.',
+  'arch.dev.title': 'In development',
+  'arch.dev.badge': 'in development',
+  'arch.dev.lead': 'This exists on the main branch but is not in production yet:',
+  'arch.dev.accounts': "Accounts and organizations, isolated from each other with PostgreSQL's Row Level Security.",
+  'arch.dev.domains': 'Verification of domain ownership with a DNS TXT record.',
+  'arch.dev.public': 'Public scanning of any domain, with a proof of work against abuse.',
+  'arch.dev.idor': 'Cross-organization access tests, validated with mutation testing.',
+  'arch.contact.title': 'Code',
+  'arch.contact.text': 'Code available for technical review on request:',
 }
 
 export const showcaseDict: Record<Lang, Record<ShowcaseKey, string>> = { es, en }

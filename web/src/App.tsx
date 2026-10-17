@@ -1,7 +1,10 @@
 import { Link, Route, Routes } from 'react-router'
 import type { Lang } from './api'
 import { useLang } from './i18n'
+import { useShowcaseT } from './i18n.showcase'
+import { Architecture } from './pages/Architecture'
 import { Home } from './pages/Home'
+import './showcase.css'
 import { ScanPage } from './pages/ScanPage'
 import { usePageMeta } from './usePageMeta'
 
@@ -30,15 +33,22 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/scans/:id" element={<ScanPage />} />
+          <Route path="/architecture" element={<Architecture />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 
       <footer className="footer">
         <a href="https://fizsar.com">← fizsar.com</a>
+        <ShowcaseFooterLinks />
       </footer>
     </div>
   )
+}
+
+function ShowcaseFooterLinks() {
+  const { t } = useShowcaseT()
+  return <Link to="/architecture">{t('footer.architecture')}</Link>
 }
 
 function LangSwitch() {

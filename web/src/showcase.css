@@ -1,0 +1,6 @@
+/* Shared showcase styles, apart from index.css for a clean merge into main. */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.5rem;
+}
