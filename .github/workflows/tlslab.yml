@@ -6,7 +6,7 @@ name: TLS lab
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, showcase]
     paths:
       - "internal/scanner/**"
       - "test/tlslab/**"

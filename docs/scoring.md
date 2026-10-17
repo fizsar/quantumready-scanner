@@ -96,7 +96,7 @@ Con intensidad `full` (`docs/scanner.md`), el escáner ve lo que `crypto/tls` no
 - Las notas guardadas no se recalculan: cada escaneo conserva su `scoring_version`. Los 6 escaneos de producción siguen en 2026.1; los nuevos llevarán 2026.2.
 - Nuestros dominios (Caddy, TLS de Go) no tienen nada de lo nuevo: siguen en **A · 95** con intensidad `full` y 2026.2 (comprobado con `qrscan`, `docs/validation.md`).
 
-Pruebas: `internal/scoring/lab_test.go` puntúa el resultado real de los 9 servidores del laboratorio (con un certificado válido, para juzgar solo la configuración TLS) y casos sintéticos para lo que ningún servidor del laboratorio tiene (solo integridad, AEGIS, Kyber junto a ML-KEM).
+Pruebas: `internal/scoring/lab_test.go` puntúa el resultado real de los 10 servidores del laboratorio (con un certificado válido, para juzgar solo la configuración TLS) y casos sintéticos para lo que ningún servidor del laboratorio tiene (solo integridad, AEGIS, Kyber junto a ML-KEM).
 
 ## Lo que no puntúa
 

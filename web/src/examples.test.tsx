@@ -24,12 +24,13 @@ function renderAt(path: string, lang: Lang) {
 // The grades the page explains. The Go test TestLabFixtures pins the same
 // numbers against the current scoring model and checks the fixtures are what
 // the API returns now, so a model change fails there and here.
-const shown = { fizsar: ['A', 95], kyber: ['D', 45], export: ['F', 20] } as const
+const shown = { fizsar: ['A', 95], modern: ['D', 45], kyber: ['D', 45], export: ['F', 20] } as const
 const labLabel = { es: 'Servidor de laboratorio aislado; no es un sitio real', en: 'Isolated lab server; not a real website' }
 
 describe('/examples', () => {
-  it('has the three examples, in this order', () => {
-    expect(EXAMPLES.map((e) => e.key)).toEqual(['fizsar', 'kyber', 'export'])
+  it('has the four examples, best grade first', () => {
+    expect(EXAMPLES.map((e) => e.key)).toEqual(['fizsar', 'modern', 'kyber', 'export'])
+    expect(EXAMPLES.map((e) => e.lab)).toEqual([false, true, true, true])
   })
 
   for (const lang of ['es', 'en'] as const) {
@@ -76,7 +77,7 @@ describe('/examples', () => {
     renderAt(`/examples#${uthAnchor('fizsar')}`, 'en')
     await screen.findByRole('heading', { level: 1, name: 'Examples' })
     const toggles = screen.getAllByRole('button', { name: 'Under the hood' })
-    expect(toggles.map((b) => b.getAttribute('aria-expanded'))).toEqual(['true', 'false', 'false'])
+    expect(toggles.map((b) => b.getAttribute('aria-expanded'))).toEqual(['true', 'false', 'false', 'false'])
     expect(toggles[0].closest('section')?.id).toBe('fizsar-under-the-hood')
   })
 
@@ -85,7 +86,7 @@ describe('/examples', () => {
     await screen.findByRole('heading', { level: 1, name: 'Ejemplos' })
     const hrefs = [...container.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')!)
     for (const h of hrefs.filter((h) => h.startsWith('#'))) expect(document.getElementById(h.slice(1)), h).not.toBeNull()
-    expect(hrefs).toEqual(expect.arrayContaining(['#fizsar', '#kyber', '#export', '#fizsar-under-the-hood']))
+    expect(hrefs).toEqual(expect.arrayContaining(['#fizsar', '#modern', '#kyber', '#export', '#fizsar-under-the-hood', '#modern-under-the-hood']))
     for (const h of hrefs.filter((h) => !h.startsWith('/') && !h.startsWith('#'))) expect(h, h).toMatch(/^(https:\/\/fizsar\.com\/?|mailto:soporte@fizsar\.com)$/)
     for (const h of [...new Set(hrefs.filter((h) => h.startsWith('/')))]) {
       cleanup()

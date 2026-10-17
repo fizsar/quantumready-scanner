@@ -124,7 +124,7 @@ const es = {
     'Cadena de suministro: las acciones de GitHub están fijadas por SHA. Cada imagen pasa por Trivy antes de publicarse: cualquier vulnerabilidad alta o crítica que ya tenga corrección bloquea la publicación. Las excepciones quedan documentadas con su motivo y caducan; al caducar, vuelven a bloquear. Las imágenes se publican en GHCR con una etiqueta inmutable por commit, y se despliega siempre por esa etiqueta.',
   'arch.quality.title': 'Calidad',
   'arch.quality.lab':
-    'Laboratorio TLS con 9 servidores deliberadamente vulnerables (SSLv2, SSLv3, EXPORT, DH débil, curvas antiguas, Kyber experimental…), solo en una red Docker interna sin salida a Internet: nunca se prueba contra terceros.',
+    'Laboratorio TLS con 10 servidores: 9 deliberadamente vulnerables (SSLv2, SSLv3, EXPORT, DH débil, curvas antiguas, Kyber experimental…) y uno bien configurado sin criptografía post-cuántica, solo en una red Docker interna sin salida a Internet: nunca se prueba contra terceros.',
   'arch.quality.testssl': 'Los resultados del escáner contra esos servidores se comparan con los de testssl.sh, una herramienta de referencia.',
   'arch.quality.fuzz': 'El código que lee las respuestas de los servidores se prueba con fuzzing: toda respuesta es una entrada no fiable.',
   'arch.ops.title': 'Operación',
@@ -144,7 +144,7 @@ const es = {
   'arch.contact.text': 'Código disponible para revisión técnica bajo petición:',
   'arch.see.title': 'Verlo en marcha',
   'arch.see.examples': 'Ejemplos de informes',
-  'arch.see.examplesText': ': fizsar.com y dos servidores del laboratorio.',
+  'arch.see.examplesText': ': fizsar.com y tres servidores del laboratorio.',
   'arch.see.report': 'Un informe real con «Bajo el capó» abierto',
   'arch.see.reportText': ': lo que el escáner ofreció a fizsar.com y lo que respondió.',
 
@@ -154,10 +154,10 @@ const es = {
 
   'examples.meta.title': 'Ejemplos · QuantumReady',
   'examples.meta.description':
-    'Informes reales de QuantumReady: fizsar.com, con intercambio de claves post-cuántico, y dos servidores de laboratorio aislados con configuraciones antiguas o rotas.',
+    'Informes reales de QuantumReady: fizsar.com, con intercambio de claves post-cuántico, y tres servidores de laboratorio aislados: uno bien configurado sin criptografía post-cuántica y dos con configuraciones antiguas o rotas.',
   'examples.title': 'Ejemplos',
   'examples.lead':
-    'Informes reales, con el mismo formato que verás al escanear tu web: uno de fizsar.com y dos de servidores de laboratorio configurados mal a propósito.',
+    'Informes reales, con el mismo formato que verás al escanear tu web: uno de fizsar.com y tres de servidores de laboratorio, uno bien configurado según los estándares de hoy y dos configurados mal a propósito.',
   'examples.labNote':
     'Los servidores de laboratorio viven en una red Docker interna, sin salida a Internet. Allí no hay certificados reales, así que su informe lleva uno válido simulado: la nota juzga solo la configuración de TLS.',
   'examples.nav': 'Ejemplos en esta página',
@@ -175,6 +175,11 @@ const es = {
     'El tráfico ya va protegido frente a «cosechar ahora, descifrar después», y el resto está bien hecho. Pierde 5 puntos porque acepta un solo grupo híbrido.',
   'examples.fizsar.fix':
     'Para llegar a 100, aceptar también SecP256r1MLKEM768. El servidor web que usa todavía no permite activarlo.',
+  'examples.modern.config':
+    'TLS 1.2 y 1.3, solo intercambio ECDHE con cifrado autenticado (AES-GCM y ChaCha20-Poly1305) y los grupos x25519 y secp256r1. Ningún grupo post-cuántico. Es la configuración que recomiendan hoy las guías habituales.',
+  'examples.modern.why':
+    'Hoy es seguro: no hay nada roto ni débil, y tiene TLS 1.3, secreto hacia adelante y un buen certificado. Pero sin intercambio híbrido, el tráfico que se capture ahora podría descifrarse cuando exista un ordenador cuántico, y ese bloque, la mitad de la nota, se queda en 0.',
+  'examples.modern.fix': 'Actualizar el software TLS a uno con ML-KEM y activar X25519MLKEM768: con eso pasaría a una A.',
   'examples.kyber.config':
     'Solo TLS 1.3, con X25519Kyber768Draft00 (un borrador de intercambio post-cuántico anterior al estándar ML-KEM) y x25519 clásico.',
   'examples.kyber.why':
@@ -310,7 +315,7 @@ const en: Record<ShowcaseKey, string> = {
     'Supply chain: GitHub Actions are pinned by SHA. Every image goes through Trivy before it is published: any high or critical vulnerability that already has a fix blocks the release. Exceptions are documented with their reason and expire; once expired, they block again. Images are published to GHCR with an immutable tag per commit, and deployments always use that tag.',
   'arch.quality.title': 'Quality',
   'arch.quality.lab':
-    'A TLS lab with 9 deliberately vulnerable servers (SSLv2, SSLv3, EXPORT, weak DH, old curves, experimental Kyber…), only on an internal Docker network with no way out to the Internet: third parties are never probed.',
+    'A TLS lab with 10 servers: 9 deliberately vulnerable ones (SSLv2, SSLv3, EXPORT, weak DH, old curves, experimental Kyber…) and one well configured without post-quantum cryptography, only on an internal Docker network with no way out to the Internet: third parties are never probed.',
   'arch.quality.testssl': "The scanner's results against those servers are compared with those of testssl.sh, a reference tool.",
   'arch.quality.fuzz': "The code that reads servers' answers is fuzzed: every answer is untrusted input.",
   'arch.ops.title': 'Operations',
@@ -329,7 +334,7 @@ const en: Record<ShowcaseKey, string> = {
   'arch.contact.text': 'Code available for technical review on request:',
   'arch.see.title': 'See it working',
   'arch.see.examples': 'Example reports',
-  'arch.see.examplesText': ': fizsar.com and two lab servers.',
+  'arch.see.examplesText': ': fizsar.com and three lab servers.',
   'arch.see.report': 'A real report with “Under the hood” open',
   'arch.see.reportText': ': what the scanner offered fizsar.com and what it answered.',
 
@@ -339,10 +344,10 @@ const en: Record<ShowcaseKey, string> = {
 
   'examples.meta.title': 'Examples · QuantumReady',
   'examples.meta.description':
-    'Real QuantumReady reports: fizsar.com, with post-quantum key exchange, and two isolated lab servers with outdated or broken setups.',
+    'Real QuantumReady reports: fizsar.com, with post-quantum key exchange, and three isolated lab servers: one well configured without post-quantum cryptography and two with outdated or broken setups.',
   'examples.title': 'Examples',
   'examples.lead':
-    'Real reports, in the same format you get when you scan your website: one of fizsar.com and two of lab servers misconfigured on purpose.',
+    'Real reports, in the same format you get when you scan your website: one of fizsar.com and three of lab servers, one well configured by today’s standards and two misconfigured on purpose.',
   'examples.labNote':
     'The lab servers live on an internal Docker network with no way out to the Internet. There are no real certificates there, so their report carries a simulated valid one: the grade judges the TLS setup only.',
   'examples.nav': 'Examples on this page',
@@ -359,6 +364,11 @@ const en: Record<ShowcaseKey, string> = {
   'examples.fizsar.why':
     'Its traffic is already protected against “harvest now, decrypt later”, and the rest is done right. It loses 5 points for accepting a single hybrid group.',
   'examples.fizsar.fix': 'To reach 100, also accept SecP256r1MLKEM768. The web server it uses cannot enable it yet.',
+  'examples.modern.config':
+    'TLS 1.2 and 1.3, ECDHE key exchange with authenticated encryption only (AES-GCM and ChaCha20-Poly1305) and the x25519 and secp256r1 groups. No post-quantum group. It is what the usual guides recommend today.',
+  'examples.modern.why':
+    'It is secure today: nothing is broken or weak, and it has TLS 1.3, forward secrecy and a good certificate. But without a hybrid key exchange, traffic captured now could be decrypted once a quantum computer exists, and that block, half of the score, stays at 0.',
+  'examples.modern.fix': 'Update the TLS software to one with ML-KEM and enable X25519MLKEM768: that alone would make it an A.',
   'examples.kyber.config':
     'TLS 1.3 only, with X25519Kyber768Draft00 (a post-quantum key exchange draft that predates the ML-KEM standard) and classical x25519.',
   'examples.kyber.why':

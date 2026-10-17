@@ -100,9 +100,9 @@ func TestLabFixtures(t *testing.T) {
 	pinned := map[string]struct {
 		grade string
 		score int
-	}{"fizsar": {"A", 95}, "kyber": {"D", 45}, "export": {"F", 20}}
+	}{"fizsar": {"A", 95}, "modern": {"D", 45}, "kyber": {"D", 45}, "export": {"F", 20}}
 	st := &fixtureStore{scans: map[uuid.UUID]store.Scan{}, findings: map[uuid.UUID][]store.Finding{}}
-	servers := map[string]string{"export": "export.tlslab.test", "kyber": "kyber.tlslab.test"}
+	servers := map[string]string{"export": "export.tlslab.test", "kyber": "kyber.tlslab.test", "modern": "modern.tlslab.test"}
 	ids := map[string]uuid.UUID{}
 	for server, host := range servers {
 		sc, fs := labScan(t, server, host)
@@ -110,7 +110,7 @@ func TestLabFixtures(t *testing.T) {
 	}
 	sc, fs := realScan(t, "fizsar.com")
 	st.scans[sc.ID], st.findings[sc.ID], ids["fizsar"] = sc, fs, sc.ID
-	allow, err := ParseAllowlist("export.tlslab.test kyber.tlslab.test fizsar.com")
+	allow, err := ParseAllowlist("export.tlslab.test kyber.tlslab.test modern.tlslab.test fizsar.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestLabFixtures(t *testing.T) {
 				got = append(got, f.Code)
 			}
 			want := map[string][]string{"export": {"SUITE_NULL", "SUITE_EXPORT", "DH_WEAK"}, "kyber": {"KEX_EXPERIMENTAL_PQC_ONLY"},
-				"fizsar": {"KEX_HYBRID_PREFERRED", "CERT_VALID"}}[server]
+				"fizsar": {"KEX_HYBRID_PREFERRED", "CERT_VALID"}, "modern": {"KEX_NO_HYBRID", "FS_ALL", "TLS13_SUPPORTED"}}[server]
 			for _, c := range want {
 				if !slices.Contains(got, c) {
 					t.Errorf("%s/%s: %s missing from %v", server, lang, c, got)
