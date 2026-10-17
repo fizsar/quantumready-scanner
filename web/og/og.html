@@ -1,0 +1,101 @@
+<!doctype html>
+<!-- Source of public/og.png (1200×630), rendered by render.sh with headless Chromium. -->
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-weight: 400;
+        src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-weight: 700;
+        src: url('fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2');
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+      body {
+        font-family: 'JetBrains Mono', monospace;
+        color: #e7e8f0;
+        background:
+          radial-gradient(ellipse 60% 70% at 18% 45%, rgba(125, 122, 255, 0.22), transparent 70%),
+          radial-gradient(ellipse 50% 60% at 95% 100%, rgba(191, 90, 242, 0.14), transparent 70%),
+          #05060b;
+        display: flex;
+        align-items: center;
+        gap: 64px;
+        padding: 0 80px;
+        box-sizing: border-box;
+      }
+      .logo {
+        width: 250px;
+        height: 250px;
+        flex: none;
+        filter: drop-shadow(0 0 24px rgba(125, 122, 255, 0.7));
+      }
+      .text {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .prompt {
+        font-size: 24px;
+        color: #9a9fb4;
+      }
+      .prompt .user {
+        color: #3dffa2;
+      }
+      .prompt .path {
+        color: rgb(90, 200, 250);
+      }
+      .wordmark {
+        font-size: 84px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        line-height: 1;
+        background: linear-gradient(90deg, rgb(90, 200, 250), rgb(125, 122, 255) 50%, rgb(191, 90, 242));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .tagline {
+        font-size: 36px;
+        font-weight: 700;
+        color: #3dffa2;
+        line-height: 1.25;
+      }
+      .sub {
+        font-size: 24px;
+        color: #c9cbdb;
+        line-height: 1.4;
+      }
+      .url {
+        font-size: 22px;
+        color: #9a9fb4;
+        border-top: 1px solid rgba(143, 140, 255, 0.3);
+        padding-top: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M22 17 32 9l10 8" fill="none" stroke="#7d7aff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="32" cy="37" r="14" fill="none" stroke="#7d7aff" stroke-width="5" />
+      <path d="M37 43l9 10" stroke="#7d7aff" stroke-width="5" stroke-linecap="round" />
+    </svg>
+    <div class="text">
+      <div class="prompt"><span class="user">guest@quantumready</span>:<span class="path">~</span>$ ./scan --pqc</div>
+      <div class="wordmark">QuantumReady</div>
+      <div class="tagline">¿Está tu web preparada<br />para la era cuántica?</div>
+      <div class="sub">Intercambio de claves post-cuántico (ML-KEM),<br />versiones de TLS y cifrados, en lenguaje claro.</div>
+      <div class="url">quantumready.fizsar.com · ES / EN</div>
+    </div>
+  </body>
+</html>

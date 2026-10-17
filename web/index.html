@@ -5,11 +5,62 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05060b" />
+    <title>QuantumReady · Auditoría post-cuántica de tu web</title>
     <meta
       name="description"
-      content="QuantumReady: auditoría de preparación post-cuántica (PQC) para endpoints TLS. Próximamente."
+      content="Comprueba si tu web ya usa cifrado post-cuántico (ML-KEM), qué versiones de TLS y cifrados acepta y qué certificado TLS presenta. Resultado en lenguaje claro, en español e inglés."
     />
-    <title>QuantumReady · Próximamente</title>
+    <!-- The SPA moves it to the current page (usePageMeta); this is the home page. -->
+    <link rel="canonical" href="https://quantumready.fizsar.com/" />
+
+    <!-- One preview for every route (SPA, no prerender yet). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="QuantumReady" />
+    <meta property="og:url" content="https://quantumready.fizsar.com/" />
+    <meta property="og:title" content="QuantumReady · Auditoría post-cuántica de tu web" />
+    <meta
+      property="og:description"
+      content="¿Está tu web preparada para la era cuántica? Intercambio de claves post-cuántico (ML-KEM), versiones de TLS, cifrados y certificado TLS, explicados en lenguaje claro."
+    />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:locale:alternate" content="en_GB" />
+    <meta property="og:image" content="https://quantumready.fizsar.com/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="QuantumReady: ¿está tu web preparada para la era cuántica? Auditoría de cifrado post-cuántico y TLS."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="QuantumReady · Auditoría post-cuántica de tu web" />
+    <meta
+      name="twitter:description"
+      content="¿Está tu web preparada para la era cuántica? ML-KEM, versiones de TLS, cifrados y certificado TLS, en lenguaje claro."
+    />
+    <meta name="twitter:image" content="https://quantumready.fizsar.com/og.png" />
+    <meta
+      name="twitter:image:alt"
+      content="QuantumReady: ¿está tu web preparada para la era cuántica? Auditoría de cifrado post-cuántico y TLS."
+    />
+
+    <!-- Structured data: a data block, never executed, so script-src 'self' does not apply. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "QuantumReady",
+        "url": "https://quantumready.fizsar.com/",
+        "description": "Auditoría de preparación post-cuántica de una web: intercambio de claves post-cuántico (ML-KEM), versiones de TLS, cifrados y certificado TLS, explicados en lenguaje claro.",
+        "applicationCategory": "SecurityApplication",
+        "operatingSystem": "Any (web browser)",
+        "browserRequirements": "Requires JavaScript",
+        "inLanguage": ["es", "en"],
+        "isAccessibleForFree": true,
+        "image": "https://quantumready.fizsar.com/og.png",
+        "creator": { "@type": "Person", "name": "fizsar", "url": "https://fizsar.com/" }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
