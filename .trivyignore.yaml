@@ -1,0 +1,13 @@
+# Exceptions to the Trivy gate of release.yml, which blocks a release on any
+# HIGH or CRITICAL vulnerability that has a fix (--ignore-unfixed).
+#
+# Each exception needs, checked by .github/scripts/trivyignore_check.py:
+#   - a comment line right above it: why it does not affect us;
+#   - statement: the same reason, shown by Trivy;
+#   - expired_at (YYYY-MM-DD): after that day Trivy blocks again.
+# Example:
+#   # api binary only; the vulnerable HTTP/2 server is never linked.
+#   - id: CVE-0000-00000
+#     statement: "api only links golang.org/x/net/idna; HTTP/2 is not served"
+#     expired_at: 2026-12-31
+vulnerabilities: []

@@ -87,13 +87,18 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Trivy (fail on CRITICAL)
+      # The gate: any HIGH or CRITICAL with a fix available blocks the release.
+      # Exceptions only in .trivyignore.yaml (justified, with expired_at: after
+      # that day the finding blocks again); the report above lists everything.
+      - name: Trivy (fail on fixable HIGH and CRITICAL)
         env:
           REF: ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
         run: |
+          python3 .github/scripts/trivyignore_check.py .trivyignore.yaml
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$RUNNER_TEMP/trivy:/cache" "$TRIVY_IMAGE" --cache-dir /cache \
-            image --scanners vuln --severity CRITICAL --exit-code 1 --skip-db-update --quiet "$REF"
+            -v "$RUNNER_TEMP/trivy:/cache" -v "$PWD/.trivyignore.yaml:/trivyignore.yaml:ro" "$TRIVY_IMAGE" --cache-dir /cache \
+            image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /trivyignore.yaml \
+            --exit-code 1 --skip-db-update --quiet "$REF"
 
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
