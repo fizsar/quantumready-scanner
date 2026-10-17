@@ -125,7 +125,8 @@ const ALERTS: [number, string, string][] = [
 /** What the server answered to one probe. */
 export type Reply =
   | { kind: 'hello'; version?: string; suite?: string; group?: string; ciphers?: number }
-  | { kind: 'alert'; code?: number; name: string }
+  // byName: the response only names the alert; the code is the IANA one for that name.
+  | { kind: 'alert'; code?: number; name: string; byName?: boolean }
   | { kind: 'closed' }
   | { kind: 'timeout' }
   | { kind: 'refused' }
@@ -137,7 +138,7 @@ export function parseError(error: string | undefined): Reply {
   const goText = /remote error: tls: (.+)$/.exec(error)?.[1]
   if (goText) {
     const a = ALERTS.find(([, , text]) => text === goText)
-    return a ? { kind: 'alert', code: a[0], name: a[1] } : { kind: 'alert', name: goText }
+    return a ? { kind: 'alert', code: a[0], name: a[1], byName: true } : { kind: 'alert', name: goText }
   }
   const code = /^alert\((\d+)\)$/.exec(error)?.[1]
   if (code) {
@@ -146,7 +147,8 @@ export function parseError(error: string | undefined): Reply {
   }
   const name = /^alert ([a-z_]+)$/.exec(error)?.[1]
   if (name) {
-    return { kind: 'alert', code: ALERTS.find(([, n]) => n === name)?.[0], name }
+    const a = ALERTS.find(([, n]) => n === name)
+    return a ? { kind: 'alert', code: a[0], name, byName: true } : { kind: 'alert', name }
   }
   if (/timeout|timed out|deadline exceeded/i.test(error)) return { kind: 'timeout' }
   if (/^(unexpected )?EOF$|connection reset|broken pipe|closed/i.test(error)) return { kind: 'closed' }

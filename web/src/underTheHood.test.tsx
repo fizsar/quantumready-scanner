@@ -120,6 +120,9 @@ describe('Under the hood panel', () => {
     expect(first.textContent).toContain('ServerHello · TLS 1.3 · TLS_AES_128_GCM_SHA256 · X25519MLKEM768')
     expect(within(probes).getAllByText('Alert 70 protocol_version').length).toBeGreaterThan(0) // TLS 1.0/1.1 and SSLv3
     expect(within(probes).getAllByText('Alert 40 handshake_failure').length).toBeGreaterThan(0) // unsupported groups
+    // The response names the alerts; the codes come from the IANA registry, and the panel says so.
+    const alerts = within(probes).getAllByText(/^Alert \d+ /)
+    expect(alerts.every((a) => a.nextElementSibling?.textContent === ' (code per IANA)')).toBe(true)
     expect(within(panel).getByText('Accepted: TLS 1.2, TLS 1.3')).toBeTruthy()
     expect(within(panel).getByText('Chosen by the server: X25519MLKEM768')).toBeTruthy()
   })
@@ -130,6 +133,7 @@ describe('Under the hood panel', () => {
     const probes = within(panel).getByRole('region', { name: 'Sondas, una a una' })
     expect(within(probes).getAllByText('Alerta 40 handshake_failure').length).toBeGreaterThan(0)
     expect(within(probes).getByText('Cierre de la conexión')).toBeTruthy() // SSLv2: EOF
+    expect(within(probes).getAllByText('(código según IANA)', { exact: false }).length).toBeGreaterThan(0)
     const suites = within(panel).getByRole('region', { name: 'Suites de cifrado aceptadas' })
     expect(within(suites).getByText('TLS_RSA_EXPORT_WITH_RC4_40_MD5')).toBeTruthy()
     expect(within(suites).getAllByText(/EXPORT · 40 bits/).length).toBeGreaterThan(0)
@@ -183,10 +187,12 @@ describe('Under the hood panel', () => {
 
 describe('parseError', () => {
   it('reads alerts, closes and timeouts as the scanner writes them', () => {
-    expect(parseError('remote error: tls: handshake failure')).toEqual({ kind: 'alert', code: 40, name: 'handshake_failure' })
-    expect(parseError('remote error: tls: protocol version not supported')).toEqual({ kind: 'alert', code: 70, name: 'protocol_version' })
-    expect(parseError('alert protocol_version')).toEqual({ kind: 'alert', code: 70, name: 'protocol_version' })
+    // Named alerts get the IANA code for the name (byName); alert(N) carries the real code.
+    expect(parseError('remote error: tls: handshake failure')).toEqual({ kind: 'alert', code: 40, name: 'handshake_failure', byName: true })
+    expect(parseError('remote error: tls: protocol version not supported')).toEqual({ kind: 'alert', code: 70, name: 'protocol_version', byName: true })
+    expect(parseError('alert protocol_version')).toEqual({ kind: 'alert', code: 70, name: 'protocol_version', byName: true })
     expect(parseError('alert(41)')).toEqual({ kind: 'alert', code: 41, name: 'unknown' })
+    expect(parseError('remote error: tls: something new')).toEqual({ kind: 'alert', name: 'something new' })
     expect(parseError('EOF')).toEqual({ kind: 'closed' })
     expect(parseError('read tcp 10.0.0.1:1->10.0.0.2:443: i/o timeout')).toEqual({ kind: 'timeout' })
     expect(parseError('server answered SSLv3')).toEqual({ kind: 'other', text: 'server answered SSLv3' })

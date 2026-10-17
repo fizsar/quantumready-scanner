@@ -241,9 +241,12 @@ export function ReplyText({ reply, t }: { reply: Reply; t: T }) {
     }
     case 'alert':
       return (
-        <span className="bad">
-          {reply.code !== undefined ? t('uth.reply.alert', { code: reply.code, name: reply.name }) : t('uth.reply.alertNoCode', { name: reply.name })}
-        </span>
+        <>
+          <span className="bad">
+            {reply.code !== undefined ? t('uth.reply.alert', { code: reply.code, name: reply.name }) : t('uth.reply.alertNoCode', { name: reply.name })}
+          </span>
+          {reply.byName && <span className="muted"> ({t('uth.reply.ianaCode')})</span>}
+        </>
       )
     case 'closed':
       return <span className="bad">{t('uth.reply.closed')}</span>
