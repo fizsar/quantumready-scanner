@@ -119,7 +119,7 @@ const es = {
   'arch.security.ssrf':
     'Anti-SSRF: el escáner resuelve el nombre y rechaza el dominio entero si alguna de sus direcciones es privada, reservada o local. Luego se conecta a la IP ya validada, nunca al nombre, para que una segunda respuesta DNS no pueda desviarlo, y la comprueba otra vez en el propio socket antes de conectar.',
   'arch.security.containers':
-    'Contenedores endurecidos: ninguno corre como root, todos tienen el sistema de archivos de solo lectura, sin capacidades de Linux y con no-new-privileges. Solo Caddy da la cara a Internet; la base de datos está en una red interna, y el worker sale a Internet por una red propia desde la que no llega a Caddy ni a la API.',
+    'Contenedores endurecidos: los cinco de la aplicación (API, worker, migraciones, web y PostgreSQL) corren sin root, con el sistema de archivos de solo lectura, sin capacidades de Linux y con no-new-privileges; la CI comprueba en cada cambio estas tres últimas. Solo Caddy, el proxy compartido con fizsar.com, da la cara a Internet; se configura fuera de este repositorio y no entra en esa lista. La base de datos está en una red interna, y el worker sale a Internet por una red propia desde la que no llega a Caddy ni a la API.',
   'arch.security.supply':
     'Cadena de suministro: las acciones de GitHub están fijadas por SHA. Cada imagen pasa por Trivy antes de publicarse: cualquier vulnerabilidad alta o crítica que ya tenga corrección bloquea la publicación. Las excepciones quedan documentadas con su motivo y caducan; al caducar, vuelven a bloquear. Las imágenes se publican en GHCR con una etiqueta inmutable por commit, y se despliega siempre por esa etiqueta.',
   'arch.quality.title': 'Calidad',
@@ -319,7 +319,7 @@ const en: Record<ShowcaseKey, string> = {
   'arch.security.ssrf':
     'Anti-SSRF: the scanner resolves the name and refuses the whole domain if any of its addresses is private, reserved or local. It then connects to the validated IP, never to the name, so a second DNS answer cannot divert it, and checks the address again on the socket itself before connecting.',
   'arch.security.containers':
-    'Hardened containers: none runs as root, all have a read-only file system, no Linux capabilities and no-new-privileges. Only Caddy faces the Internet; the database sits on an internal network, and the worker reaches the Internet through its own network, from which it cannot reach Caddy or the API.',
+    'Hardened containers: the application’s five (API, worker, migrations, web and PostgreSQL) run as non-root users, with a read-only file system, no Linux capabilities and no-new-privileges; CI checks the last three on every change. Only Caddy, the proxy shared with fizsar.com, faces the Internet; it is configured outside this repository and is not part of that list. The database sits on an internal network, and the worker reaches the Internet through its own network, from which it cannot reach Caddy or the API.',
   'arch.security.supply':
     'Supply chain: GitHub Actions are pinned by SHA. Every image goes through Trivy before it is published: any high or critical vulnerability that already has a fix blocks the release. Exceptions are documented with their reason and expire; once expired, they block again. Images are published to GHCR with an immutable tag per commit, and deployments always use that tag.',
   'arch.quality.title': 'Quality',
