@@ -25,9 +25,6 @@
 .arch-figure {
   margin: 0;
 }
-.arch-scroll {
-  overflow-x: auto;
-}
 .arch-diagram {
   --d-bg: #0a0c16;
   --d-box: #11142a;
@@ -39,9 +36,23 @@
   --d-db: var(--amber);
   display: block;
   width: 100%;
-  min-width: 36rem; /* below that, scroll inside the figure rather than shrink the text */
   height: auto;
   font-family: var(--mono-font);
+}
+/* One layout at a time: the wide one would shrink its text below this width,
+   so narrow screens get the tall one instead of a sideways scroll. */
+.arch-diagram-tall {
+  display: none;
+  max-width: 26rem;
+  margin: 0 auto;
+}
+@media (max-width: 40rem) {
+  .arch-diagram-wide {
+    display: none;
+  }
+  .arch-diagram-tall {
+    display: block;
+  }
 }
 /* The site is dark only (color-scheme: dark), so the diagram follows it
    whatever the system theme; with its own opaque background it stays readable

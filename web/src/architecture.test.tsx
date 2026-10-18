@@ -75,16 +75,25 @@ describe('/architecture', () => {
 
   it('the diagram is an accessible SVG with title and desc', async () => {
     renderAt('/architecture', 'es')
-    const svg = await screen.findByRole('img', { name: showcaseDict.es['arch.flow.svgTitle'] })
-    const title = svg.querySelector(':scope > title')
-    const desc = svg.querySelector(':scope > desc')
-    expect(title?.textContent).toBe(showcaseDict.es['arch.flow.svgTitle'])
-    expect(desc?.textContent).toBe(showcaseDict.es['arch.flow.svgDesc'])
-    expect(svg.getAttribute('aria-labelledby')).toBe(title?.id)
-    expect(svg.getAttribute('aria-describedby')).toBe(desc?.id)
-    for (const k of ['arch.flow.browser', 'arch.flow.caddy', 'arch.flow.web', 'arch.flow.api', 'arch.flow.db', 'arch.flow.worker', 'arch.flow.scanner', 'arch.flow.target'] as const) {
-      expect(within(svg as unknown as HTMLElement).getByText(showcaseDict.es[k]), k).toBeTruthy()
+    // Two layouts of the same diagram (wide and tall); CSS shows one (display: none
+    // also hides the other from screen readers; jsdom has no layout, so both are here).
+    const svgs = await screen.findAllByRole('img', { name: showcaseDict.es['arch.flow.svgTitle'] })
+    expect(svgs.map((s) => s.getAttribute('class'))).toEqual(['arch-diagram arch-diagram-wide', 'arch-diagram arch-diagram-tall'])
+    for (const svg of svgs) {
+      const title = svg.querySelector(':scope > title')
+      const desc = svg.querySelector(':scope > desc')
+      expect(title?.textContent).toBe(showcaseDict.es['arch.flow.svgTitle'])
+      expect(desc?.textContent).toBe(showcaseDict.es['arch.flow.svgDesc'])
+      expect(svg.getAttribute('aria-labelledby')).toBe(title?.id)
+      expect(svg.getAttribute('aria-describedby')).toBe(desc?.id)
+      for (const k of ['arch.flow.browser', 'arch.flow.caddy', 'arch.flow.web', 'arch.flow.api', 'arch.flow.db', 'arch.flow.worker', 'arch.flow.scanner', 'arch.flow.target'] as const) {
+        expect(within(svg as unknown as HTMLElement).getByText(showcaseDict.es[k]), k).toBeTruthy()
+      }
+      expect(svg.querySelectorAll('path.arch-edge'), 'same arrows in both').toHaveLength(7)
     }
+    // Unique ids: the two diagrams must not share titles or arrow markers.
+    const ids = [...document.querySelectorAll('svg [id]')].map((e) => e.id)
+    expect(new Set(ids).size).toBe(ids.length)
   })
 
   it('keeps the CSP: no style attributes or elements, no inline handlers', async () => {
