@@ -49,12 +49,7 @@ type Config struct {
 	// running then keep their lease and another worker retries them after it
 	// expires. Default 50 s.
 	ShutdownTimeout time.Duration
-	// Heartbeat, if set, is called after every loop iteration that did not
-	// fail (including idle ones) with the oldest last-iteration time across
-	// all slots: one stuck slot keeps it from advancing. The container
-	// healthcheck is built on it.
-	Heartbeat func(oldest time.Time)
-	Logger    *slog.Logger
+	Logger          *slog.Logger
 }
 
 // Worker processes the scan queue.
@@ -62,6 +57,9 @@ type Worker struct {
 	st  *store.Store
 	sc  Scanner
 	cfg Config
+	// Per slot, when its loop last finished an iteration without error
+	// (Unix nanoseconds); see SlotBeats. Slots only store their own entry.
+	beats []atomic.Int64
 }
 
 // New returns a Worker with cfg, filling in defaults. It refuses a lease that
@@ -96,8 +94,35 @@ func New(st *store.Store, sc Scanner, cfg Config) (*Worker, error) {
 		return nil, fmt.Errorf("worker: lease %v must exceed the scan timeout %v plus a margin of %v (> %v)",
 			cfg.Lease, sc.ScanTimeout(), cfg.LeaseMargin, minLease)
 	}
-	return &Worker{st: st, sc: sc, cfg: cfg}, nil
+	w := &Worker{st: st, sc: sc, cfg: cfg, beats: make([]atomic.Int64, cfg.Concurrency)}
+	w.resetBeats()
+	return w, nil
 }
+
+func (w *Worker) resetBeats() {
+	now := time.Now().UnixNano()
+	for i := range w.beats {
+		w.beats[i].Store(now)
+	}
+}
+
+// SlotBeats returns, per slot, when its loop last finished an iteration
+// without error, idle ones included (New or Run's start before the first).
+// A slot beats about every PollInterval while it waits for work, and after
+// each scan, which the scanner's timeout keeps under the lease: a slot silent
+// for longer than Lease is stuck. Failing iterations (database down) do not
+// beat, so a broken queue looks stuck too. It never blocks the slots: the
+// caller (the healthcheck writer in cmd/worker) does any I/O.
+func (w *Worker) SlotBeats() []time.Time {
+	out := make([]time.Time, len(w.beats))
+	for i := range w.beats {
+		out[i] = time.Unix(0, w.beats[i].Load())
+	}
+	return out
+}
+
+// Lease returns how long a claim lasts.
+func (w *Worker) Lease() time.Duration { return w.cfg.Lease }
 
 // Run processes scans until ctx is canceled, then stops claiming and waits up
 // to ShutdownTimeout for the scans in flight.
@@ -106,24 +131,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	work, cancelWork := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancelWork()
 
-	// Last successful iteration per slot (Unix nanoseconds), for Heartbeat.
-	last := make([]atomic.Int64, w.cfg.Concurrency)
-	start := time.Now().UnixNano()
-	for i := range last {
-		last[i].Store(start)
-	}
-	beat := func(slot int) {
-		last[slot].Store(time.Now().UnixNano())
-		if w.cfg.Heartbeat == nil {
-			return
-		}
-		oldest := last[0].Load()
-		for i := range last {
-			oldest = min(oldest, last[i].Load())
-		}
-		w.cfg.Heartbeat(time.Unix(0, oldest))
-	}
-
+	w.resetBeats()
 	var wg sync.WaitGroup
 	for slot := range w.cfg.Concurrency {
 		wg.Go(func() {
@@ -132,7 +140,7 @@ func (w *Worker) Run(ctx context.Context) error {
 				if err != nil {
 					w.cfg.Logger.Error("worker: process scan", "err", err)
 				} else {
-					beat(slot)
+					w.beats[slot].Store(time.Now().UnixNano())
 				}
 				if processed && err == nil {
 					continue // there may be more work: no wait

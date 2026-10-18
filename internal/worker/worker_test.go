@@ -14,7 +14,6 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"os"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -432,23 +431,6 @@ func TestStalledWorkerResultIsDiscarded(t *testing.T) {
 	}
 }
 
-type beats struct {
-	mu    sync.Mutex
-	times []time.Time
-}
-
-func (b *beats) record(t time.Time) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.times = append(b.times, t)
-}
-
-func (b *beats) snapshot() []time.Time {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return append([]time.Time{}, b.times...)
-}
-
 func runInBackground(t *testing.T, w *Worker) {
 	t.Helper()
 	ctx, stop := context.WithCancel(context.Background())
@@ -462,9 +444,9 @@ func runInBackground(t *testing.T, w *Worker) {
 	})
 }
 
-// The queue loop beats on every iteration, idle ones included, and not while
+// A slot's beat advances on every iteration, idle ones included, and not while
 // an iteration (a scan) is still running.
-func TestHeartbeatFromTheLoop(t *testing.T) {
+func TestSlotBeatsFromTheLoop(t *testing.T) {
 	st := newTestStore(t)
 	started, release := make(chan struct{}, 1), make(chan struct{})
 	sc := scanFunc(func(_ context.Context, host string, port int) (*scanner.Result, error) {
@@ -472,37 +454,32 @@ func TestHeartbeatFromTheLoop(t *testing.T) {
 		<-release
 		return canned(host, port, "X25519MLKEM768"), nil
 	})
-	var b beats
-	w := mustNew(t, st, sc, Config{Concurrency: 1, PollInterval: 20 * time.Millisecond, ShutdownTimeout: time.Second, Heartbeat: b.record, Logger: quiet})
+	w := mustNew(t, st, sc, Config{Concurrency: 1, PollInterval: 20 * time.Millisecond, ShutdownTimeout: time.Second, Logger: quiet})
 	runInBackground(t, w)
 
 	time.Sleep(200 * time.Millisecond)
-	if n := len(b.snapshot()); n < 3 {
-		t.Fatalf("idle loop beat %d times in 200ms, want several", n)
+	if age := time.Since(w.SlotBeats()[0]); age > 100*time.Millisecond {
+		t.Fatalf("idle slot last beat %v ago, want a beat every poll (20ms)", age)
 	}
 
 	enqueue(t, st, "example.com")
 	<-started
-	before := len(b.snapshot())
+	before := w.SlotBeats()[0]
 	time.Sleep(300 * time.Millisecond)
-	during := b.snapshot()
-	if len(during) != before {
-		t.Errorf("beat %d times during a scan, want 0", len(during)-before)
-	}
-	if last := during[len(during)-1]; time.Since(last) < 250*time.Millisecond {
-		t.Errorf("latest heartbeat is %v old during a 300ms scan", time.Since(last))
+	if during := w.SlotBeats()[0]; !during.Equal(before) {
+		t.Errorf("slot beat during a scan (%v → %v), want no beat until it ends", before, during)
 	}
 
 	close(release)
 	time.Sleep(150 * time.Millisecond)
-	if after := b.snapshot(); len(after) <= len(during) || time.Since(after[len(after)-1]) > 100*time.Millisecond {
-		t.Errorf("no fresh heartbeat after the scan finished")
+	if age := time.Since(w.SlotBeats()[0]); age > 100*time.Millisecond {
+		t.Errorf("no fresh beat after the scan finished (last %v ago)", age)
 	}
 }
 
-// With two slots, one stuck slot holds the heartbeat back even if the other
-// keeps looping.
-func TestHeartbeatTracksTheOldestSlot(t *testing.T) {
+// With two slots, a stuck slot stops beating while the other keeps going: the
+// healthcheck writer (cmd/worker) sees exactly which one.
+func TestSlotBeatsShowTheStuckSlot(t *testing.T) {
 	st := newTestStore(t)
 	started := make(chan struct{}, 1)
 	stuck := scanFunc(func(ctx context.Context, _ string, _ int) (*scanner.Result, error) {
@@ -510,8 +487,7 @@ func TestHeartbeatTracksTheOldestSlot(t *testing.T) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	})
-	var b beats
-	w := mustNew(t, st, stuck, Config{Concurrency: 2, PollInterval: 20 * time.Millisecond, ShutdownTimeout: 100 * time.Millisecond, Heartbeat: b.record, Logger: quiet})
+	w := mustNew(t, st, stuck, Config{Concurrency: 2, PollInterval: 20 * time.Millisecond, ShutdownTimeout: 100 * time.Millisecond, Logger: quiet})
 	runInBackground(t, w)
 
 	time.Sleep(100 * time.Millisecond)
@@ -520,32 +496,34 @@ func TestHeartbeatTracksTheOldestSlot(t *testing.T) {
 	stuckAt := time.Now()
 	time.Sleep(300 * time.Millisecond)
 
-	all := b.snapshot()
-	var afterStuck []time.Time
-	for _, ts := range all {
-		if ts.After(stuckAt) {
-			afterStuck = append(afterStuck, ts)
+	var fresh, silent int
+	for _, b := range w.SlotBeats() {
+		if b.After(stuckAt) {
+			fresh++
+		} else {
+			silent++
 		}
 	}
-	if len(afterStuck) > 0 {
-		t.Errorf("heartbeat advanced to %v while a slot was stuck since %v", afterStuck[len(afterStuck)-1], stuckAt)
+	if fresh != 1 || silent != 1 {
+		t.Errorf("after one slot got stuck: %d slots beating, %d silent; want 1 and 1 (%v)", fresh, silent, w.SlotBeats())
 	}
 }
 
 // Iterations that fail (database down) never beat.
-func TestNoHeartbeatWhenTheQueueFails(t *testing.T) {
+func TestNoSlotBeatsWhenTheQueueFails(t *testing.T) {
 	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
 		_, err := migrations.Up(ctx, db)
 		return err
 	})
 	st := store.NewStore(pool)
 	pool.Close() // every query fails from now on
-	var b beats
-	w := mustNew(t, st, fastScanner("X25519MLKEM768"), Config{Concurrency: 1, PollInterval: 20 * time.Millisecond, Heartbeat: b.record, Logger: quiet})
+	w := mustNew(t, st, fastScanner("X25519MLKEM768"), Config{Concurrency: 1, PollInterval: 20 * time.Millisecond, Logger: quiet})
 	runInBackground(t, w)
+	time.Sleep(50 * time.Millisecond)
+	first := w.SlotBeats()[0]
 	time.Sleep(200 * time.Millisecond)
-	if n := len(b.snapshot()); n != 0 {
-		t.Errorf("beat %d times with a failing queue, want 0", n)
+	if b := w.SlotBeats()[0]; !b.Equal(first) {
+		t.Errorf("slot beat with a failing queue (%v → %v)", first, b)
 	}
 }
 

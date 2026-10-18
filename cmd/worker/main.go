@@ -84,15 +84,12 @@ func run(logger *slog.Logger) error {
 	w, err := worker.New(store.NewStore(pool), scanner.New(scanOpts), worker.Config{
 		Concurrency: concurrency,
 		Logger:      logger,
-		Heartbeat: func(oldest time.Time) {
-			if err := writeHeartbeat(hbPath, oldest); err != nil {
-				logger.Warn("worker: cannot write heartbeat", "err", err)
-			}
-		},
 	})
 	if err != nil {
 		return err
 	}
+	hb := &heartbeatWriter{path: hbPath, every: heartbeatEvery, stale: w.Lease(), slots: w.SlotBeats, now: time.Now, log: logger}
+	go hb.run(ctx)
 	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency, "intensity", scanOpts.Intensity)
 	err = w.Run(ctx)
 	logger.Info("worker stopped")
