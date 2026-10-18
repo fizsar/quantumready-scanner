@@ -92,7 +92,7 @@
         "category": "certificate",
         "title": "Classical signature (ECDSA P-256): future quantum risk",
         "detail": "The server proves its identity with ECDSA P-256, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before. There are no post-quantum (ML-DSA) certificates on the public web yet. It does not affect the grade.",
-        "remediation": "Nothing to do yet. Keep renewal automated so you can switch to ML-DSA or hybrid certificates as soon as authorities issue them."
+        "remediation": "Nothing to do on the signature yet. Keep renewal automated so you can switch to ML-DSA or hybrid certificates as soon as authorities issue them."
       },
       {
         "code": "KEX_SINGLE_HYBRID",

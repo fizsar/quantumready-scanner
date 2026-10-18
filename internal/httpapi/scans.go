@@ -248,17 +248,23 @@ func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
 	}
 	// Finding parameters by code: some titles use them, e.g. "({bits} bits)".
 	params := make(map[string]map[string]string, len(rows))
+	// Some texts depend on the scan: its date and its other findings.
+	tctx := scoring.Context{ScanTime: sc.CreatedAt}
+	if sc.StartedAt != nil {
+		tctx.ScanTime = *sc.StartedAt
+	}
 	for _, f := range rows {
 		var p map[string]string
 		if err := json.Unmarshal(f.Params, &p); err != nil {
 			return nil, err
 		}
 		params[f.Code] = p
+		tctx.Codes = append(tctx.Codes, f.Code)
 	}
 	if s.Cap != nil {
 		rep.Cap = &capView{Grade: s.Cap.Grade}
 		for _, c := range s.Cap.Codes {
-			rep.Cap.Codes = append(rep.Cap.Codes, labeled{c, scoring.Describe(c, params[c], lang).Title})
+			rep.Cap.Codes = append(rep.Cap.Codes, labeled{c, scoring.DescribeIn(c, params[c], lang, tctx).Title})
 		}
 	}
 	for _, b := range s.Blocks {
@@ -277,7 +283,7 @@ func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
 		rep.Findings = append(rep.Findings, findingView{
 			Code: f.Code, Axis: f.Axis, AxisLabel: scoring.Label("axis."+f.Axis, lang),
 			Severity: f.Severity, SeverityLabel: scoring.Label("severity."+f.Severity, lang),
-			Category: f.Category, Text: scoring.Describe(f.Code, params, lang),
+			Category: f.Category, Text: scoring.DescribeIn(f.Code, params, lang, tctx),
 		})
 	}
 	rep.NotEvaluated = make([]labeled, 0, len(s.NotEvaluated))

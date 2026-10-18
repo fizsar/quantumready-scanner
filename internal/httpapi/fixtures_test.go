@@ -216,6 +216,18 @@ func TestLabFixtures(t *testing.T) {
 			if err := json.Unmarshal(v.Report.Result, &res); err != nil {
 				t.Fatal(err)
 			}
+			// The classical-signature advice follows the renewal finding:
+			// fizsar.com renews automatically, the lab certificates do not.
+			for _, f := range v.Report.Findings {
+				if f.Code != "CERT_CLASSICAL_SIGNATURE" {
+					continue
+				}
+				keep := map[string]string{"es": "Mantén la renovación", "en": "Keep renewal"}[lang]
+				automate := map[string]string{"es": "Automatiza la renovación", "en": "Automate renewal"}[lang]
+				if want := map[bool]string{true: keep, false: automate}[server == "fizsar"]; !strings.Contains(f.Remediation, want) {
+					t.Errorf("%s/%s: classical-signature advice %q, want %q", server, lang, f.Remediation, want)
+				}
+			}
 			if err := certFitsSuites(&res); err != nil {
 				t.Errorf("%s/%s: %v", server, lang, err)
 			}
