@@ -32,9 +32,19 @@ import (
 //
 // From a slot getting stuck to an unhealthy container: 90 s until the writer
 // notices, then up to 30 s until the file is too old, then Docker's retries.
+//
+// Docker does not restart an unhealthy container, only one whose process
+// ended. So a slot silent for stuckExitAfter makes the worker log one ERROR
+// and exit with a non-zero code (supervise), and the restart policy
+// (unless-stopped in deploy/compose.prod.yaml) brings it back. The scan the
+// slot held is not lost: its lease expires 90 s after the claim and the
+// queue hands it to a worker again (up to the attempt limit).
+//   - stuckExitAfter = 4 min: well past the lease, and after the healthcheck
+//     has already shown the worker unhealthy for a while.
 const (
 	heartbeatEvery  = 5 * time.Second
 	heartbeatMaxAge = 30 * time.Second
+	stuckExitAfter  = 4 * time.Minute
 )
 
 func heartbeatPath() string {
@@ -91,16 +101,31 @@ type heartbeatWriter struct {
 	log   *slog.Logger
 	stuck []int // slots reported stuck: warn once per episode, not every tick
 	ioErr bool  // a write error was reported: warn once until it works again
+
+	// exitAfter: a slot silent for longer makes onStuck run once (the worker
+	// then exits so Docker restarts it). Zero disables it.
+	exitAfter time.Duration
+	onStuck   func(slots []int)
+	exiting   bool
 }
 
 // tick checks the slots once and writes the file if they are all alive.
 func (h *heartbeatWriter) tick() {
 	now := h.now()
-	var stuck []int
+	var stuck, dead []int
 	for i, t := range h.slots() {
 		if now.Sub(t) > h.stale {
 			stuck = append(stuck, i)
 		}
+		if h.exitAfter > 0 && now.Sub(t) > h.exitAfter {
+			dead = append(dead, i)
+		}
+	}
+	if len(dead) > 0 && h.onStuck != nil && !h.exiting {
+		h.exiting = true
+		h.log.Error("worker: queue loop slot stuck too long; exiting so the container restarts (its scan returns to the queue when the lease expires)",
+			"stuck_slots", dead, "slots", len(h.slots()), "silent_for_more_than", h.exitAfter.String())
+		h.onStuck(dead)
 	}
 	if len(stuck) > 0 {
 		if !slices.Equal(stuck, h.stuck) {
@@ -122,6 +147,35 @@ func (h *heartbeatWriter) tick() {
 		return
 	}
 	h.ioErr = false
+}
+
+// errStuck ends the worker when a slot stayed stuck (see stuckExitAfter).
+type errStuck struct{ slots []int }
+
+func (e errStuck) Error() string {
+	return fmt.Sprintf("queue loop slots %v stuck for more than %v", e.slots, stuckExitAfter)
+}
+
+// supervise runs run until it returns, or until stuck reports slots: then it
+// cancels run's context, waits up to grace for in-flight work to stop, and
+// returns errStuck, so the process ends with a non-zero code. A slot that is
+// truly hung may never return; grace bounds the wait.
+func supervise(ctx context.Context, run func(context.Context) error, stuck <-chan []int, grace time.Duration) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- run(ctx) }()
+	select {
+	case err := <-done:
+		return err
+	case slots := <-stuck:
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(grace):
+		}
+		return errStuck{slots}
+	}
 }
 
 // run ticks right away and then every h.every until ctx is done.

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -198,8 +199,77 @@ func TestHealthcheckReadsTheWritersFile(t *testing.T) {
 	}
 }
 
+// A slot silent past stuckExitAfter makes the worker exit once (Docker only
+// restarts a process that ended); one silent for less does not.
+func TestStuckSlotEndsTheWorker(t *testing.T) {
+	t0 := time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC)
+	c := &clock{t0}
+	slots := &fakeSlots{beats: []time.Time{t0, t0}}
+	h, logs := newWriter(t, slots, c)
+	h.exitAfter = stuckExitAfter
+	var calls [][]int
+	h.onStuck = func(s []int) { calls = append(calls, s) }
+
+	// Slot 1 stuck just under the threshold: unhealthy (no heartbeat), not killed.
+	c.t = t0.Add(stuckExitAfter - time.Second)
+	slots.set(0, c.t)
+	h.tick()
+	if len(calls) != 0 {
+		t.Fatalf("exit requested after %v, threshold %v", stuckExitAfter-time.Second, stuckExitAfter)
+	}
+
+	// Past it: exit requested once, with the slot, and one ERROR line.
+	for range 5 {
+		c.t = c.t.Add(heartbeatEvery)
+		slots.set(0, c.t)
+		h.tick()
+	}
+	if len(calls) != 1 || len(calls[0]) != 1 || calls[0][0] != 1 {
+		t.Errorf("exit requests: %v, want exactly one for slot 1", calls)
+	}
+	if n := strings.Count(logs.String(), `"level":"ERROR"`); n != 1 || !strings.Contains(logs.String(), `"stuck_slots":[1]`) {
+		t.Errorf("%d ERROR lines, want 1 naming slot 1:\n%s", n, logs.String())
+	}
+}
+
+// supervise ends the worker when a slot is reported stuck: it stops the loop,
+// waits for it at most grace, and returns errStuck (a non-zero exit).
+func TestSuperviseExitsWhenStuck(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		run  func(context.Context) error
+	}{
+		{"loop that stops when told", func(ctx context.Context) error { <-ctx.Done(); return nil }},
+		{"loop hung for good", func(context.Context) error { select {} }},
+	} {
+		stuck := make(chan []int, 1)
+		res := make(chan error, 1)
+		go func() { res <- supervise(context.Background(), tt.run, stuck, 100*time.Millisecond) }()
+		stuck <- []int{1}
+		select {
+		case err := <-res:
+			var se errStuck
+			if !errors.As(err, &se) || len(se.slots) != 1 || se.slots[0] != 1 {
+				t.Errorf("%s: %v, want errStuck for slot 1", tt.name, err)
+			}
+		case <-time.After(2 * time.Second):
+			t.Errorf("%s: supervise did not return", tt.name)
+		}
+	}
+	// Nothing stuck: whatever the loop returns.
+	if err := supervise(context.Background(), func(context.Context) error { return nil }, make(chan []int), time.Second); err != nil {
+		t.Errorf("clean stop: %v", err)
+	}
+}
+
 // The values relate as health.go explains.
 func TestHeartbeatValues(t *testing.T) {
+	if stuckExitAfter < 3*time.Minute || stuckExitAfter > 5*time.Minute {
+		t.Errorf("stuckExitAfter %v outside 3–5 minutes", stuckExitAfter)
+	}
+	if lease := 90 * time.Second; stuckExitAfter <= lease+heartbeatMaxAge {
+		t.Errorf("stuckExitAfter %v must leave the healthcheck time to show it first (lease %v + %v)", stuckExitAfter, lease, heartbeatMaxAge)
+	}
 	if heartbeatMaxAge < 3*heartbeatEvery {
 		t.Errorf("heartbeatMaxAge %v must allow a few missed writes every %v", heartbeatMaxAge, heartbeatEvery)
 	}
