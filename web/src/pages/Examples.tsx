@@ -12,7 +12,8 @@ export default function Examples() {
   const { lang, t } = useShowcaseT()
   const { hash } = useLocation()
   usePageMeta(t('examples.meta.title'), false, t('examples.meta.description'))
-  const date = new Intl.DateTimeFormat(lang === 'es' ? 'es-ES' : 'en-GB', { dateStyle: 'long', timeZone: 'UTC' })
+  // The visitor's time zone, as the report footer below uses: both show the same day.
+  const date = new Intl.DateTimeFormat(lang === 'es' ? 'es-ES' : 'en-GB', { dateStyle: 'long' })
 
   // The page renders at once (no fetch), but after the browser looked for the
   // #fragment: scroll to it ourselves.

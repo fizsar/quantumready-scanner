@@ -61,12 +61,34 @@ describe('/examples', () => {
     })
   }
 
-  it('dates the real scan and the lab scans as they happened', async () => {
-    renderAt('/examples', 'en')
-    await screen.findByRole('heading', { level: 1, name: 'Examples' })
-    expect(within(document.getElementById('fizsar')!).getByText('Real scan of 17 October 2026')).toBeTruthy()
-    expect(within(document.getElementById('kyber')!).getByText('Scanned in the lab on 14 October 2026')).toBeTruthy()
-  })
+  // kyber finished at 22:04:37 UTC and fizsar.com at 11:47:58 UTC: near
+  // midnight in some zone, so header and footer must use the same one (the
+  // visitor's). TZ changes at runtime reach Date and Intl in Node.
+  for (const [zone, kyberDay, fizsarDay] of [
+    ['UTC', '14 October 2026', '17 October 2026'],
+    ['Pacific/Kiritimati', '15 October 2026', '18 October 2026'], // UTC+14
+    ['America/Los_Angeles', '14 October 2026', '17 October 2026'],
+  ] as const) {
+    it(`header and report footer give the same day (${zone})`, async () => {
+      const before = process.env.TZ
+      process.env.TZ = zone
+      try {
+        renderAt('/examples', 'en')
+        await screen.findByRole('heading', { level: 1, name: 'Examples' })
+        for (const [key, day, header] of [
+          ['kyber', kyberDay, `Scanned in the lab on ${kyberDay}`],
+          ['fizsar', fizsarDay, `Real scan of ${fizsarDay}`],
+        ] as const) {
+          const section = document.getElementById(key)!
+          expect(within(section).getByText(header), key).toBeTruthy()
+          const footer = section.querySelector('.report-footer')!.textContent ?? ''
+          expect(footer, `${key} footer`).toContain(`Scanned on ${day} at `)
+        }
+      } finally {
+        process.env.TZ = before
+      }
+    })
+  }
 
   it('the lab hosts are reserved names that never resolve (RFC 6761 .test)', () => {
     for (const { lab, scans } of EXAMPLES.filter((e) => e.lab)) {
