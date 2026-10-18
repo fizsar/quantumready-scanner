@@ -174,6 +174,7 @@ func (s *Scanner) runRaw(ctx context.Context, t target, res *Result) {
 	rs.res.Probes = int(rs.used.Load())
 	rs.res.BudgetExhausted = rs.exhausted.Load()
 	slices.SortFunc(rs.res.DH, func(a, b DHParams) int { return a.PrimeBits - b.PrimeBits })
+	rs.res.Normalize()
 	res.Raw = &rs.res
 	res.NotEvaluated = notEvaluatedFull(&rs.res)
 }

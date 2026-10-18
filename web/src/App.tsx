@@ -1,14 +1,21 @@
+import { lazy, Suspense } from 'react'
 import { Link, Route, Routes } from 'react-router'
 import type { Lang } from './api'
 import { useAuth } from './auth'
 import { useLang } from './i18n'
+import { useShowcaseT } from './i18n.showcase'
 import { AboutScans } from './pages/AboutScans'
 import { AccountPage, ForgotPage, LoginPage, RegisterPage, ResetPage, VerifyPage } from './pages/AccountPages'
+import { Architecture } from './pages/Architecture'
 import { Home } from './pages/Home'
 import { InvitePage } from './pages/InvitePage'
 import { OrgPage } from './pages/OrgPage'
 import { ScanPage } from './pages/ScanPage'
+import './showcase.css'
 import { usePageMeta } from './usePageMeta'
+
+// The example reports (fixtures) load only on /examples.
+const Examples = lazy(() => import('./pages/Examples'))
 
 export default function App() {
   const { t } = useLang()
@@ -48,12 +55,16 @@ export default function App() {
           <Route path="/org" element={<OrgPage />} />
           <Route path="/org/scans/:id" element={<ScanPage org />} />
           <Route path="/invite" element={<InvitePage />} />
+          <Route path="/architecture" element={<Architecture />} />
+          <Route path="/examples" element={<Suspense><Examples /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 
       <footer className="footer">
-        <a href="https://fizsar.com">← fizsar.com</a> · <Link to="/about-scans">{t('nav.about')}</Link>
+        <a href="https://fizsar.com">← fizsar.com</a>
+        <Link to="/about-scans">{t('nav.about')}</Link>
+        <ShowcaseFooterLinks />
       </footer>
     </div>
   )
@@ -76,6 +87,16 @@ function AccountLink() {
     <Link to="/login" className="nav-link">
       {t('nav.login')}
     </Link>
+  )
+}
+
+function ShowcaseFooterLinks() {
+  const { t } = useShowcaseT()
+  return (
+    <>
+      <Link to="/examples">{t('links.examples')}</Link>
+      <Link to="/architecture">{t('footer.architecture')}</Link>
+    </>
   )
 }
 

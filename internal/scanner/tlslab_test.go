@@ -25,7 +25,7 @@ import (
 	"github.com/fizsar/quantumready-saas/internal/scanner/rawtls"
 )
 
-var labServers = []string{"ssl2", "ssl3", "export", "dhe1024", "tls10", "secp224", "tls12", "tls13", "kyber"}
+var labServers = []string{"ssl2", "ssl3", "export", "dhe1024", "tls10", "secp224", "tls12", "tls13", "modern", "kyber"}
 
 // knownDifferences are expected mismatches with testssl.sh, explained in
 // docs/validation.md. Key: server/aspect.

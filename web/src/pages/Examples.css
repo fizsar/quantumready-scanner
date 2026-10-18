@@ -1,0 +1,46 @@
+/* /examples (showcase). Uses the tokens of index.css. */
+.examples {
+  width: min(100%, 46rem);
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+.examples-toc {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  scroll-margin-top: 1rem;
+}
+.example .report {
+  width: 100%;
+}
+.example-lab {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--amber);
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+}
+.example-notes {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.example-notes dt {
+  color: rgb(var(--cyan));
+  font-weight: 700;
+  margin-top: 0.4rem;
+}
+.example-notes dd {
+  margin: 0;
+}
+.uth {
+  scroll-margin-top: 1rem;
+}

@@ -5,11 +5,80 @@ import (
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// publicViewKeys are the only top-level fields of a scan as the API serves it
+// (scanView). The web's "Download JSON" saves exactly that response.
+var publicViewKeys = []string{"id", "host", "port", "intensity", "status", "retries", "created_at", "started_at", "finished_at",
+	"error", "reused", "age_seconds", "queue_position", "queue_eta_seconds", "lang", "report"}
+
+// An organization's scan, downloaded from its page ("Download JSON" saves the
+// GET /api/org/scans/{id} response as is), carries the same fields as a
+// public one: no organization, user, domain or lease identifiers, and no
+// member's address. The public download keeps its shape too.
+func TestOrgScanDownloadHasNoInternalData(t *testing.T) {
+	a := newAuthAPI(t, AuthLimits{EmailIP: NewLimiter(100, 100)})
+	ana, me := a.signedIn(t, "ana@example.com", "203.0.113.1")
+	orgA := *me.ActiveOrgID
+	d := addDomain(t, ana, "fizsar.com")
+	a.verify(t, d.ID, "verified", 0)
+
+	sc, fs := labScan(t, "kyber", "lab.fizsar.com")
+	ctx := context.Background()
+	if _, err := a.owner.Exec(ctx, `INSERT INTO scans (id, host, port, status, created_at, started_at, finished_at, result, scoring,
+			scoring_version, grade, score, organization_id, intensity)
+		VALUES ($1, $2, 443, 'done', $3, $3, $4, $5, $6, $6::jsonb->>'scoring_version', $6::jsonb->>'grade', ($6::jsonb->>'score')::int, $7, 'full')`,
+		sc.ID, sc.Host, sc.CreatedAt, sc.FinishedAt, sc.Result, sc.Scoring, orgA); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range fs {
+		if _, err := a.owner.Exec(ctx, `INSERT INTO findings (scan_id, position, code, axis, severity, category, params) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			sc.ID, f.Position, f.Code, f.Axis, f.Severity, f.Category, f.Params); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	check := func(name string, body []byte) {
+		t.Helper()
+		var top map[string]json.RawMessage
+		if err := json.Unmarshal(body, &top); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for k := range top {
+			if !slices.Contains(publicViewKeys, k) {
+				t.Errorf("%s: field %q is not part of the public scan view", name, k)
+			}
+		}
+		raw := string(body)
+		for _, leak := range []string{orgA.String(), me.User.ID.String(), d.ID.String(), "ana@example.com",
+			"organization", "user_id", "requested_by", "lease", "domain_id", "attempts"} {
+			if strings.Contains(raw, leak) {
+				t.Errorf("%s: the downloaded JSON contains %q", name, leak)
+			}
+		}
+	}
+
+	w := ana.do(t, "GET", "/api/org/scans/"+sc.ID.String(), "")
+	expect(t, w, http.StatusOK, "")
+	check("organization scan", w.Body.Bytes())
+
+	// The public download: a public scan through the public endpoint.
+	pub, _ := labScan(t, "export", "fizsar.com")
+	if _, err := a.owner.Exec(ctx, `INSERT INTO scans (id, host, port, status, created_at, started_at, finished_at, result, scoring,
+			scoring_version, grade, score)
+		VALUES ($1, $2, 443, 'done', $3, $3, $4, $5, $6, $6::jsonb->>'scoring_version', $6::jsonb->>'grade', ($6::jsonb->>'score')::int)`,
+		pub.ID, pub.Host, pub.CreatedAt, pub.FinishedAt, pub.Result, pub.Scoring); err != nil {
+		t.Fatal(err)
+	}
+	w = a.client("203.0.113.9").do(t, "GET", "/api/scans/"+pub.ID.String(), "")
+	expect(t, w, http.StatusOK, "")
+	check("public scan", w.Body.Bytes())
+}
 
 // verify marks a domain verified (or lost since lostDaysAgo) as the worker would.
 func (a *authAPI) verify(t *testing.T, id uuid.UUID, status string, lostDaysAgo int) {

@@ -2,6 +2,8 @@ import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { solveAltcha } from '../altcha'
 import { ApiError, createScan, getAltcha, getTargets } from '../api'
+import { HostNotAllowed } from '../components/HostNotAllowed'
+import { ShowcaseHomeLinks } from '../components/ShowcaseLinks'
 import { useLang } from '../i18n'
 import { usePageMeta } from '../usePageMeta'
 import { errorMessage } from '../verdict'
@@ -118,13 +120,16 @@ export function Home() {
             </p>
           )}
           <p id={errorId} className="error" role="alert">
-            {error ? errorMessage(error, t) : ''}
+            {error && !(error.code === 'host_not_allowed' && !mode.open) ? errorMessage(error, t) : ''}
           </p>
         </form>
+        {/* The closed-beta explanation only while scanning is closed (PUBLIC_SCAN_OPEN=false). */}
+        {error?.code === 'host_not_allowed' && !mode.open && <HostNotAllowed targets={targets} busy={busy} onScan={(h) => void scan(h)} />}
         <p className="muted small">
           <Link to="/about-scans">{t('home.aboutScans')}</Link>
         </p>
       </section>
+      <ShowcaseHomeLinks />
     </div>
   )
 }

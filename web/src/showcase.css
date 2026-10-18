@@ -1,0 +1,14 @@
+/* Shared showcase styles, apart from index.css for a clean merge into main. */
+.showcase-links {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 1rem;
+}
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.5rem;
+}

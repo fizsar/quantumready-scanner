@@ -113,8 +113,12 @@ func printReport(r *scanner.Result, s scoring.Result, lang string) {
 	}
 
 	fmt.Printf("\n%s\n", t["findings"])
+	tctx := scoring.Context{ScanTime: r.StartedAt}
 	for _, f := range s.Findings {
-		txt := scoring.Describe(f.Code, f.Params, lang)
+		tctx.Codes = append(tctx.Codes, f.Code)
+	}
+	for _, f := range s.Findings {
+		txt := scoring.DescribeIn(f.Code, f.Params, lang, tctx)
 		fmt.Printf("  [%s · %s] %s\n", scoring.Label("severity."+string(f.Severity), lang), scoring.Label("axis."+string(f.Axis), lang), txt.Title)
 		fmt.Printf("      %s\n", txt.Detail)
 		if txt.Remediation != "" {

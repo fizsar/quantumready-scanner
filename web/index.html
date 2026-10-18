@@ -1,15 +1,68 @@
 <!doctype html>
-<html lang="es">
+<!-- lang and the metadata below are in English (link previews, search results);
+     the app switches lang to the visitor's language as soon as it loads. -->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05060b" />
+    <title>QuantumReady · Post-quantum audit of your website</title>
     <meta
       name="description"
-      content="QuantumReady: auditoría de preparación post-cuántica (PQC) para endpoints TLS. Próximamente."
+      content="Check whether your website already uses post-quantum key exchange (ML-KEM), which TLS versions and ciphers it accepts and which TLS certificate it presents. Results in plain language, in English and Spanish."
     />
-    <title>QuantumReady · Próximamente</title>
+    <!-- The SPA moves it to the current page (usePageMeta); this is the home page. -->
+    <link rel="canonical" href="https://quantumready.fizsar.com/" />
+
+    <!-- One preview for every route (SPA, no prerender yet). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="QuantumReady" />
+    <meta property="og:url" content="https://quantumready.fizsar.com/" />
+    <meta property="og:title" content="QuantumReady · Post-quantum audit of your website" />
+    <meta
+      property="og:description"
+      content="Is your website ready for the quantum era? Post-quantum key exchange (ML-KEM), TLS versions, ciphers and the TLS certificate, explained in plain language."
+    />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:locale:alternate" content="es_ES" />
+    <meta property="og:image" content="https://quantumready.fizsar.com/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="QuantumReady: is your website ready for the quantum era? Post-quantum key exchange and TLS audit."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="QuantumReady · Post-quantum audit of your website" />
+    <meta
+      name="twitter:description"
+      content="Is your website ready for the quantum era? ML-KEM, TLS versions, ciphers and the TLS certificate, in plain language."
+    />
+    <meta name="twitter:image" content="https://quantumready.fizsar.com/og.png" />
+    <meta
+      name="twitter:image:alt"
+      content="QuantumReady: is your website ready for the quantum era? Post-quantum key exchange and TLS audit."
+    />
+
+    <!-- Structured data: a data block, never executed, so script-src 'self' does not apply. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "QuantumReady",
+        "url": "https://quantumready.fizsar.com/",
+        "description": "Post-quantum readiness audit of a website: post-quantum key exchange (ML-KEM), TLS versions, ciphers and the TLS certificate, explained in plain language.",
+        "applicationCategory": "SecurityApplication",
+        "operatingSystem": "Any (web browser)",
+        "browserRequirements": "Requires JavaScript",
+        "inLanguage": ["en", "es"],
+        "isAccessibleForFree": true,
+        "image": "https://quantumready.fizsar.com/og.png",
+        "creator": { "@type": "Person", "name": "fizsar", "url": "https://fizsar.com/" }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

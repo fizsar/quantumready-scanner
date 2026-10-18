@@ -88,7 +88,17 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("database pool: %w", err)
 	}
-	defer pool.Close()
+	// Close the pool on the way out, but never hang on it: a stuck slot may
+	// still hold a connection when the worker gives up on it.
+	defer func() {
+		closed := make(chan struct{})
+		go func() { pool.Close(); close(closed) }()
+		select {
+		case <-closed:
+		case <-time.After(5 * time.Second):
+			logger.Warn("worker: database pool did not close within 5 s")
+		}
+	}()
 
 	hbPath := heartbeatPath()
 	scanOpts, err := scannerOptions(os.Getenv)
@@ -100,11 +110,6 @@ func run(logger *slog.Logger) error {
 		MaxPerMinute:       perMinute,
 		PublicQueueTimeout: queueTimeout,
 		Logger:             logger,
-		Heartbeat: func(oldest time.Time) {
-			if err := writeHeartbeat(hbPath, oldest); err != nil {
-				logger.Warn("worker: cannot write heartbeat", "err", err)
-			}
-		},
 	})
 	if err != nil {
 		return err
@@ -113,8 +118,19 @@ func run(logger *slog.Logger) error {
 	checker := &worker.DomainChecker{Queue: store.NewStore(pool).Queries, DNS: &dnscheck.Checker{}, Logger: logger}
 	go checker.Run(ctx)
 
-	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency, "max_scans_per_minute", perMinute, "public_queue_timeout", queueTimeout.String())
-	err = w.Run(ctx)
+	stuck := make(chan []int, 1)
+	hb := &heartbeatWriter{path: hbPath, every: heartbeatEvery, stale: w.Lease(), slots: w.SlotBeats, now: time.Now, log: logger,
+		exitAfter: stuckExitAfter, onStuck: func(slots []int) {
+			select {
+			case stuck <- slots:
+			default:
+			}
+		}}
+	go hb.run(ctx)
+	logger.Info("worker started", "version", version, "commit", commit, "concurrency", concurrency, "intensity", scanOpts.Intensity,
+		"max_scans_per_minute", perMinute, "public_queue_timeout", queueTimeout.String())
+	// In-flight scans get the worker's shutdown timeout (50 s) plus a margin.
+	err = supervise(ctx, w.Run, stuck, 60*time.Second)
 	logger.Info("worker stopped")
 	return err
 }
