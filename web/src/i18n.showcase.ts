@@ -167,7 +167,7 @@ const es = {
   'examples.lead':
     'Informes reales, con el mismo formato que verás al escanear tu web: uno de fizsar.com y tres de servidores de laboratorio, uno bien configurado según los estándares de hoy y dos configurados mal a propósito.',
   'examples.labNote':
-    'Los servidores de laboratorio viven en una red Docker interna, sin salida a Internet. Su certificado real es autofirmado, así que el informe lleva uno simulado y válido, con el mismo tipo de clave que el real y un emisor de laboratorio: la nota juzga la configuración de TLS. Como no se renueva de forma automatizada, pierde los 5 puntos de ese apartado.',
+    'Los servidores de laboratorio viven en una red Docker interna, sin salida a Internet. Su certificado real es autofirmado, así que el informe lleva uno simulado y válido, con el mismo tipo de clave que el real y un emisor de laboratorio. Así la nota valora su configuración de TLS y un certificado válido sin renovación automatizada (5 puntos menos), no el hecho de que el real sea autofirmado.',
   'examples.nav': 'Ejemplos en esta página',
   'examples.heading': '{host} · {grade} · {score}',
   'examples.lab': 'Servidor de laboratorio aislado; no es un sitio real',
@@ -365,7 +365,7 @@ const en: Record<ShowcaseKey, string> = {
   'examples.lead':
     'Real reports, in the same format you get when you scan your website: one of fizsar.com and three of lab servers, one well configured by today’s standards and two misconfigured on purpose.',
   'examples.labNote':
-    'The lab servers live on an internal Docker network with no way out to the Internet. Their real certificate is self-signed, so the report carries a simulated valid one, with the same key type as the real one and a lab issuer: the grade judges the TLS setup. As it is not renewed in an automated way, it loses the 5 points for that.',
+    'The lab servers live on an internal Docker network with no way out to the Internet. Their real certificate is self-signed, so the report carries a simulated valid one, with the same key type as the real one and a lab issuer. So the grade reflects its TLS setup and a valid certificate without automated renewal (5 points less), not the fact that the real one is self-signed.',
   'examples.nav': 'Examples on this page',
   'examples.heading': '{host} · {grade} · {score}',
   'examples.lab': 'Isolated lab server; not a real website',
