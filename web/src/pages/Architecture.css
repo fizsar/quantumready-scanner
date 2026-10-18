@@ -16,17 +16,6 @@
   flex-direction: column;
   gap: 0.6rem;
 }
-.arch-badge {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--amber);
-  border: 1px solid currentColor;
-  border-radius: 6px;
-  padding: 0.05rem 0.4rem;
-  margin-left: 0.4rem;
-  vertical-align: middle;
-}
 .arch-dev {
   border-style: dashed;
 }

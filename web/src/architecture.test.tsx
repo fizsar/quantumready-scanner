@@ -21,8 +21,8 @@ function renderAt(path: string, lang: Lang) {
 
 const heading = { es: 'Arquitectura', en: 'Architecture' }
 const sections = {
-  es: ['El flujo de un escaneo', 'Motor de escaneo', 'Modelo de puntuación (2026.2)', 'Seguridad del propio servicio', 'Calidad', 'Operación', /En desarrollo/, 'Código'],
-  en: ['The path of a scan', 'Scanning engine', 'Scoring model (2026.2)', 'Security of the service itself', 'Quality', 'Operations', /In development/, 'Code'],
+  es: ['El flujo de un escaneo', 'Motor de escaneo', 'Modelo de puntuación (2026.2)', 'Seguridad del propio servicio', 'Calidad', 'Operación', 'En desarrollo', 'Verlo en marcha', 'Código'],
+  en: ['The path of a scan', 'Scanning engine', 'Scoring model (2026.2)', 'Security of the service itself', 'Quality', 'Operations', 'In development', 'See it working', 'Code'],
 }
 
 const forbidden = forbiddenProse
@@ -36,9 +36,10 @@ describe('/architecture', () => {
       expect(document.title).toBe(showcaseDict[lang]['arch.meta.title'])
       const link = screen.getByRole('link', { name: 'soporte@fizsar.com' })
       expect(link.getAttribute('href')).toBe('mailto:soporte@fizsar.com')
-      // The in-development part says so and links nowhere.
+      // The in-development part says so once (heading only) and links nowhere.
       const dev = screen.getByRole('region', { name: sections[lang][6] })
-      expect(within(dev).getByText(showcaseDict[lang]['arch.dev.badge'])).toBeTruthy()
+      expect(within(dev).getByRole('heading', { level: 2 }).textContent).toBe(showcaseDict[lang]['arch.dev.title'])
+      expect(dev.textContent?.match(/en desarrollo|in development/gi)).toHaveLength(1)
       expect(within(dev).queryAllByRole('link')).toHaveLength(0)
     })
 

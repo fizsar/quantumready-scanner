@@ -65,15 +65,7 @@ export function Architecture() {
         {list(['arch.ops.backup', 'arch.ops.restore', 'arch.ops.alerts', 'arch.ops.deploy'])}
       </Section>
 
-      <Section
-        id="arch-dev"
-        className="arch-dev"
-        title={
-          <>
-            {t('arch.dev.title')} <span className="arch-badge">{t('arch.dev.badge')}</span>
-          </>
-        }
-      >
+      <Section id="arch-dev" className="arch-dev" title={t('arch.dev.title')}>
         <p className="muted">{t('arch.dev.lead')}</p>
         {list(['arch.dev.accounts', 'arch.dev.domains', 'arch.dev.public', 'arch.dev.idor'])}
       </Section>
