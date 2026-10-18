@@ -373,10 +373,10 @@ var findingTexts = map[string]langTexts{
 	},
 	"CERT_NOT_AUTOMATED": {
 		"es": {Title: "Sin señales de renovación automatizada",
-			Detail:      "Validez de {days} días, emitido por {issuer}. La validez máxima baja a 200 días (marzo de 2026), 100 (2027) y 47 (2029), y el cambio a certificados post-cuánticos exigirá reemitirlos: sin automatización, cada cambio es trabajo manual y riesgo de caducidad.",
+			Detail:      "Validez de {days} días, emitido por {issuer}. {validity_schedule}. El cambio a certificados post-cuánticos exigirá reemitirlos: sin automatización, cada cambio es trabajo manual y riesgo de caducidad.",
 			Remediation: "Automatiza la emisión y renovación con ACME (certbot, Caddy, cert-manager…), con tu autoridad actual si lo soporta o con una autoridad gratuita."},
 		"en": {Title: "No sign of automated renewal",
-			Detail:      "{days}-day validity, issued by {issuer}. Maximum validity drops to 200 days (March 2026), 100 (2027) and 47 (2029), and moving to post-quantum certificates will require reissuing them: without automation, every change is manual work and an expiry risk.",
+			Detail:      "{days}-day validity, issued by {issuer}. {validity_schedule}. Moving to post-quantum certificates will require reissuing them: without automation, every change is manual work and an expiry risk.",
 			Remediation: "Automate issuance and renewal with ACME (certbot, Caddy, cert-manager…), with your current authority if it supports it or a free one."},
 	},
 	"CERT_CT": {

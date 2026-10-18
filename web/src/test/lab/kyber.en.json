@@ -124,7 +124,7 @@
         "severity_label": "Low",
         "category": "certificate",
         "title": "No sign of automated renewal",
-        "detail": "90-day validity, issued by QuantumReady TLS lab. Maximum validity drops to 200 days (March 2026), 100 (2027) and 47 (2029), and moving to post-quantum certificates will require reissuing them: without automation, every change is manual work and an expiry risk.",
+        "detail": "90-day validity, issued by QuantumReady TLS lab. Maximum certificate validity is already 200 days (since 15 March 2026) and will drop to 100 days on 15 March 2027 and to 47 on 15 March 2029 (CA/Browser Forum ballot SC-081). Moving to post-quantum certificates will require reissuing them: without automation, every change is manual work and an expiry risk.",
         "remediation": "Automate issuance and renewal with ACME (certbot, Caddy, cert-manager…), with your current authority if it supports it or a free one."
       },
       {

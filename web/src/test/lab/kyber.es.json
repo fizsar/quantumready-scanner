@@ -124,7 +124,7 @@
         "severity_label": "Bajo",
         "category": "certificate",
         "title": "Sin señales de renovación automatizada",
-        "detail": "Validez de 90 días, emitido por QuantumReady TLS lab. La validez máxima baja a 200 días (marzo de 2026), 100 (2027) y 47 (2029), y el cambio a certificados post-cuánticos exigirá reemitirlos: sin automatización, cada cambio es trabajo manual y riesgo de caducidad.",
+        "detail": "Validez de 90 días, emitido por QuantumReady TLS lab. La validez máxima de los certificados ya es de 200 días (desde el 15 de marzo de 2026) y bajará a 100 días el 15 de marzo de 2027 y a 47 el 15 de marzo de 2029 (votación SC-081 del CA/Browser Forum). El cambio a certificados post-cuánticos exigirá reemitirlos: sin automatización, cada cambio es trabajo manual y riesgo de caducidad.",
         "remediation": "Automatiza la emisión y renovación con ACME (certbot, Caddy, cert-manager…), con tu autoridad actual si lo soporta o con una autoridad gratuita."
       },
       {
