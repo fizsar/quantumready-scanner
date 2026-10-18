@@ -12,7 +12,7 @@ import fizsarEn from './test/lab/fizsar.en.json'
 import fizsarEs from './test/lab/fizsar.es.json'
 import kyberEn from './test/lab/kyber.en.json'
 import kyberEs from './test/lab/kyber.es.json'
-import { parseError, probeRows, resultOf, type ScanResult } from './underTheHood'
+import { otherRawProbes, parseError, probeRows, resultOf, type ScanResult } from './underTheHood'
 
 // Real scans: fizsar.com as the scanner saw it, and two servers of the
 // isolated TLS lab (test/tlslab), through the API (internal/httpapi/fixtures_test.go).
@@ -177,6 +177,36 @@ describe('Under the hood panel', () => {
     )
     await screen.findByText('Nota: A')
     expect(screen.queryByRole('button', { name: 'Bajo el capó' })).toBeNull()
+  })
+})
+
+describe('raw probes in the panel', () => {
+  it('lists the raw version probes oldest first and counts the rest exactly', async () => {
+    const r = resultOf(scans.fizsar.en.report!)!
+    const raw = probeRows(r).filter((p) => p.source === 'raw').map((p) => (p.offer.kind === 'version' ? p.offer.version : ''))
+    expect(raw).toEqual(['SSLv2', 'SSLv3', 'TLS 1.0', 'TLS 1.1'])
+    expect(r.raw!.probes).toBe(11)
+    expect(otherRawProbes(r)).toBe(7) // 11 connections, 4 listed one by one
+
+    const panel = await openPanel(scans.fizsar.en, 'en')
+    expect(within(panel).getByText('The other 7 raw probes enumerate suites and groups; the API keeps what they found, in the tables above.')).toBeTruthy()
+  })
+
+  it('export: 38 raw connections, 5 listed', async () => {
+    const r = resultOf(scans.export.es.report!)!
+    expect(otherRawProbes(r)).toBe(r.raw!.probes - 2 - (r.raw!.versions ?? []).length)
+    expect(otherRawProbes(r)).toBe(33)
+    const panel = await openPanel(scans.export.es, 'es')
+    expect(within(panel).getByText(/^Las otras 33 sondas en crudo/)).toBeTruthy()
+  })
+
+  it('a probe the budget refused made no connection; numbers that do not add up get no number', () => {
+    const base = resultOf(scans.fizsar.en.report!)!
+    const budget = 'scanner: raw probe budget exhausted'
+    const refused = { ...base, raw: { ...base.raw!, probes: 3, versions: [{ version: 'TLS 1.0', id: 769, status: 'error' as const, error: budget }] } }
+    expect(otherRawProbes(refused)).toBe(1) // 3 connections: SSLv2, SSLv3 and one more; TLS 1.0 was never sent
+    const odd = { ...base, raw: { ...base.raw!, probes: 2 } } // fewer connections than rows listed
+    expect(otherRawProbes(odd)).toBeUndefined()
   })
 })
 

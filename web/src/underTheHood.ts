@@ -192,14 +192,37 @@ export function probeRows(r: ScanResult): ProbeRow[] {
     rows.push({ source: 'cryptotls', offer: { kind: 'group', group: g.name, id: g.id }, reply: protoReply(g, { kind: 'hello', group: g.name }) })
   }
   if (r.raw) {
+    const raw: ProbeRow[] = []
     for (const [version, p] of [['SSLv2', r.raw.sslv2], ['SSLv3', r.raw.sslv3]] as const) {
-      rows.push({ source: 'raw', offer: { kind: 'version', version }, reply: protoReply(p, { kind: 'hello', version, ciphers: p.ciphers?.length }) })
+      raw.push({ source: 'raw', offer: { kind: 'version', version }, reply: protoReply(p, { kind: 'hello', version, ciphers: p.ciphers?.length }) })
     }
     for (const v of r.raw.versions ?? []) {
-      rows.push({ source: 'raw', offer: { kind: 'version', version: v.version }, reply: protoReply(v, { kind: 'hello', version: v.version }) })
+      raw.push({ source: 'raw', offer: { kind: 'version', version: v.version }, reply: protoReply(v, { kind: 'hello', version: v.version }) })
     }
+    // Oldest version first: SSLv2, SSLv3, TLS 1.0, TLS 1.1…
+    const rank = (row: ProbeRow) => VERSION_ORDER.indexOf(row.offer.kind === 'version' ? row.offer.version : '')
+    rows.push(...raw.sort((a, b) => rank(a) - rank(b)))
   }
   return rows
+}
+
+const VERSION_ORDER = ['SSLv2', 'SSLv3', 'TLS 1.0', 'TLS 1.1', 'TLS 1.2', 'TLS 1.3']
+
+/** The scanner's error when the raw probe budget refused a connection (internal/scanner/raw.go). */
+const BUDGET_ERROR = 'raw probe budget exhausted'
+
+/**
+ * How many raw probes the panel does not list one by one: raw.probes counts
+ * every raw connection made (internal/scanner/raw.go, exchange), and each
+ * listed raw row (SSLv2, SSLv3, every raw.versions entry) is exactly one
+ * connection, unless the budget refused it (then it was not made). Undefined
+ * when the numbers do not add up, so the panel says it without a number.
+ */
+export function otherRawProbes(r: ScanResult): number | undefined {
+  if (!r.raw) return undefined
+  const listed = [r.raw.sslv2, r.raw.sslv3, ...(r.raw.versions ?? [])].filter((p) => !p.error?.includes(BUDGET_ERROR)).length
+  const others = r.raw.probes - listed
+  return others >= 0 ? others : undefined
 }
 
 /** Every version tried, oldest first, with whether any probe got it accepted. */

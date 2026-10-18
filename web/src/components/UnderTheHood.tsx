@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useId, useState } from 'react'
 import { useLocation } from 'react-router'
 import type { ScanView } from '../api'
 import { useShowcaseT, type ShowcaseKey } from '../i18n.showcase'
-import { downloadJSON, hex, parseError, probeRows, resultOf, suitesByVersion, versionsTried, type Offer, type Reply, type ScanResult } from '../underTheHood'
+import { downloadJSON, hex, otherRawProbes, parseError, probeRows, resultOf, suitesByVersion, versionsTried, type Offer, type Reply, type ScanResult } from '../underTheHood'
 import './UnderTheHood.css'
 
 type T = (key: ShowcaseKey, vars?: Record<string, string | number>) => string
@@ -236,9 +236,16 @@ function Probes({ r, t }: { r: ScanResult; t: T }) {
           </li>
         ))}
       </ol>
-      {r.raw && <p className="muted small">{t('uth.probes.rawNote', { n: r.raw.probes })}</p>}
+      {r.raw && <p className="muted small">{rawNote(otherRawProbes(r), t)}</p>}
     </section>
   )
+}
+
+function rawNote(n: number | undefined, t: T) {
+  if (n === undefined) return t('uth.probes.rawNoteSome')
+  if (n === 0) return t('uth.probes.rawNoteNone')
+  if (n === 1) return t('uth.probes.rawNoteOne')
+  return t('uth.probes.rawNote', { n })
 }
 
 function OfferText({ offer, t }: { offer: Offer; t: T }) {
