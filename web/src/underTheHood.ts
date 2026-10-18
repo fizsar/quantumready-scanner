@@ -62,6 +62,9 @@ export interface ScanResult {
   raw?: {
     probes: number
     budget_exhausted?: boolean
+    // suites, tls13_groups and tls12_curves hold only what crypto/tls did not
+    // already find; scans before S6d lack this field and may hold null.
+    lists_exclude_crypto_tls?: boolean
     sslv2: RawProtocol
     sslv3: RawProtocol
     versions?: VersionProbe[]

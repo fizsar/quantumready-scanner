@@ -141,6 +141,7 @@ func readResult(t *testing.T, path string) *scanner.Result {
 }
 
 func storedScan(server, host string, r *scanner.Result) (store.Scan, []store.Finding) {
+	r.Raw.Normalize() // the form the scanner writes today (these scans predate it)
 	s := scoring.Evaluate(r)
 	result, _ := json.Marshal(r)
 	scoringJSON, _ := json.Marshal(s)

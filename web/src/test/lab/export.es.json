@@ -400,6 +400,7 @@
       "connections": 53,
       "raw": {
         "probes": 38,
+        "lists_exclude_crypto_tls": true,
         "sslv2": {
           "status": "not_supported",
           "error": "EOF"
@@ -410,8 +411,8 @@
         },
         "versions": [
           {
-            "version": "TLS 1.2",
-            "id": 771,
+            "version": "TLS 1.0",
+            "id": 769,
             "status": "supported"
           },
           {
@@ -420,8 +421,8 @@
             "status": "supported"
           },
           {
-            "version": "TLS 1.0",
-            "id": 769,
+            "version": "TLS 1.2",
+            "id": 771,
             "status": "supported"
           }
         ],
@@ -714,7 +715,7 @@
           }
         ],
         "suites_complete": true,
-        "tls13_suites": null,
+        "tls13_suites": [],
         "tls13_suites_complete": true,
         "dh": [
           {
@@ -723,9 +724,9 @@
             "prime_bits": 512
           }
         ],
-        "tls13_groups": null,
+        "tls13_groups": [],
         "tls13_groups_complete": true,
-        "tls12_curves": null,
+        "tls12_curves": [],
         "tls12_curves_complete": true
       }
     }

@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -74,16 +75,28 @@ type Result struct {
 
 // RawResult is what the raw ClientHello probes (internal/scanner/rawtls)
 // observed: what crypto/tls cannot offer. A "complete" flag is false when an
-// enumeration stopped on an error or on the probe budget.
+// enumeration stopped on an error or on the probe budget; true means the
+// enumeration finished, whatever it found.
+//
+// Suites, TLS13Groups and TLS12Curves list only what crypto/tls did not
+// already find or probe (ListsExcludeCryptoTLS): an empty list means
+// "nothing beyond key_exchange.groups and the tls1x_cipher_suites lists",
+// not "none at all". Results written before showcase S6d may hold null
+// instead of an empty list and lack ListsExcludeCryptoTLS, with the same
+// meaning; Normalize brings them to the current form.
 type RawResult struct {
 	Probes          int  `json:"probes"` // raw connections used
 	BudgetExhausted bool `json:"budget_exhausted,omitempty"`
 
+	// ListsExcludeCryptoTLS is always true: see above.
+	ListsExcludeCryptoTLS bool `json:"lists_exclude_crypto_tls"`
+
 	SSLv2 RawProtocol `json:"sslv2"`
 	SSLv3 RawProtocol `json:"sslv3"`
 
-	// Versions: TLS 1.2, 1.1 and 1.0 as seen by the raw probes, for the
-	// versions crypto/tls did not find (it cannot offer their suites).
+	// Versions: TLS 1.0, 1.1 and 1.2 (oldest first) as seen by the raw
+	// probes, for the versions crypto/tls did not find (it cannot offer
+	// their suites).
 	Versions []VersionProbe `json:"versions,omitempty"`
 
 	// Suites lists, per version (TLS 1.2, then 1.1, 1.0 and, only if the
@@ -110,6 +123,29 @@ type RawResult struct {
 	TLS12Curves         []RawGroup `json:"tls12_curves"`
 	TLS12CurvesComplete bool       `json:"tls12_curves_complete"`
 	ExplicitCurve       bool       `json:"explicit_curve,omitempty"` // EC parameters sent explicitly
+}
+
+// Normalize brings a raw result to the current form: empty lists instead of
+// null, ListsExcludeCryptoTLS set, Versions oldest first. Idempotent; the
+// scanner applies it to every new result, and it reads old ones the same way.
+func (r *RawResult) Normalize() {
+	if r == nil {
+		return
+	}
+	r.ListsExcludeCryptoTLS = true
+	if r.Suites == nil {
+		r.Suites = []RawSuite{}
+	}
+	if r.TLS13Suites == nil {
+		r.TLS13Suites = []RawSuite{}
+	}
+	if r.TLS13Groups == nil {
+		r.TLS13Groups = []RawGroup{}
+	}
+	if r.TLS12Curves == nil {
+		r.TLS12Curves = []RawGroup{}
+	}
+	slices.SortStableFunc(r.Versions, func(a, b VersionProbe) int { return int(a.ID) - int(b.ID) })
 }
 
 // RawProtocol is the result of offering SSLv2 or SSLv3.
