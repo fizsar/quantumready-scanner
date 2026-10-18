@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import type { Lang } from './api'
@@ -33,7 +33,7 @@ describe('/architecture', () => {
       renderAt('/architecture', lang)
       expect(await screen.findByRole('heading', { level: 1, name: heading[lang] })).toBeTruthy()
       for (const s of sections[lang]) expect(screen.getByRole('region', { name: s }), String(s)).toBeTruthy()
-      expect(document.title).toBe(showcaseDict[lang]['arch.meta.title'])
+      await waitFor(() => expect(document.title).toBe(showcaseDict[lang]['arch.meta.title'])) // set in an effect
       const link = screen.getByRole('link', { name: 'soporte@fizsar.com' })
       expect(link.getAttribute('href')).toBe('mailto:soporte@fizsar.com')
       // The in-development part says so once (heading only) and links nowhere.

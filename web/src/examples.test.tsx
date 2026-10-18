@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import type { Lang } from './api'
@@ -37,7 +37,8 @@ describe('/examples', () => {
     it(`renders every example with its grade (${lang})`, async () => {
       renderAt('/examples', lang)
       expect(await screen.findByRole('heading', { level: 1, name: showcaseDict[lang]['examples.title'] })).toBeTruthy()
-      expect(document.title).toBe(showcaseDict[lang]['examples.meta.title'])
+      // Set in an effect: on a slow runner it can land after the heading.
+      await waitFor(() => expect(document.title).toBe(showcaseDict[lang]['examples.meta.title']))
       for (const { key, lab, scans } of EXAMPLES) {
         const scan = scans[lang]
         const [grade, score] = shown[key]
