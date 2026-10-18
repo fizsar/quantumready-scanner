@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Lang } from './api'
 import App from './App'
 import { uthAnchor } from './exampleAnchors'
@@ -63,15 +63,14 @@ describe('/examples', () => {
 
   // kyber finished at 22:04:37 UTC and fizsar.com at 11:47:58 UTC: near
   // midnight in some zone, so header and footer must use the same one (the
-  // visitor's). TZ changes at runtime reach Date and Intl in Node.
+  // visitor's). TZ changes at runtime (vi.stubEnv) reach Date and Intl in Node.
   for (const [zone, kyberDay, fizsarDay] of [
     ['UTC', '14 October 2026', '17 October 2026'],
     ['Pacific/Kiritimati', '15 October 2026', '18 October 2026'], // UTC+14
     ['America/Los_Angeles', '14 October 2026', '17 October 2026'],
   ] as const) {
     it(`header and report footer give the same day (${zone})`, async () => {
-      const before = process.env.TZ
-      process.env.TZ = zone
+      vi.stubEnv('TZ', zone)
       try {
         renderAt('/examples', 'en')
         await screen.findByRole('heading', { level: 1, name: 'Examples' })
@@ -85,7 +84,7 @@ describe('/examples', () => {
           expect(footer, `${key} footer`).toContain(`Scanned on ${day} at `)
         }
       } finally {
-        process.env.TZ = before
+        vi.unstubAllEnvs()
       }
     })
   }
