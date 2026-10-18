@@ -2,15 +2,16 @@
 
 | Servidor | full: conexiones | full: sondas en crudo | full: duración (local) | full: duración (RTT 100 ms) | basic: conexiones | basic: duración (local) | basic: duración (RTT 100 ms) |
 |---|---|---|---|---|---|---|---|
-| `ssl2` | 21 | 6 | 17 ms | 1614 ms | 15 | 4 ms | 1006 ms |
-| `ssl3` | 45 | 30 | 120 ms | 6521 ms | 15 | 31 ms | 1027 ms |
-| `export` | 53 | 38 | 50 ms | 8105 ms | 15 | 3 ms | 1008 ms |
-| `dhe1024` | 31 | 16 | 61 ms | 3688 ms | 15 | 4 ms | 1009 ms |
-| `tls10` | 30 | 11 | 75 ms | 3448 ms | 19 | 26 ms | 1837 ms |
-| `secp224` | 31 | 16 | 43 ms | 3662 ms | 15 | 4 ms | 1010 ms |
-| `tls12` | 49 | 33 | 29 ms | 7084 ms | 16 | 6 ms | 1017 ms |
-| `tls13` | 32 | 17 | 17 ms | 3430 ms | 15 | 8 ms | 1010 ms |
-| `kyber` | 26 | 11 | 8 ms | 2214 ms | 15 | 4 ms | 1007 ms |
+| `ssl2` | 21 | 6 | 17 ms | 1618 ms | 15 | 3 ms | 1009 ms |
+| `ssl3` | 45 | 30 | 145 ms | 6615 ms | 15 | 49 ms | 1045 ms |
+| `export` | 53 | 38 | 55 ms | 8102 ms | 15 | 4 ms | 1012 ms |
+| `dhe1024` | 31 | 16 | 97 ms | 3697 ms | 15 | 17 ms | 1009 ms |
+| `tls10` | 30 | 11 | 137 ms | 3461 ms | 19 | 43 ms | 1830 ms |
+| `secp224` | 31 | 16 | 57 ms | 3666 ms | 15 | 5 ms | 1008 ms |
+| `tls12` | 49 | 33 | 36 ms | 7074 ms | 16 | 8 ms | 1015 ms |
+| `tls13` | 32 | 17 | 21 ms | 3432 ms | 15 | 9 ms | 1013 ms |
+| `modern` | 29 | 11 | 28 ms | 2433 ms | 18 | 16 ms | 1430 ms |
+| `kyber` | 26 | 11 | 9 ms | 2218 ms | 15 | 8 ms | 1009 ms |
 
 ## Comparación con testssl.sh
 
@@ -40,6 +41,10 @@
 | `tls13` | protocolos | 1 | 1 | = |
 | `tls13` | suites TLS 1.3 | 5 | 5 | = |
 | `tls13` | grupos | 8 | 8 | = |
+| `modern` | protocolos | 2 | 2 | = |
+| `modern` | suites TLS 1.0–1.2 | 3 | 3 | = |
+| `modern` | suites TLS 1.3 | 3 | 3 | = |
+| `modern` | grupos | 2 | 2 | = |
 | `kyber` | protocolos | 1 | 1 | = |
 | `kyber` | suites TLS 1.3 | 3 | 3 | = |
 | `kyber` | grupos | 0 | 2 | **vemos más**: [X25519Kyber768Draft00 x25519] |

@@ -12,14 +12,14 @@ import (
 )
 
 // labResults loads the real scans of the TLS lab servers (intensity full),
-// copied from test/tlslab/results in milestone 2.7.4. The lab certificates
+// copied from test/tlslab/results in milestone 2.7.4 (modern in showcase S4b). The lab certificates
 // are self-signed (or not captured at all where crypto/tls cannot connect),
 // and their F cap would hide every protocol and suite rule, so each result
 // gets the valid certificate of ideal(): what is judged is the TLS setup.
 func labResults(t *testing.T) map[string]*scanner.Result {
 	t.Helper()
 	files, err := filepath.Glob(filepath.Join("testdata", "lab", "*.json"))
-	if err != nil || len(files) != 9 {
+	if err != nil || len(files) != 10 {
 		t.Fatalf("lab results: %v, %d files", err, len(files))
 	}
 	out := map[string]*scanner.Result{}
@@ -79,6 +79,8 @@ func TestLabServers(t *testing.T) {
 		"tls12":   {40, "D", "B", []string{"SUITE_CBC"}, []string{"DH_OK", "SUITE_CCM8", "SUITE_CBC", "GROUPS_EXTRA", "FS_PARTIAL"}},
 		"tls13":   {100, "A", "", nil, []string{"KEX_HYBRID_PREFERRED", "KEX_MULTIPLE_PQC", "KEX_PURE_MLKEM", "SUITE_CCM8", "GROUPS_EXTRA"}},
 		"kyber":   {45, "D", "", nil, []string{"KEX_NO_HYBRID", "KEX_EXPERIMENTAL_PQC_ONLY", "TLS13_SUITES_AEAD", "FS_ALL"}},
+		// Well configured today, not quantum-ready: nothing to cap, no PQC.
+		"modern": {45, "D", "", nil, []string{"KEX_NO_HYBRID", "TLS13_SUPPORTED", "TLS13_SUITES_AEAD", "FS_ALL", "CERT_VALID"}},
 	}
 	for name, r := range labResults(t) {
 		res := Evaluate(r)

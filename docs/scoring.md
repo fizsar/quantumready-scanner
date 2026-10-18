@@ -96,7 +96,7 @@ Con intensidad `full` (`docs/scanner.md`), el escáner ve lo que `crypto/tls` no
 - Las notas guardadas no se recalculan: cada escaneo conserva su `scoring_version`. Los 6 escaneos de producción siguen en 2026.1; los nuevos llevarán 2026.2.
 - Nuestros dominios (Caddy, TLS de Go) no tienen nada de lo nuevo: siguen en **A · 95** con intensidad `full` y 2026.2 (comprobado con `qrscan`, `docs/validation.md`).
 
-Pruebas: `internal/scoring/lab_test.go` puntúa el resultado real de los 9 servidores del laboratorio (con un certificado válido, para juzgar solo la configuración TLS) y casos sintéticos para lo que ningún servidor del laboratorio tiene (solo integridad, AEGIS, Kyber junto a ML-KEM).
+Pruebas: `internal/scoring/lab_test.go` puntúa el resultado real de los 10 servidores del laboratorio (con un certificado válido, para juzgar solo la configuración TLS) y casos sintéticos para lo que ningún servidor del laboratorio tiene (solo integridad, AEGIS, Kyber junto a ML-KEM).
 
 ## Lo que no puntúa
 
@@ -107,6 +107,92 @@ Pruebas: `internal/scoring/lab_test.go` puntúa el resultado real de los 9 servi
 ## Hallazgos
 
 Cada hallazgo tiene `code` estable, `axis` (`quantum`/`current`), `severity` (`critical`, `high`, `medium`, `low`, `info`, `pass`), `category` y `params`. En base de datos solo se guardan código y parámetros; los textos ES/EN (título, explicación, remediación) viven en `internal/scoring/catalog.go`, así que se pueden corregir sin migrar datos. Un test comprueba que todos los códigos tienen texto en ambos idiomas y que ningún marcador queda sin rellenar.
+
+### Referencias por hallazgo
+
+La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/scoring/references_test.go`) comprueba que cada código del catálogo tiene aquí una fila con al menos una fuente (RFC, CVE, borrador del IETF, publicación del NIST/FIPS o votación del CA/Browser Forum), que cada fuente es un enlace a su sitio oficial (rfc-editor.org, nvd.nist.gov, csrc.nist.gov, datatracker.ietf.org o cabforum.org) con su título en «Fuentes», y que no sobra ninguna fila. Quedan fuera tres códigos que no juzgan al servidor, sino que dicen que el escaneo no pudo comprobar algo (no puntúan, ver «Lo que no puntúa»): `SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN` y `CERT_MISSING`.
+
+| Código | Referencia |
+|---|---|
+| `KEX_HYBRID_PREFERRED`, `KEX_HYBRID_NOT_PREFERRED`, `KEX_SINGLE_HYBRID`, `KEX_MULTIPLE_HYBRIDS` | [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024) (X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024); [FIPS 203](https://csrc.nist.gov/pubs/fips/203/final) (ML-KEM) |
+| `KEX_NO_HYBRID` | [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024); [FIPS 203](https://csrc.nist.gov/pubs/fips/203/final) |
+| `KEX_PURE_MLKEM`, `KEX_MULTIPLE_PQC` | [FIPS 203](https://csrc.nist.gov/pubs/fips/203/final); [draft-ietf-tls-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-mlkem/) |
+| `KEX_EXPERIMENTAL_PQC_ONLY`, `KEX_EXPERIMENTAL_PQC_EXTRA` | [draft-tls-westerbaan-xyber768d00](https://datatracker.ietf.org/doc/draft-tls-westerbaan-xyber768d00/) (borrador caducado, anterior al estándar) |
+| `TLS13_SUPPORTED`, `TLS13_MISSING` | [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446); [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024) (los grupos híbridos son de TLS 1.3) |
+| `TLS13_SUITES_AEAD` | [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446), sección 9.1 y apéndice B.4 |
+| `SUITE_INTEGRITY_ONLY` | [RFC 9150](https://www.rfc-editor.org/rfc/rfc9150) |
+| `SUITE_CCM8` | [RFC 6655](https://www.rfc-editor.org/rfc/rfc6655); [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) |
+| `SUITE_MODERN_AEAD` | [NIST SP 800-232](https://csrc.nist.gov/pubs/sp/800/232/final) (Ascon) |
+| `SUITE_NULL` | [RFC 5246](https://www.rfc-editor.org/rfc/rfc5246), apéndice C |
+| `SUITE_EXPORT` | [CVE-2015-0204](https://nvd.nist.gov/vuln/detail/CVE-2015-0204) (FREAK); [CVE-2015-4000](https://nvd.nist.gov/vuln/detail/CVE-2015-4000) (Logjam) |
+| `SUITE_ANON` | [RFC 5246](https://www.rfc-editor.org/rfc/rfc5246), apéndice F.1.1.1 |
+| `SUITE_DES` | [RFC 5469](https://www.rfc-editor.org/rfc/rfc5469); [FIPS 46-3](https://csrc.nist.gov/pubs/fips/46-3/final) (retirado) |
+| `SUITE_RC4` | [RFC 7465](https://www.rfc-editor.org/rfc/rfc7465) |
+| `SUITE_3DES` | [CVE-2016-2183](https://nvd.nist.gov/vuln/detail/CVE-2016-2183) (Sweet32) |
+| `SUITE_CBC` | [CVE-2013-0169](https://nvd.nist.gov/vuln/detail/CVE-2013-0169) (Lucky Thirteen); [RFC 7457](https://www.rfc-editor.org/rfc/rfc7457) |
+| `SYM_AES128` | [NIST SP 800-57 Part 1 Rev. 5](https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final) (AES-128 da 128 bits de seguridad) |
+| `PROTO_SSL2` | [RFC 6176](https://www.rfc-editor.org/rfc/rfc6176); [CVE-2016-0800](https://nvd.nist.gov/vuln/detail/CVE-2016-0800) (DROWN) |
+| `PROTO_SSL3` | [RFC 7568](https://www.rfc-editor.org/rfc/rfc7568); [CVE-2014-3566](https://nvd.nist.gov/vuln/detail/CVE-2014-3566) (POODLE) |
+| `PROTO_LEGACY_TLS` | [RFC 8996](https://www.rfc-editor.org/rfc/rfc8996) |
+| `FS_ALL`, `FS_PARTIAL`, `FS_NONE` | [RFC 9325](https://www.rfc-editor.org/rfc/rfc9325) (BCP 195) |
+| `DH_WEAK` | [CVE-2015-4000](https://nvd.nist.gov/vuln/detail/CVE-2015-4000) (Logjam) |
+| `DH_SMALL`, `DH_OK` | [NIST SP 800-131A Rev. 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final); [RFC 7919](https://www.rfc-editor.org/rfc/rfc7919) |
+| `GROUP_WEAK_CURVES` | [RFC 8422](https://www.rfc-editor.org/rfc/rfc8422); [RFC 9847](https://www.rfc-editor.org/rfc/rfc9847) (marca secp224r1, secp192r1 y las curvas binarias como desaconsejadas, «D») |
+| `GROUPS_EXTRA` | [RFC 7919](https://www.rfc-editor.org/rfc/rfc7919) (ffdhe); [RFC 8734](https://www.rfc-editor.org/rfc/rfc8734) (brainpool en TLS 1.3); [RFC 7748](https://www.rfc-editor.org/rfc/rfc7748) (x448) |
+| `CERT_VALID`, `CERT_UNTRUSTED`, `CERT_SELF_SIGNED` | [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280), sección 6 (validación de la cadena) |
+| `CERT_EXPIRED`, `CERT_NOT_YET_VALID`, `CERT_EXPIRES_SOON` | [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280), sección 4.1.2.5 (validez) |
+| `CERT_HOSTNAME_MISMATCH` | [RFC 9525](https://www.rfc-editor.org/rfc/rfc9525) |
+| `CERT_WEAK_KEY` | [NIST SP 800-131A Rev. 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final) |
+| `CERT_WEAK_SIGNATURE` | [RFC 9155](https://www.rfc-editor.org/rfc/rfc9155); [NIST SP 800-131A Rev. 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final) |
+| `CERT_CLASSICAL_SIGNATURE` | [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final) (ML-DSA); [FIPS 205](https://csrc.nist.gov/pubs/fips/205/final) (SLH-DSA) |
+| `CERT_CT`, `CERT_CT_MISSING` | [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) |
+| `CERT_AUTOMATED_ACME`, `CERT_NOT_AUTOMATED` | [RFC 8555](https://www.rfc-editor.org/rfc/rfc8555) (ACME) |
+| `CERT_AUTOMATED_SHORT` | [CA/Browser Forum, SC081v3](https://cabforum.org/2025/04/11/ballot-sc081v3-introduce-schedule-of-reducing-validity-and-data-reuse-periods/) (validez máxima de 47 días en 2029) |
+
+#### Fuentes
+
+| Fuente | Título oficial | URL |
+|---|---|---|
+| RFC 5246 | The Transport Layer Security (TLS) Protocol Version 1.2 | https://www.rfc-editor.org/rfc/rfc5246 |
+| RFC 5280 | Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile | https://www.rfc-editor.org/rfc/rfc5280 |
+| RFC 5469 | DES and IDEA Cipher Suites for Transport Layer Security (TLS) | https://www.rfc-editor.org/rfc/rfc5469 |
+| RFC 6176 | Prohibiting Secure Sockets Layer (SSL) Version 2.0 | https://www.rfc-editor.org/rfc/rfc6176 |
+| RFC 6655 | AES-CCM Cipher Suites for Transport Layer Security (TLS) | https://www.rfc-editor.org/rfc/rfc6655 |
+| RFC 6962 | Certificate Transparency | https://www.rfc-editor.org/rfc/rfc6962 |
+| RFC 7457 | Summarizing Known Attacks on Transport Layer Security (TLS) and Datagram TLS (DTLS) | https://www.rfc-editor.org/rfc/rfc7457 |
+| RFC 7465 | Prohibiting RC4 Cipher Suites | https://www.rfc-editor.org/rfc/rfc7465 |
+| RFC 7568 | Deprecating Secure Sockets Layer Version 3.0 | https://www.rfc-editor.org/rfc/rfc7568 |
+| RFC 7748 | Elliptic Curves for Security | https://www.rfc-editor.org/rfc/rfc7748 |
+| RFC 7919 | Negotiated Finite Field Diffie-Hellman Ephemeral Parameters for Transport Layer Security (TLS) | https://www.rfc-editor.org/rfc/rfc7919 |
+| RFC 8422 | Elliptic Curve Cryptography (ECC) Cipher Suites for Transport Layer Security (TLS) Versions 1.2 and Earlier | https://www.rfc-editor.org/rfc/rfc8422 |
+| RFC 8446 | The Transport Layer Security (TLS) Protocol Version 1.3 | https://www.rfc-editor.org/rfc/rfc8446 |
+| RFC 8555 | Automatic Certificate Management Environment (ACME) | https://www.rfc-editor.org/rfc/rfc8555 |
+| RFC 8734 | Elliptic Curve Cryptography (ECC) Brainpool Curves for Transport Layer Security (TLS) Version 1.3 | https://www.rfc-editor.org/rfc/rfc8734 |
+| RFC 8996 | Deprecating TLS 1.0 and TLS 1.1 | https://www.rfc-editor.org/rfc/rfc8996 |
+| RFC 9150 | TLS 1.3 Authentication and Integrity-Only Cipher Suites | https://www.rfc-editor.org/rfc/rfc9150 |
+| RFC 9155 | Deprecating MD5 and SHA-1 Signature Hashes in TLS 1.2 and DTLS 1.2 | https://www.rfc-editor.org/rfc/rfc9155 |
+| RFC 9325 | Recommendations for Secure Use of Transport Layer Security (TLS) and Datagram Transport Layer Security (DTLS) | https://www.rfc-editor.org/rfc/rfc9325 |
+| RFC 9525 | Service Identity in TLS | https://www.rfc-editor.org/rfc/rfc9525 |
+| RFC 9847 | IANA Registry Updates for TLS and DTLS | https://www.rfc-editor.org/rfc/rfc9847 |
+| RFC 10024 | Post-Quantum Traditional (PQ/T) Hybrid Key Agreement Mechanisms for TLS 1.3 | https://www.rfc-editor.org/rfc/rfc10024 |
+| draft-ietf-tls-mlkem | ML-KEM Post-Quantum Key Agreement for TLS 1.3 | https://datatracker.ietf.org/doc/draft-ietf-tls-mlkem/ |
+| draft-tls-westerbaan-xyber768d00 | X25519Kyber768Draft00 hybrid post-quantum key agreement | https://datatracker.ietf.org/doc/draft-tls-westerbaan-xyber768d00/ |
+| CVE-2013-0169 | Lucky Thirteen: CBC padding timing attack in TLS/DTLS | https://nvd.nist.gov/vuln/detail/CVE-2013-0169 |
+| CVE-2014-3566 | POODLE: SSL 3.0 CBC padding oracle | https://nvd.nist.gov/vuln/detail/CVE-2014-3566 |
+| CVE-2015-0204 | FREAK: RSA EXPORT key downgrade | https://nvd.nist.gov/vuln/detail/CVE-2015-0204 |
+| CVE-2015-4000 | Logjam: DHE EXPORT downgrade and weak Diffie-Hellman groups | https://nvd.nist.gov/vuln/detail/CVE-2015-4000 |
+| CVE-2016-0800 | DROWN: decrypting TLS with SSLv2 | https://nvd.nist.gov/vuln/detail/CVE-2016-0800 |
+| CVE-2016-2183 | Sweet32: birthday attacks on 64-bit block ciphers (3DES) | https://nvd.nist.gov/vuln/detail/CVE-2016-2183 |
+| FIPS 46-3 | Data Encryption Standard (DES) (withdrawn) | https://csrc.nist.gov/pubs/fips/46-3/final |
+| FIPS 203 | Module-Lattice-Based Key-Encapsulation Mechanism Standard | https://csrc.nist.gov/pubs/fips/203/final |
+| FIPS 204 | Module-Lattice-Based Digital Signature Standard | https://csrc.nist.gov/pubs/fips/204/final |
+| FIPS 205 | Stateless Hash-Based Digital Signature Standard | https://csrc.nist.gov/pubs/fips/205/final |
+| NIST SP 800-57 Part 1 Rev. 5 | Recommendation for Key Management: Part 1 – General | https://csrc.nist.gov/pubs/sp/800/57/pt1/r5/final |
+| NIST SP 800-131A Rev. 2 | Transitioning the Use of Cryptographic Algorithms and Key Lengths | https://csrc.nist.gov/pubs/sp/800/131/a/r2/final |
+| NIST SP 800-232 | Ascon-Based Lightweight Cryptography Standards for Constrained Devices: Authenticated Encryption, Hash, and Extendable Output Functions | https://csrc.nist.gov/pubs/sp/800/232/final |
+| CA/Browser Forum SC081v3 | Ballot SC081v3: Introduce Schedule of Reducing Validity and Data Reuse Periods | https://cabforum.org/2025/04/11/ballot-sc081v3-introduce-schedule-of-reducing-validity-and-data-reuse-periods/ |
+
+Los CVE no tienen título oficial en el NVD: se indica el nombre con que se conoce el ataque.
 
 ## Versionado del modelo
 
@@ -134,7 +220,7 @@ Model version **2026.1**. `internal/scoring` turns a scan into a **post-quantum 
 
 **Never scored**: what crypto/tls cannot evaluate (shown separately, tested), probe errors (`SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN`), and informational findings (classical signature, AES-128/Grover, Certificate Transparency with embedded vs handshake SCTs).
 
-**Findings** store only `code` and `params`; ES/EN texts live in `catalog.go` and are tested for completeness.
+**Findings** store only `code` and `params`; ES/EN texts live in `catalog.go` and are tested for completeness. **References**: the source of every finding (RFC, CVE, IETF draft, NIST/FIPS or CA/Browser Forum ballot) is in the "Referencias por hallazgo" table above; `TestEveryFindingHasAReference` checks every catalog code has one, except the three that only say a check could not be made (`SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN`, `CERT_MISSING`).
 
 **Versioning**: every result carries `scoring_version`. Changing weights, thresholds, caps or finding rules **requires bumping `scoring.Version`** (`YYYY.N`); rewording a text does not. The column to store it arrives with the `scans` table (milestone 2.3).
 

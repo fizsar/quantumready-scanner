@@ -12,17 +12,25 @@ type Text struct {
 	Remediation string `json:"remediation,omitempty"`
 }
 
-// Describe renders the texts of a finding code in lang, filling {params}.
-// Unknown languages fall back to Spanish; unknown codes return the code.
+// Describe renders the texts of a finding code in lang, filling {params},
+// for a scan run now and with no other findings known (see DescribeIn).
 func Describe(code string, params map[string]string, lang string) Text {
+	return DescribeIn(code, params, lang, Context{})
+}
+
+// DescribeIn renders the texts of a finding code in lang, filling {params}
+// and the placeholders that depend on the scan (see context.go). Unknown
+// languages fall back to Spanish; unknown codes return the code.
+func DescribeIn(code string, params map[string]string, lang string, ctx Context) Text {
 	byLang, ok := findingTexts[code]
 	if !ok {
 		return Text{Title: code}
 	}
 	t, ok := byLang[lang]
 	if !ok {
-		t = byLang[Languages[0]]
+		lang, t = Languages[0], byLang[Languages[0]]
 	}
+	params = ctx.params(params, lang)
 	return Text{Title: fill(t.Title, params), Detail: fill(t.Detail, params), Remediation: fill(t.Remediation, params)}
 }
 
@@ -350,10 +358,10 @@ var findingTexts = map[string]langTexts{
 	"CERT_CLASSICAL_SIGNATURE": {
 		"es": {Title: "Firma clásica ({key}): riesgo cuántico futuro",
 			Detail:      "La identidad del servidor se demuestra con {key}, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. Hoy no hay certificados post-cuánticos (ML-DSA) en la web pública. No afecta a la nota.",
-			Remediation: "Nada que hacer todavía. Mantén la renovación automatizada para poder cambiar a certificados ML-DSA o híbridos en cuanto las autoridades los emitan."},
+			Remediation: "Nada que hacer todavía en la firma. {renewal_advice}"},
 		"en": {Title: "Classical signature ({key}): future quantum risk",
 			Detail:      "The server proves its identity with {key}, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before. There are no post-quantum (ML-DSA) certificates on the public web yet. It does not affect the grade.",
-			Remediation: "Nothing to do yet. Keep renewal automated so you can switch to ML-DSA or hybrid certificates as soon as authorities issue them."},
+			Remediation: "Nothing to do on the signature yet. {renewal_advice}"},
 	},
 	"CERT_AUTOMATED_SHORT": {
 		"es": {Title: "Certificado de vida corta ({days} días)", Detail: "Una validez tan corta solo es viable con renovación automatizada, que es lo que permitirá cambiar a certificados post-cuánticos sin esfuerzo."},
@@ -365,10 +373,10 @@ var findingTexts = map[string]langTexts{
 	},
 	"CERT_NOT_AUTOMATED": {
 		"es": {Title: "Sin señales de renovación automatizada",
-			Detail:      "Validez de {days} días, emitido por {issuer}. La validez máxima baja a 200 días (marzo de 2026), 100 (2027) y 47 (2029), y el cambio a certificados post-cuánticos exigirá reemitirlos: sin automatización, cada cambio es trabajo manual y riesgo de caducidad.",
+			Detail:      "Validez de {days} días, emitido por {issuer}. {validity_schedule}. El cambio a certificados post-cuánticos exigirá reemitirlos: sin automatización, cada cambio es trabajo manual y riesgo de caducidad.",
 			Remediation: "Automatiza la emisión y renovación con ACME (certbot, Caddy, cert-manager…), con tu autoridad actual si lo soporta o con una autoridad gratuita."},
 		"en": {Title: "No sign of automated renewal",
-			Detail:      "{days}-day validity, issued by {issuer}. Maximum validity drops to 200 days (March 2026), 100 (2027) and 47 (2029), and moving to post-quantum certificates will require reissuing them: without automation, every change is manual work and an expiry risk.",
+			Detail:      "{days}-day validity, issued by {issuer}. {validity_schedule}. Moving to post-quantum certificates will require reissuing them: without automation, every change is manual work and an expiry risk.",
 			Remediation: "Automate issuance and renewal with ACME (certbot, Caddy, cert-manager…), with your current authority if it supports it or a free one."},
 	},
 	"CERT_CT": {

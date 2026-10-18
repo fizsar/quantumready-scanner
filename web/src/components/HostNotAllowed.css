@@ -1,0 +1,27 @@
+/* 403 host_not_allowed block (showcase). Uses the tokens of index.css. */
+.hna {
+  border: 1px solid var(--amber);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.hna-title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--amber);
+}
+.hna-targets,
+.hna-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+.hna-links {
+  flex-direction: column;
+  font-size: 0.9rem;
+}
