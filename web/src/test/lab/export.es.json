@@ -10,7 +10,7 @@
   "lang": "es",
   "report": {
     "scoring_version": "2026.2",
-    "score": 20,
+    "score": 15,
     "grade": "F",
     "score_grade": "F",
     "cap": {
@@ -75,7 +75,7 @@
       {
         "id": "certificate",
         "label": "Certificado y agilidad",
-        "points": 20,
+        "points": 15,
         "max": 20,
         "items": [
           {
@@ -99,7 +99,7 @@
           {
             "id": "automation",
             "label": "Renovación automatizada",
-            "points": 5,
+            "points": 0,
             "max": 5
           }
         ]
@@ -212,29 +212,30 @@
         "severity": "low",
         "severity_label": "Bajo",
         "category": "certificate",
-        "title": "Firma clásica (ECDSA P-256): riesgo cuántico futuro",
-        "detail": "La identidad del servidor se demuestra con ECDSA P-256, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. Hoy no hay certificados post-cuánticos (ML-DSA) en la web pública. No afecta a la nota.",
+        "title": "Firma clásica (RSA-2048): riesgo cuántico futuro",
+        "detail": "La identidad del servidor se demuestra con RSA-2048, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. Hoy no hay certificados post-cuánticos (ML-DSA) en la web pública. No afecta a la nota.",
         "remediation": "Nada que hacer todavía. Mantén la renovación automatizada para poder cambiar a certificados ML-DSA o híbridos en cuanto las autoridades los emitan."
       },
       {
-        "code": "CERT_CT",
+        "code": "CERT_NOT_AUTOMATED",
+        "axis": "quantum",
+        "axis_label": "Riesgo cuántico",
+        "severity": "low",
+        "severity_label": "Bajo",
+        "category": "certificate",
+        "title": "Sin señales de renovación automatizada",
+        "detail": "Validez de 90 días, emitido por QuantumReady TLS lab. La validez máxima baja a 200 días (marzo de 2026), 100 (2027) y 47 (2029), y el cambio a certificados post-cuánticos exigirá reemitirlos: sin automatización, cada cambio es trabajo manual y riesgo de caducidad.",
+        "remediation": "Automatiza la emisión y renovación con ACME (certbot, Caddy, cert-manager…), con tu autoridad actual si lo soporta o con una autoridad gratuita."
+      },
+      {
+        "code": "CERT_CT_MISSING",
         "axis": "current",
         "axis_label": "Riesgo actual",
         "severity": "info",
         "severity_label": "Informativo",
         "category": "certificate",
-        "title": "Transparencia de certificados",
-        "detail": "El certificado aporta SCT: 2 incrustados por la autoridad y 0 entregados en el handshake. Informativo."
-      },
-      {
-        "code": "CERT_AUTOMATED_ACME",
-        "axis": "quantum",
-        "axis_label": "Riesgo cuántico",
-        "severity": "pass",
-        "severity_label": "Correcto",
-        "category": "certificate",
-        "title": "Renovación automatizada (Let's Encrypt)",
-        "detail": "El certificado lo emite Let's Encrypt, una autoridad que funciona con ACME (renovación automática; validez de 90 días). Cambiar a certificados post-cuánticos será, previsiblemente, una actualización más."
+        "title": "Sin SCT de transparencia",
+        "detail": "No se han encontrado SCT (ni incrustados ni en el handshake). Los navegadores los exigen para certificados públicos, así que suele indicar un certificado privado. Informativo."
       },
       {
         "code": "CERT_VALID",
@@ -244,7 +245,7 @@
         "severity_label": "Correcto",
         "category": "certificate",
         "title": "Certificado válido",
-        "detail": "La cadena es de confianza, coincide con el nombre y está vigente (emisor: Let's Encrypt; caduca en 46 días)."
+        "detail": "La cadena es de confianza, coincide con el nombre y está vigente (emisor: QuantumReady TLS lab; caduca en 46 días)."
       }
     ],
     "not_evaluated": [
@@ -369,25 +370,24 @@
         "sans": [
           "export.tlslab.test"
         ],
-        "issuer": "YE1",
+        "issuer": "QuantumReady TLS lab CA (simulated)",
         "issuer_org": [
-          "Let's Encrypt"
+          "QuantumReady TLS lab"
         ],
         "not_before": "2026-09-01T00:00:00Z",
         "not_after": "2026-11-30T00:00:00Z",
         "validity_days": 90,
         "days_to_expiry": 46,
-        "key_algorithm": "ECDSA",
-        "key_size": 256,
-        "curve": "P-256",
-        "signature_algorithm": "ECDSA-SHA384",
+        "key_algorithm": "RSA",
+        "key_size": 2048,
+        "signature_algorithm": "SHA256-RSA",
         "trusted": true,
         "hostname_match": true,
         "expired": false,
         "not_yet_valid": false,
         "self_signed": false,
         "ocsp_stapled": false,
-        "scts_embedded": 2,
+        "scts_embedded": 0,
         "scts_handshake": 0,
         "chain": null
       },

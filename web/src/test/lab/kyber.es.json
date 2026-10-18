@@ -10,7 +10,7 @@
   "lang": "es",
   "report": {
     "scoring_version": "2026.2",
-    "score": 45,
+    "score": 40,
     "grade": "D",
     "score_grade": "D",
     "pqc": false,
@@ -52,7 +52,7 @@
       {
         "id": "certificate",
         "label": "Certificado y agilidad",
-        "points": 20,
+        "points": 15,
         "max": 20,
         "items": [
           {
@@ -76,7 +76,7 @@
           {
             "id": "automation",
             "label": "Renovación automatizada",
-            "points": 5,
+            "points": 0,
             "max": 5
           }
         ]
@@ -117,6 +117,17 @@
         "remediation": "Nada que hacer todavía. Mantén la renovación automatizada para poder cambiar a certificados ML-DSA o híbridos en cuanto las autoridades los emitan."
       },
       {
+        "code": "CERT_NOT_AUTOMATED",
+        "axis": "quantum",
+        "axis_label": "Riesgo cuántico",
+        "severity": "low",
+        "severity_label": "Bajo",
+        "category": "certificate",
+        "title": "Sin señales de renovación automatizada",
+        "detail": "Validez de 90 días, emitido por QuantumReady TLS lab. La validez máxima baja a 200 días (marzo de 2026), 100 (2027) y 47 (2029), y el cambio a certificados post-cuánticos exigirá reemitirlos: sin automatización, cada cambio es trabajo manual y riesgo de caducidad.",
+        "remediation": "Automatiza la emisión y renovación con ACME (certbot, Caddy, cert-manager…), con tu autoridad actual si lo soporta o con una autoridad gratuita."
+      },
+      {
         "code": "SYM_AES128",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
@@ -127,24 +138,14 @@
         "detail": "La conexión usa TLS_AES_128_GCM_SHA256. En teoría, el algoritmo de Grover reduce la seguridad de AES-128 a unos 64 bits, pero no es paralelizable de forma práctica y NIST sigue considerando AES-128 adecuado. Informativo: no afecta a la nota."
       },
       {
-        "code": "CERT_CT",
+        "code": "CERT_CT_MISSING",
         "axis": "current",
         "axis_label": "Riesgo actual",
         "severity": "info",
         "severity_label": "Informativo",
         "category": "certificate",
-        "title": "Transparencia de certificados",
-        "detail": "El certificado aporta SCT: 2 incrustados por la autoridad y 0 entregados en el handshake. Informativo."
-      },
-      {
-        "code": "CERT_AUTOMATED_ACME",
-        "axis": "quantum",
-        "axis_label": "Riesgo cuántico",
-        "severity": "pass",
-        "severity_label": "Correcto",
-        "category": "certificate",
-        "title": "Renovación automatizada (Let's Encrypt)",
-        "detail": "El certificado lo emite Let's Encrypt, una autoridad que funciona con ACME (renovación automática; validez de 90 días). Cambiar a certificados post-cuánticos será, previsiblemente, una actualización más."
+        "title": "Sin SCT de transparencia",
+        "detail": "No se han encontrado SCT (ni incrustados ni en el handshake). Los navegadores los exigen para certificados públicos, así que suele indicar un certificado privado. Informativo."
       },
       {
         "code": "TLS13_SUPPORTED",
@@ -164,7 +165,7 @@
         "severity_label": "Correcto",
         "category": "certificate",
         "title": "Certificado válido",
-        "detail": "La cadena es de confianza, coincide con el nombre y está vigente (emisor: Let's Encrypt; caduca en 46 días)."
+        "detail": "La cadena es de confianza, coincide con el nombre y está vigente (emisor: QuantumReady TLS lab; caduca en 46 días)."
       },
       {
         "code": "FS_ALL",
@@ -312,9 +313,9 @@
         "sans": [
           "kyber.tlslab.test"
         ],
-        "issuer": "YE1",
+        "issuer": "QuantumReady TLS lab CA (simulated)",
         "issuer_org": [
-          "Let's Encrypt"
+          "QuantumReady TLS lab"
         ],
         "not_before": "2026-09-01T00:00:00Z",
         "not_after": "2026-11-30T00:00:00Z",
@@ -323,14 +324,14 @@
         "key_algorithm": "ECDSA",
         "key_size": 256,
         "curve": "P-256",
-        "signature_algorithm": "ECDSA-SHA384",
+        "signature_algorithm": "ECDSA-SHA256",
         "trusted": true,
         "hostname_match": true,
         "expired": false,
         "not_yet_valid": false,
         "self_signed": false,
         "ocsp_stapled": false,
-        "scts_embedded": 2,
+        "scts_embedded": 0,
         "scts_handshake": 0,
         "chain": null
       },

@@ -24,7 +24,7 @@ function renderAt(path: string, lang: Lang) {
 // The grades the page explains. The Go test TestLabFixtures pins the same
 // numbers against the current scoring model and checks the fixtures are what
 // the API returns now, so a model change fails there and here.
-const shown = { fizsar: ['A', 95], modern: ['D', 45], kyber: ['D', 45], export: ['F', 20] } as const
+const shown = { fizsar: ['A', 95], modern: ['D', 40], kyber: ['D', 40], export: ['F', 15] } as const
 const labLabel = { es: 'Servidor de laboratorio aislado; no es un sitio real', en: 'Isolated lab server; not a real website' }
 
 describe('/examples', () => {
@@ -53,6 +53,8 @@ describe('/examples', () => {
         }
         // Lab servers carry the label; the real scan does not.
         expect(within(section).queryByText(labLabel[lang]) !== null, key).toBe(lab)
+        // A lab certificate is no CA's: no Let's Encrypt, no automated renewal claimed.
+        if (lab) expect(section.textContent, key).not.toMatch(/Let.s Encrypt/)
         // Each panel has its own anchor.
         expect(section.querySelector(`#${uthAnchor(key)}`), key).not.toBeNull()
       }

@@ -105,10 +105,10 @@ describe('result page', () => {
 // (internal/httpapi TestLabFixtures writes test/lab/*.json).
 describe('result page with lab scans (model 2026.2)', () => {
   it.each([
-    ['export', 'es', /acepta conexiones que no cifran nada/, 'F', '20 de 100 puntos', /Diffie-Hellman demasiado débil \(512 bits\)/],
-    ['export', 'en', /accepts connections that encrypt nothing/, 'F', '20 out of 100 points', /Diffie-Hellman far too weak \(512 bits\)/],
-    ['kyber', 'es', /versión experimental del cifrado post-cuántico/, 'D', '45 de 100 puntos', /Solo PQC experimental: X25519Kyber768Draft00/],
-    ['kyber', 'en', /experimental version of post-quantum encryption/, 'D', '45 out of 100 points', /Experimental PQC only: X25519Kyber768Draft00/],
+    ['export', 'es', /acepta conexiones que no cifran nada/, 'F', '15 de 100 puntos', /Diffie-Hellman demasiado débil \(512 bits\)/],
+    ['export', 'en', /accepts connections that encrypt nothing/, 'F', '15 out of 100 points', /Diffie-Hellman far too weak \(512 bits\)/],
+    ['kyber', 'es', /versión experimental del cifrado post-cuántico/, 'D', '40 de 100 puntos', /Solo PQC experimental: X25519Kyber768Draft00/],
+    ['kyber', 'en', /experimental version of post-quantum encryption/, 'D', '40 out of 100 points', /Experimental PQC only: X25519Kyber768Draft00/],
   ] as const)('%s (%s)', async (server, lang, verdict, grade, score, finding) => {
     const view = (await import(`./test/lab/${server}.${lang}.json`)).default
     stubFetch(() => json(view))
