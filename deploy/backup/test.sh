@@ -151,6 +151,7 @@ RESTIC_MOUNTS=()
 if bash "$here/restore-test.sh" >/dev/null 2>"$fx/err"; then bad "restore-test detects a mismatch"; else
 	check "restore-test detects a mismatch" grep -q '"scans" : 999' "$fx/err"
 fi
+check "fail ping names the file and line (restore-test.sh)" grep -Eq '^/restore/fail restore test failed: exit [0-9]+ at restore-test\.sh:[0-9]+$' "$fx/pings.log"
 
 # A dump that carries the rows of a no-data table must fail the drill too,
 # even with a manifest that says 0 (the drill counts for real).
@@ -164,6 +165,11 @@ if bash "$here/restore-test.sh" >/dev/null 2>"$fx/err"; then bad "restore-test f
 	check "restore-test fails if no-data rows were backed up" grep -q '"usage_daily" : 2 }' "$fx/err"
 fi
 check "pings: restore fail (2)" [ "$(pings /restore/fail)" = 2 ]
+# A failure inside common.sh (restic, missing repository) names common.sh.
+mkdir "$fx/empty-repo"
+if RESTIC_REPOSITORY=$fx/empty-repo bash "$here/restore-test.sh" >/dev/null 2>&1; then bad "restore-test with a missing repository"; else
+	check "fail ping names common.sh for a restic failure" grep -Eq '^/restore/fail restore test failed: exit [0-9]+ at common\.sh:[0-9]+$' "$fx/pings.log"
+fi
 
 echo "--- failed dump"
 before=$(snapshots)
@@ -174,6 +180,7 @@ fi
 check "no new dump, no .partial left" [ "$(qr_dumps .dump)/$(qr_dumps .partial)" = 2/0 ]
 check "no new snapshot" [ "$(snapshots)" = "$before" ]
 check "pings: backup fail" [ "$(pings /backup/fail)" = 1 ]
+check "fail ping names the file and line (backup.sh)" grep -Eq '^/backup/fail backup failed: exit [0-9]+ at backup\.sh:[0-9]+$' "$fx/pings.log"
 
 echo
 if [ "$fails" = 0 ]; then echo "backup tests: all passed"; else

@@ -21,13 +21,13 @@ fi
 
 partial=()
 on_error() {
-	local rc=$? line=$1
+	local rc=$? where="${2##*/}:$1"
 	rm -f "${partial[@]}" # a failed dump never survives as a valid-looking file
-	echo "backup FAILED (exit $rc, line $line)" >&2
-	hc "${HC_PING_URL:-}" /fail "backup failed: exit $rc at line $line"
+	echo "backup FAILED (exit $rc at $where)" >&2
+	hc "${HC_PING_URL:-}" /fail "backup failed: exit $rc at $where"
 	exit "$rc"
 }
-trap 'on_error $LINENO' ERR
+trap 'on_error $LINENO "${BASH_SOURCE[0]}"' ERR # file and line of the failing command (common.sh too)
 
 hc "${HC_PING_URL:-}" /start
 cd "$QR_DIR"
