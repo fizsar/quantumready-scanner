@@ -47,7 +47,7 @@ lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint
 	npm --prefix web run lint
 	npm --prefix web run typecheck
 
-build: web/node_modules ## Build bin/{api,migrate,worker} and web/dist
+build: web/node_modules ## Build bin/{api,migrate,worker,qradmin,qrscan} and web/dist
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/ ./cmd/...
 	npm --prefix web run build
 

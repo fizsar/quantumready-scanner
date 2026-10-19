@@ -28,5 +28,7 @@ DELETE FROM blocked_targets_daily WHERE day < current_date - @keep_days::int;
 SELECT day, event, dim, count FROM usage_daily WHERE day >= @since ORDER BY day, event, dim;
 
 -- name: BlockedTargetsSince :many
+-- Only domains asked for at least 3 times: one or two requests are likely a
+-- single visitor trying their own site, and listing them says nothing useful.
 SELECT domain, sum(count)::bigint AS total FROM blocked_targets_daily
-WHERE day >= @since GROUP BY domain ORDER BY total DESC, domain;
+WHERE day >= @since GROUP BY domain HAVING sum(count) >= 3 ORDER BY total DESC, domain;

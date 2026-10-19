@@ -13,7 +13,7 @@ import (
 
 const blockedTargetsSince = `-- name: BlockedTargetsSince :many
 SELECT domain, sum(count)::bigint AS total FROM blocked_targets_daily
-WHERE day >= $1 GROUP BY domain ORDER BY total DESC, domain
+WHERE day >= $1 GROUP BY domain HAVING sum(count) >= 3 ORDER BY total DESC, domain
 `
 
 type BlockedTargetsSinceRow struct {
@@ -21,6 +21,8 @@ type BlockedTargetsSinceRow struct {
 	Total  int64
 }
 
+// Only domains asked for at least 3 times: one or two requests are likely a
+// single visitor trying their own site, and listing them says nothing useful.
 func (q *Queries) BlockedTargetsSince(ctx context.Context, since pgtype.Date) ([]BlockedTargetsSinceRow, error) {
 	rows, err := q.db.Query(ctx, blockedTargetsSince, since)
 	if err != nil {

@@ -65,8 +65,8 @@ jobs:
       # tlssha1=1 / rsa1024min=0 relax crypto/tls for the scanner only (docs/scanner.md).
       - name: Weak-TLS GODEBUG only in scanner binaries
         run: |
-          for b in api migrate worker qrscan; do go build -o "$RUNNER_TEMP/$b" "./cmd/$b"; done
-          for b in api migrate; do
+          for b in api migrate qradmin worker qrscan; do go build -o "$RUNNER_TEMP/$b" "./cmd/$b"; done
+          for b in api migrate qradmin; do
             if go version -m "$RUNNER_TEMP/$b" | grep -E 'DefaultGODEBUG=.*(tlssha1=1|rsa1024min=0)'; then
               echo "::error::$b must not carry the scanner's weak-TLS GODEBUG settings"
               exit 1
