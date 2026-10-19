@@ -43,11 +43,12 @@ dump=$BACKUP_DIR/qr-$ts.dump
 manifest=$BACKUP_DIR/qr-$ts.manifest.json
 partial=("$dump.partial" "$manifest.partial")
 
-# 1. Dump, check it is a readable archive, record the row counts.
-docker compose exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc </dev/null >"$dump.partial"
+# 1. Dump (without the rows of NO_DATA_TABLES), check it is a readable archive,
+#    record the row counts (0 for NO_DATA_TABLES).
+docker compose exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc "${DUMP_EXCLUDE[@]}" </dev/null >"$dump.partial"
 docker compose exec -T db pg_restore --list <"$dump.partial" >/dev/null
 docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAq -v ON_ERROR_STOP=1 \
-	-c "$MANIFEST_SQL" </dev/null >"$manifest.partial"
+	-c "$DUMP_MANIFEST_SQL" </dev/null >"$manifest.partial"
 mv "$dump.partial" "$dump"
 mv "$manifest.partial" "$manifest"
 partial=()

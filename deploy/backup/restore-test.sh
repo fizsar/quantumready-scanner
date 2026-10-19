@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Restore drill: restores the latest restic snapshot into a throwaway
 # PostgreSQL (separate container, no network, data in tmpfs) and checks that
-# its tables and row counts match the manifest recorded at backup time.
+# its tables and row counts match the manifest recorded at backup time. The
+# manifest records 0 for NO_DATA_TABLES (common.sh) and the drill counts them
+# for real: a backup that carried their rows fails.
 # Never touches the production database. Run monthly by qr-restore-test.timer.
 #
 # Environment (backup.env): RESTIC_*, AWS_*, HC_RESTORE_PING_URL.

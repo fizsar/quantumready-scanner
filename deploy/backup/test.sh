@@ -91,9 +91,18 @@ qr_dumps() { find "$fx/backups" -maxdepth 1 -name "qr-*$1" | wc -l; }
 psql -c 'CREATE TABLE scans (id serial PRIMARY KEY, host text);
 	CREATE TABLE findings (id serial PRIMARY KEY, scan_id int REFERENCES scans);
 	CREATE TABLE "audit log" (id int); CREATE TABLE empty (id int);
+	CREATE TABLE usage_daily (day date, event text, dim text, count bigint);
+	CREATE TABLE blocked_targets_daily (day date, domain text, count bigint);
 	INSERT INTO scans (host) VALUES ($$a.com$$), ($$b.com$$), ($$c.com$$);
 	INSERT INTO findings (scan_id) SELECT 1 FROM generate_series(1, 5);
-	INSERT INTO "audit log" VALUES (1);'
+	INSERT INTO "audit log" VALUES (1);
+	INSERT INTO usage_daily VALUES (current_date, $$page_view$$, $$/$$, 7), (current_date, $$lang_switch$$, $$en$$, 1);
+	INSERT INTO blocked_targets_daily VALUES (current_date, $$example.org$$, 3);'
+
+# NO_DATA_TABLES are the real M1 tables (a rename must not silently back them up).
+for t in "${NO_DATA_TABLES[@]}"; do
+	check "no-data table $t exists in migrations/" grep -qE "^CREATE TABLE $t \(" "$here"/../../migrations/*.sql
+done
 
 echo "--- backups"
 check "init" bash "$here/backup.sh" init
@@ -109,8 +118,13 @@ check "local: manual dump untouched" [ -e "$fx/backups/pre-phase2-20261013T18424
 check "local: no .partial files" [ "$(qr_dumps .partial)" = 0 ]
 check "local: files are 0600" [ -z "$(find "$fx/backups" -name 'qr-*' ! -perm 600)" ]
 latest=$(find "$fx/backups" -name 'qr-*.manifest.json' | sort | tail -1)
-want='{ "audit log" : 1, "empty" : 0, "findings" : 5, "scans" : 4 }'
-check "manifest = row counts ($(cat "$latest"))" [ "$(cat "$latest")" = "$want" ]
+want='{ "audit log" : 1, "blocked_targets_daily" : 0, "empty" : 0, "findings" : 5, "scans" : 4, "usage_daily" : 0 }'
+check "manifest = row counts, 0 for no-data tables ($(cat "$latest"))" [ "$(cat "$latest")" = "$want" ]
+toc=$(cd "$fx" && docker compose exec -T db pg_restore --list <"${latest%.manifest.json}.dump")
+for t in "${NO_DATA_TABLES[@]}"; do
+	check "dump: $t schema kept, rows left out" bash -c 'grep -qE " TABLE public $1 " <<<"$2" && ! grep -qE " TABLE DATA public $1 " <<<"$2"' _ "$t" "$toc"
+done
+check "dump: other tables keep their rows" grep -qE " TABLE DATA public scans " <<<"$toc"
 n=$(snapshots)
 # keep-daily keeps the newest per day; restic also keeps the oldest snapshot while
 # the daily/weekly/monthly slots are not yet filled: 3 same-day backups → 2.
@@ -137,7 +151,19 @@ RESTIC_MOUNTS=()
 if bash "$here/restore-test.sh" >/dev/null 2>"$fx/err"; then bad "restore-test detects a mismatch"; else
 	check "restore-test detects a mismatch" grep -q '"scans" : 999' "$fx/err"
 fi
-check "pings: restore fail" [ "$(pings /restore/fail)" = 1 ]
+
+# A dump that carries the rows of a no-data table must fail the drill too,
+# even with a manifest that says 0 (the drill counts for real).
+mkdir "$fx/withdata"
+(cd "$fx" && docker compose exec -T db pg_dump -U qr -d quantumready -Fc </dev/null >"$fx/withdata/qr-20990101T000000Z.dump")
+psql -c "$DUMP_MANIFEST_SQL" >"$fx/withdata/qr-20990101T000000Z.manifest.json"
+RESTIC_MOUNTS=(-v "$fx/withdata:/backup:ro")
+restic_run backup --host quantumready --tag quantumready --quiet /backup/qr-20990101T000000Z.dump /backup/qr-20990101T000000Z.manifest.json >/dev/null
+RESTIC_MOUNTS=()
+if bash "$here/restore-test.sh" >/dev/null 2>"$fx/err"; then bad "restore-test fails if no-data rows were backed up"; else
+	check "restore-test fails if no-data rows were backed up" grep -q '"usage_daily" : 2 }' "$fx/err"
+fi
+check "pings: restore fail (2)" [ "$(pings /restore/fail)" = 2 ]
 
 echo "--- failed dump"
 before=$(snapshots)
