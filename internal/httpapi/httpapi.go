@@ -45,11 +45,21 @@ type Config struct {
 	// TargetCooldown defaults to DefaultTargetCooldown.
 	TargetCooldown time.Duration
 
+	// Usage enables the M1 usage counters (POST /api/e and the 403 count);
+	// nil disables them.
+	Usage UsageStore
+	// UsageLimiter rate-limits POST /api/e per client; nil means 60/min and
+	// 1,000/day.
+	UsageLimiter *Limiter
+
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
 
-type api struct{ cfg Config }
+type api struct {
+	cfg          Config
+	usageLimiter *Limiter
+}
 
 // NewRouter returns the root handler of the API.
 func NewRouter(cfg Config) http.Handler {
@@ -65,7 +75,10 @@ func NewRouter(cfg Config) http.Handler {
 	if cfg.TargetCooldown <= 0 {
 		cfg.TargetCooldown = DefaultTargetCooldown
 	}
-	a := &api{cfg: cfg}
+	if cfg.UsageLimiter == nil {
+		cfg.UsageLimiter = NewLimiter(60, 1000)
+	}
+	a := &api{cfg: cfg, usageLimiter: cfg.UsageLimiter}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
@@ -82,6 +95,9 @@ func NewRouter(cfg Config) http.Handler {
 			r.Get("/targets", a.listTargets)
 			r.Post("/scans", a.createScan)
 			r.Get("/scans/{id}", a.getScan)
+		}
+		if cfg.Usage != nil {
+			r.Post("/e", a.usageEvent)
 		}
 	})
 	return r

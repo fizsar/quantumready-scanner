@@ -80,6 +80,7 @@ func run(logger *slog.Logger) error {
 			Version:        version,
 			DB:             pool,
 			Scans:          store.NewStore(pool),
+			Usage:          store.NewStore(pool),
 			Allowlist:      allow,
 			TrustedProxies: trusted,
 			Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
