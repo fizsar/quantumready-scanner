@@ -1,5 +1,9 @@
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+
+// findBy*/waitFor: 5 s instead of 1 s. Lazily loaded pages (/examples) can
+// take longer than a second when the whole suite runs in parallel.
+configure({ asyncUtilTimeout: 5000 })
 
 afterEach(() => {
   cleanup()

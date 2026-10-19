@@ -8,7 +8,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type BlockedTargetsDaily struct {
+	Day    pgtype.Date
+	Domain string
+	Count  int64
+}
 
 type Finding struct {
 	ID       int64
@@ -44,4 +51,11 @@ type Scan struct {
 	Pqc            *bool
 	Retries        int32
 	NotBefore      *time.Time
+}
+
+type UsageDaily struct {
+	Day   pgtype.Date
+	Event string
+	Dim   string
+	Count int64
 }

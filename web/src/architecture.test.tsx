@@ -115,7 +115,7 @@ describe('/architecture', () => {
     for (const h of internal) {
       cleanup()
       renderAt(h, 'es')
-      const h1 = await screen.findByRole('heading', { level: 1 }) // pages may load lazily
+      const h1 = await screen.findByRole('heading', { level: 1 }, { timeout: 5000 }) // /examples loads lazily // pages may load lazily
       expect(h1.textContent, h).not.toBe('Esta página no existe')
       const id = h.split('#')[1]
       if (id) expect(document.getElementById(id), h).not.toBeNull()
