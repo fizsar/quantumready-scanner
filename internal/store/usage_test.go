@@ -8,6 +8,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// The domains of blocked scan requests are deleted after keep_days.
+func TestPurgeBlockedTargets(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	for _, ago := range []int{40, 31, 30, 1, 0} {
+		d := now.AddDate(0, 0, -ago)
+		day := pgtype.Date{Time: time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC), Valid: true}
+		if err := st.CountBlockedTarget(ctx, CountBlockedTargetParams{Day: day, Domain: "example.org", MaxDomains: 10}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n, err := st.PurgeBlockedTargets(ctx, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("purged %d rows, want 2 (40 and 31 days old)", n)
+	}
+	var left int
+	if err := st.pool.QueryRow(ctx, `SELECT count(*) FROM blocked_targets_daily`).Scan(&left); err != nil {
+		t.Fatal(err)
+	}
+	if left != 3 {
+		t.Errorf("%d rows left, want 3 (30, 1 and 0 days old)", left)
+	}
+}
+
 // Counters add up per day, event and dim; past max_dims different dims a
 // day, new ones go to "other", so junk cannot grow the table without bound.
 func TestCountUsageCapsDims(t *testing.T) {

@@ -93,6 +93,9 @@ func run(logger *slog.Logger) error {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	// The domains of blocked scan requests (M1) are kept 30 days.
+	go purgeLoop(ctx, store.NewStore(pool).PurgeBlockedTargets, blockedTargetsKeepDays, 24*time.Hour, logger)
+
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,

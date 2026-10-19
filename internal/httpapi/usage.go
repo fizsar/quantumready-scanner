@@ -146,6 +146,28 @@ func today() pgtype.Date {
 	return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
 }
 
+// countBlocked counts a scan request refused with 403 host_not_allowed, and
+// the registrable domain it pointed at (never an IP address). Nothing about
+// who asked is kept. Bots are not counted, and the per-client limit of
+// POST /api/e applies, since the 403 comes before the scan rate limit.
+func (a *api) countBlocked(r *http.Request, host string) {
+	if a.cfg.Usage == nil || isBot(r) {
+		return
+	}
+	if ok, _ := a.usageLimiter.Reserve(rateKey(clientAddr(r, a.cfg.TrustedProxies))); !ok {
+		return
+	}
+	a.countUsage(r.Context(), "scan_blocked_403", "")
+	h, err := domains.Normalize(host)
+	if err != nil { // an IP address, a special-use name…: the count alone
+		return
+	}
+	d := domains.Registrable(h)
+	if err := a.cfg.Usage.CountBlockedTarget(r.Context(), store.CountBlockedTargetParams{Day: today(), Domain: d, MaxDomains: maxBlockedHost}); err != nil {
+		a.cfg.Logger.Warn("usage: count blocked target", "err", err)
+	}
+}
+
 // countUsage adds one; a failure is logged and never reaches the user.
 func (a *api) countUsage(ctx context.Context, event, dim string) {
 	if a.cfg.Usage == nil {

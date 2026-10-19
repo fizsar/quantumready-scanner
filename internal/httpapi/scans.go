@@ -68,6 +68,7 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !a.cfg.Allowlist.Allows(host) {
+		a.countBlocked(r, host)
 		writeError(w, r, http.StatusForbidden, "host_not_allowed")
 		return
 	}
