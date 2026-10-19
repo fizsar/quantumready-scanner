@@ -1,8 +1,9 @@
-import { lazy, Suspense } from 'react'
-import { Link, Route, Routes } from 'react-router'
+import { lazy, Suspense, useEffect } from 'react'
+import { Link, Route, Routes, useLocation } from 'react-router'
 import type { Lang } from './api'
 import { useLang } from './i18n'
 import { useShowcaseT } from './i18n.showcase'
+import { pageView, track } from './metrics'
 import { Architecture } from './pages/Architecture'
 import { Home } from './pages/Home'
 import './showcase.css'
@@ -33,6 +34,7 @@ export default function App() {
         <LangSwitch />
       </header>
 
+      <PageViews />
       <main id="main" className="main" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -51,6 +53,13 @@ export default function App() {
   )
 }
 
+/** M1: one page view per route change (not per #anchor). */
+function PageViews() {
+  const { pathname } = useLocation()
+  useEffect(() => pageView(pathname), [pathname])
+  return null
+}
+
 function ShowcaseFooterLinks() {
   const { t } = useShowcaseT()
   return (
@@ -64,7 +73,16 @@ function ShowcaseFooterLinks() {
 function LangSwitch() {
   const { lang, setLang, t } = useLang()
   const opt = (l: Lang, label: string) => (
-    <button type="button" className="lang-btn" aria-pressed={lang === l} lang={l} onClick={() => setLang(l)}>
+    <button
+      type="button"
+      className="lang-btn"
+      aria-pressed={lang === l}
+      lang={l}
+      onClick={() => {
+        if (l !== lang) track({ e: 'lang_switch', d: l })
+        setLang(l)
+      }}
+    >
       {label}
     </button>
   )

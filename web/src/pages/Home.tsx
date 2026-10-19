@@ -4,6 +4,7 @@ import { ApiError, createScan, getTargets } from '../api'
 import { HostNotAllowed } from '../components/HostNotAllowed'
 import { ShowcaseHomeLinks } from '../components/ShowcaseLinks'
 import { useLang } from '../i18n'
+import { track } from '../metrics'
 import { usePageMeta } from '../usePageMeta'
 import { errorMessage } from '../verdict'
 
@@ -34,6 +35,7 @@ export function Home() {
     setError(null)
     try {
       const s = await createScan(h, lang)
+      track({ e: 'scan_started', d: s.host })
       navigate(`/scans/${s.id}`)
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError(0, 'network', ''))
