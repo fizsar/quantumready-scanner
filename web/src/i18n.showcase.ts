@@ -163,6 +163,41 @@ const es = {
   'links.examples': 'Ejemplos',
   'links.architecture': 'Arquitectura',
 
+  'footer.privacy': 'Privacidad',
+  'privacy.meta.title': 'Privacidad · QuantumReady',
+  'privacy.meta.description':
+    'Qué mide QuantumReady y qué no: recuentos diarios en su propio servidor, sin cookies, sin guardar IPs y sin identificadores.',
+  'privacy.title': 'Privacidad',
+  'privacy.lead':
+    'Lo que hace hoy esta web con los datos de quien la visita. La política de privacidad completa llegará con la beta.',
+  'privacy.counted.title': 'Qué contamos',
+  'privacy.counted.lead': 'Para saber si la web le sirve a alguien, sumamos uno a contadores diarios:',
+  'privacy.counted.pages': 'Visitas por página. Los informes de escaneo cuentan todos juntos como «informe», nunca cuál.',
+  'privacy.counted.source':
+    'Desde qué sitio llegas: solo su dominio (por ejemplo, linkedin.com) y solo en la primera página de la visita, nunca la dirección completa.',
+  'privacy.counted.events':
+    'Algunos usos: escanear un dominio de demostración (cuál), abrir «Bajo el capó», descargar el JSON y cambiar de idioma.',
+  'privacy.counted.how':
+    'Cada recuento es un número por día. No se guarda quién, ni a qué hora, ni nada que relacione un recuento con otro.',
+  'privacy.not.title': 'Qué no hacemos',
+  'privacy.not.cookies': 'No usamos cookies. Lo único que guarda tu navegador es el idioma, si lo cambias.',
+  'privacy.not.ip':
+    'Ni los recuentos ni la base de datos guardan tu dirección IP ni ningún identificador. Para frenar abusos, el servidor usa la IP en memoria para limitar las peticiones de cada cliente, sin guardarla en la base de datos.',
+  'privacy.not.thirdParty': 'No hay analítica ni publicidad de terceros: los recuentos se hacen en nuestro propio servidor.',
+  'privacy.gpc.title': 'Control Global de Privacidad (GPC)',
+  'privacy.gpc.p':
+    'Si tu navegador envía la señal Global Privacy Control, la web no envía ningún recuento. Tampoco se cuentan los navegadores automatizados ni los robots conocidos.',
+  'privacy.blocked.title': 'Dominios que todavía no se pueden escanear',
+  'privacy.blocked.p1':
+    'Por ahora solo se analizan los dominios de demostración. Si se pide escanear otro, el servidor rechaza la petición y suma uno al recuento de ese dominio en ese día: solo el dominio (por ejemplo, example.com), sin nada de quién lo pidió. Así sabemos qué interés hay en abrir el escáner.',
+  'privacy.blocked.p2':
+    'Estos recuentos se borran a los 30 días y no entran en las copias de seguridad. Como se hacen en el servidor al rechazar la petición, se cuentan también con GPC.',
+  'privacy.scans.title': 'Informes de escaneo',
+  'privacy.scans.p':
+    'Cada escaneo guarda el dominio analizado y su resultado técnico, para mostrar el informe en su enlace. No guarda nada de quién lo lanzó.',
+  'privacy.contact.title': 'Contacto',
+  'privacy.contact.p': 'Dudas o peticiones sobre privacidad:',
+
   'examples.meta.title': 'Ejemplos · QuantumReady',
   'examples.meta.description':
     'Informes reales de QuantumReady: fizsar.com, con intercambio de claves post-cuántico, y tres servidores de laboratorio aislados: uno bien configurado sin criptografía post-cuántica y dos con configuraciones antiguas o rotas.',
@@ -363,6 +398,41 @@ const en: Record<ShowcaseKey, string> = {
   'links.label': 'More about QuantumReady',
   'links.examples': 'Examples',
   'links.architecture': 'Architecture',
+
+  'footer.privacy': 'Privacy',
+  'privacy.meta.title': 'Privacy · QuantumReady',
+  'privacy.meta.description':
+    'What QuantumReady measures and what it does not: daily counts on its own server, no cookies, no stored IPs and no identifiers.',
+  'privacy.title': 'Privacy',
+  'privacy.lead':
+    'What this site does today with the data of its visitors. The full privacy policy will come with the beta.',
+  'privacy.counted.title': 'What we count',
+  'privacy.counted.lead': 'To know whether the site is useful to anyone, we add one to daily counters:',
+  'privacy.counted.pages': 'Visits per page. Scan reports are all counted together as “report”, never which one.',
+  'privacy.counted.source':
+    'Which site you come from: only its domain (for example, linkedin.com) and only on the first page of the visit, never the full address.',
+  'privacy.counted.events':
+    'Some uses: scanning a demo domain (which one), opening “Under the hood”, downloading the JSON and switching language.',
+  'privacy.counted.how':
+    'Each count is a number per day. Nothing is stored about who, at what time, or anything linking one count to another.',
+  'privacy.not.title': 'What we do not do',
+  'privacy.not.cookies': 'We use no cookies. The only thing your browser keeps is the language, if you change it.',
+  'privacy.not.ip':
+    'Neither the counts nor the database store your IP address or any identifier. To curb abuse, the server uses the IP in memory to limit each client’s requests, without storing it in the database.',
+  'privacy.not.thirdParty': 'No third-party analytics or advertising: the counting happens on our own server.',
+  'privacy.gpc.title': 'Global Privacy Control (GPC)',
+  'privacy.gpc.p':
+    'If your browser sends the Global Privacy Control signal, the site sends no counts at all. Automated browsers and known bots are not counted either.',
+  'privacy.blocked.title': 'Domains that cannot be scanned yet',
+  'privacy.blocked.p1':
+    'For now only the demo domains are analyzed. If a scan of another one is requested, the server refuses it and adds one to that domain’s count for the day: only the domain (for example, example.com), nothing about who asked. That tells us how much interest there is in opening the scanner.',
+  'privacy.blocked.p2':
+    'These counts are deleted after 30 days and are left out of the backups. Since the server counts them when it refuses the request, they are counted with GPC too.',
+  'privacy.scans.title': 'Scan reports',
+  'privacy.scans.p':
+    'Each scan stores the analyzed domain and its technical result, to show the report at its link. It stores nothing about who started it.',
+  'privacy.contact.title': 'Contact',
+  'privacy.contact.p': 'Privacy questions or requests:',
 
   'examples.meta.title': 'Examples · QuantumReady',
   'examples.meta.description':

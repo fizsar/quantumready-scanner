@@ -34,7 +34,7 @@ const (
 
 // The closed lists. Anything else is dropped without a trace.
 var (
-	usageRoutes = []string{"/", "/examples", "/architecture", "scan_report", "not_found"}
+	usageRoutes = []string{"/", "/examples", "/architecture", "/privacy", "scan_report", "not_found"}
 	usagePages  = []string{"scan_report", "examples"}
 	usageLangs  = []string{"es", "en"}
 )

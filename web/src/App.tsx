@@ -5,6 +5,7 @@ import { useLang } from './i18n'
 import { useShowcaseT } from './i18n.showcase'
 import { pageView, track } from './metrics'
 import { Architecture } from './pages/Architecture'
+import { Privacy } from './pages/Privacy'
 import { Home } from './pages/Home'
 import './showcase.css'
 
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/scans/:id" element={<ScanPage />} />
           <Route path="/architecture" element={<Architecture />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/examples" element={<Suspense><Examples /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -66,6 +68,7 @@ function ShowcaseFooterLinks() {
     <>
       <Link to="/examples">{t('links.examples')}</Link>
       <Link to="/architecture">{t('footer.architecture')}</Link>
+      <Link to="/privacy">{t('footer.privacy')}</Link>
     </>
   )
 }

@@ -4,7 +4,7 @@
 // asks for privacy (Global Privacy Control) or is driven by automation, and a
 // failure never reaches the page.
 
-export type Route = '/' | '/examples' | '/architecture' | 'scan_report' | 'not_found'
+export type Route = '/' | '/examples' | '/architecture' | '/privacy' | 'scan_report' | 'not_found'
 export type Page = 'scan_report' | 'examples'
 
 export type UsageEvent =
@@ -15,7 +15,7 @@ export type UsageEvent =
 
 /** The route as counted: scan results are one bucket, never their id. */
 export function routeOf(pathname: string): Route {
-  if (pathname === '/' || pathname === '/examples' || pathname === '/architecture') return pathname
+  if (pathname === '/' || pathname === '/examples' || pathname === '/architecture' || pathname === '/privacy') return pathname
   if (/^\/scans\/[^/]+\/?$/.test(pathname)) return 'scan_report'
   return 'not_found'
 }

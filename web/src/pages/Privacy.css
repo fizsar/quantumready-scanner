@@ -1,0 +1,19 @@
+/* /privacy (showcase, M1). Uses the tokens of index.css. */
+.privacy {
+  width: min(100%, 46rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.privacy-section p + p,
+.privacy-section p + ul,
+.privacy-section ul + p {
+  margin-top: 0.5rem;
+}
+.privacy-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}

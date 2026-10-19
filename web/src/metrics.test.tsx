@@ -47,6 +47,7 @@ describe('M1 metrics', () => {
     expect(routeOf('/')).toBe('/')
     expect(routeOf('/examples')).toBe('/examples')
     expect(routeOf('/architecture')).toBe('/architecture')
+    expect(routeOf('/privacy')).toBe('/privacy')
     expect(routeOf('/scans/11111111-2222-3333-4444-555555555555')).toBe('scan_report')
     expect(routeOf('/admin')).toBe('not_found')
   })

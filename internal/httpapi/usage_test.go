@@ -78,6 +78,7 @@ func TestUsageEventsCounted(t *testing.T) {
 	h, u := usageAPI(t, nil)
 	for _, body := range []string{
 		`{"e":"page_view","p":"/examples"}`,
+		`{"e":"page_view","p":"/privacy"}`,
 		`{"e":"page_view","p":"/","entry":true,"r":"www.linkedin.com"}`,
 		`{"e":"page_view","p":"scan_report","entry":true}`,
 		`{"e":"page_view","p":"/architecture","entry":true,"r":"quantumready.fizsar.com"}`, // a reload: no source
@@ -90,7 +91,7 @@ func TestUsageEventsCounted(t *testing.T) {
 			t.Errorf("%s: %d", body, code)
 		}
 	}
-	want := []string{"page_view//examples", "page_view//", "visit_source/linkedin.com", "page_view/scan_report", "visit_source/direct",
+	want := []string{"page_view//examples", "page_view//privacy", "page_view//", "visit_source/linkedin.com", "page_view/scan_report", "visit_source/direct",
 		"page_view//architecture", "scan_started/quantumready.fizsar.com", "under_the_hood_open/examples", "json_download/scan_report", "lang_switch/en"}
 	if !slices.Equal(u.counts, want) {
 		t.Errorf("counted\n %v\nwant\n %v", u.counts, want)
