@@ -24,7 +24,7 @@ check() { # check DESCRIPTION COMMAND…
 # Lint with shellcheck if installed, else with its official image.
 sc=(shellcheck)
 command -v shellcheck >/dev/null || sc=(docker run --rm -v "$here/../..:/src:ro" -w /src koalaman/shellcheck:v0.10.0)
-(cd "$here/../.." && "${sc[@]}" -x deploy/backup/*.sh deploy/deploy.sh) && ok shellcheck || bad shellcheck
+(cd "$here/../.." && "${sc[@]}" -x deploy/backup/*.sh deploy/*.sh) && ok shellcheck || bad shellcheck
 
 # Under $HOME, not /tmp: it is bind-mounted into containers.
 fx=$(mktemp -d "${XDG_CACHE_HOME:-$HOME/.cache}/qr-backup-test.XXXXXX")
