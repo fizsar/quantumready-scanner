@@ -2,7 +2,8 @@
 
 # API image: static Go binaries on distroless (nonroot, no shell).
 # Ships /api, /migrate (one-shot compose service), /worker (scan queue),
-# /mailer (email outbox) and /qradmin (signup codes; run by hand).
+# /mailer (email outbox) and /qradmin (signup codes, exclusions, opt-outs and
+# usage stats; run by hand).
 # Only /worker carries the scanner's GODEBUG settings (see cmd/worker).
 
 FROM golang:1.27.2-alpine AS build

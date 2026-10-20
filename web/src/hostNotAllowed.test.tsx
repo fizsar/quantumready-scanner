@@ -85,7 +85,7 @@ describe('403 host_not_allowed', () => {
     for (const h of internal) {
       cleanup()
       renderAt(h, 'es')
-      const h1 = await screen.findByRole('heading', { level: 1 })
+      const h1 = await screen.findByRole('heading', { level: 1 }, { timeout: 5000 }) // /examples loads lazily
       expect(h1.textContent, h).not.toBe('Esta página no existe')
     }
   })

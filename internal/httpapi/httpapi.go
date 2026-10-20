@@ -83,6 +83,13 @@ type Config struct {
 	// it synchronous.
 	Async func(func())
 
+	// Usage enables the M1 usage counters (POST /api/e and the 403 count);
+	// nil disables them.
+	Usage UsageStore
+	// UsageLimiter rate-limits POST /api/e per client; nil means 60/min and
+	// 1,000/day.
+	UsageLimiter *Limiter
+
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -94,7 +101,10 @@ type PublicLimits struct {
 	Challenge *Limiter // ALTCHA challenges per client: 60/min, 2000/day
 }
 
-type api struct{ cfg Config }
+type api struct {
+	cfg          Config
+	usageLimiter *Limiter
+}
 
 // NewRouter returns the root handler of the API.
 func NewRouter(cfg Config) http.Handler {
@@ -125,7 +135,10 @@ func NewRouter(cfg Config) http.Handler {
 	if cfg.PublicLimits.Challenge == nil {
 		cfg.PublicLimits.Challenge = NewLimiter(60, 2000)
 	}
-	a := &api{cfg: cfg}
+	if cfg.UsageLimiter == nil {
+		cfg.UsageLimiter = NewLimiter(60, 1000)
+	}
+	a := &api{cfg: cfg, usageLimiter: cfg.UsageLimiter}
 	a.authDefaults()
 
 	r := chi.NewRouter()
@@ -203,6 +216,9 @@ func NewRouter(cfg Config) http.Handler {
 					r.Post("/change-password", a.changePassword)
 				})
 			})
+		}
+		if cfg.Usage != nil {
+			r.Post("/e", a.usageEvent)
 		}
 	})
 	return r

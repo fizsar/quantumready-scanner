@@ -87,6 +87,8 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 	}
 	open := a.cfg.PublicScanOpen && !a.cfg.Allowlist.Allows(host)
 	if !a.cfg.PublicScanOpen && !a.cfg.Allowlist.Allows(host) {
+		a.countBlocked(r, host) // M1; with open scanning there is no such 403
+
 		writeError(w, r, http.StatusForbidden, "host_not_allowed")
 		return
 	}

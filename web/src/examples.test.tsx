@@ -119,7 +119,7 @@ describe('/examples', () => {
     for (const h of [...new Set(hrefs.filter((h) => h.startsWith('/')))]) {
       cleanup()
       renderAt(h, 'es')
-      const h1 = await screen.findByRole('heading', { level: 1 })
+      const h1 = await screen.findByRole('heading', { level: 1 }, { timeout: 5000 }) // /examples loads lazily
       expect(h1.textContent, h).not.toBe('Esta página no existe')
     }
   })

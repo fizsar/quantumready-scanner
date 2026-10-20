@@ -107,6 +107,7 @@ func run(logger *slog.Logger) error {
 		Version:        version,
 		DB:             pool,
 		Scans:          st,
+		Usage:          st,
 		Allowlist:      allow,
 		TrustedProxies: trusted,
 		Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
@@ -132,6 +133,9 @@ func run(logger *slog.Logger) error {
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+
+	// The domains of blocked scan requests (M1) are kept 30 days.
+	go purgeLoop(ctx, st.PurgeBlockedTargets, blockedTargetsKeepDays, 24*time.Hour, logger)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()

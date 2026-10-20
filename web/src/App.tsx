@@ -1,12 +1,14 @@
-import { lazy, Suspense } from 'react'
-import { Link, Route, Routes } from 'react-router'
+import { lazy, Suspense, useEffect } from 'react'
+import { Link, Route, Routes, useLocation } from 'react-router'
 import type { Lang } from './api'
 import { useAuth } from './auth'
 import { useLang } from './i18n'
 import { useShowcaseT } from './i18n.showcase'
+import { pageView, track } from './metrics'
 import { AboutScans } from './pages/AboutScans'
 import { AccountPage, ForgotPage, LoginPage, RegisterPage, ResetPage, VerifyPage } from './pages/AccountPages'
 import { Architecture } from './pages/Architecture'
+import { Privacy } from './pages/Privacy'
 import { Home } from './pages/Home'
 import { InvitePage } from './pages/InvitePage'
 import { OrgPage } from './pages/OrgPage'
@@ -41,6 +43,7 @@ export default function App() {
         </div>
       </header>
 
+      <PageViews />
       <main id="main" className="main" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -56,6 +59,7 @@ export default function App() {
           <Route path="/org/scans/:id" element={<ScanPage org />} />
           <Route path="/invite" element={<InvitePage />} />
           <Route path="/architecture" element={<Architecture />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/examples" element={<Suspense><Examples /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -90,12 +94,20 @@ function AccountLink() {
   )
 }
 
+/** M1: one page view per route change (not per #anchor). */
+function PageViews() {
+  const { pathname } = useLocation()
+  useEffect(() => pageView(pathname), [pathname])
+  return null
+}
+
 function ShowcaseFooterLinks() {
   const { t } = useShowcaseT()
   return (
     <>
       <Link to="/examples">{t('links.examples')}</Link>
       <Link to="/architecture">{t('footer.architecture')}</Link>
+      <Link to="/privacy">{t('footer.privacy')}</Link>
     </>
   )
 }
@@ -103,7 +115,16 @@ function ShowcaseFooterLinks() {
 function LangSwitch() {
   const { lang, setLang, t } = useLang()
   const opt = (l: Lang, label: string) => (
-    <button type="button" className="lang-btn" aria-pressed={lang === l} lang={l} onClick={() => setLang(l)}>
+    <button
+      type="button"
+      className="lang-btn"
+      aria-pressed={lang === l}
+      lang={l}
+      onClick={() => {
+        if (l !== lang) track({ e: 'lang_switch', d: l })
+        setLang(l)
+      }}
+    >
       {label}
     </button>
   )

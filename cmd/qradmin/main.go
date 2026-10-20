@@ -4,7 +4,8 @@
 //	qradmin signup-code [-note "for Ana"] [-days 14]
 //
 // signup-code creates a closed-beta registration code and prints it once:
-// only its SHA-256 is stored, so it cannot be shown again.
+// only its SHA-256 is stored, so it cannot be shown again. stats prints the
+// M1 usage counters (stats.go).
 package main
 
 import (
@@ -28,7 +29,8 @@ const usage = `usage: qradmin signup-code [-note TEXT] [-days N]
        qradmin exclude remove DOMAIN
        qradmin exclude list
        qradmin optout list                         (owners' opt-outs, kept even if no longer verified)
-       qradmin optout clear DOMAIN`
+       qradmin optout clear DOMAIN
+       qradmin stats [-days N]                     (M1 usage counters of the last N days, UTC; 1-366, default 30)`
 
 func main() {
 	if err := run(context.Background(), os.Args[1:], os.Getenv, os.Stdout); err != nil {
@@ -51,6 +53,9 @@ func run(ctx context.Context, args []string, getenv func(string) string, out io.
 	}
 	if len(args) > 0 && args[0] == "optout" {
 		return optout(ctx, args[1:], getenv, out)
+	}
+	if len(args) > 0 && args[0] == "stats" {
+		return statsCmd(ctx, args[1:], getenv, out)
 	}
 	if len(args) == 0 || args[0] != "signup-code" {
 		return errors.New(usage)

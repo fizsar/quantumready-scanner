@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useId, useState } from 'react'
 import { useLocation } from 'react-router'
 import type { ScanView } from '../api'
 import { useShowcaseT, type ShowcaseKey } from '../i18n.showcase'
+import { track } from '../metrics'
 import { downloadJSON, hex, otherRawProbes, parseError, probeRows, resultOf, suitesByVersion, versionsTried, type Offer, type Reply, type ScanResult } from '../underTheHood'
 import './UnderTheHood.css'
 
@@ -30,6 +31,11 @@ export function UnderTheHood({ scan, anchor = 'under-the-hood', level = 1 }: { s
   useEffect(() => {
     if (linked) document.getElementById(anchor)?.scrollIntoView?.()
   }, [linked, anchor])
+  // M1: each time it opens, by a click or a link.
+  const page = anchor === 'under-the-hood' ? 'scan_report' : 'examples'
+  useEffect(() => {
+    if (open) track({ e: 'under_the_hood_open', d: page })
+  }, [open, page])
   const r = scan.report && resultOf(scan.report)
   if (!r) return null
   const num = new Intl.NumberFormat(lang === 'es' ? 'es-ES' : 'en-GB', { maximumFractionDigits: 1 })
@@ -46,7 +52,10 @@ export function UnderTheHood({ scan, anchor = 'under-the-hood', level = 1 }: { s
       <div id={`${id}-body`} className="uth-body" hidden={!open}>
         <p className="muted small">{t('uth.lead')}</p>
         <div className="uth-download">
-          <button type="button" className="btn" onClick={() => downloadJSON(scan)}>
+          <button type="button" className="btn" onClick={() => {
+              downloadJSON(scan)
+              track({ e: 'json_download', d: page })
+            }}>
             {t('uth.download')}
           </button>
           <span className="muted small">{t('uth.downloadHelp')}</span>
