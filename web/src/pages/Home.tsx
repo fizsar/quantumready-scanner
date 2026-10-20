@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError, createScan, getTargets } from '../api'
 import { HostNotAllowed } from '../components/HostNotAllowed'
+import { HowItWorks } from '../components/HowItWorks'
 import { ShowcaseHomeLinks } from '../components/ShowcaseLinks'
 import { useLang } from '../i18n'
 import { track } from '../metrics'
@@ -110,6 +111,7 @@ export function Home() {
         </form>
         {error?.code === 'host_not_allowed' && <HostNotAllowed targets={targets} busy={busy} onScan={(h) => void scan(h)} />}
       </section>
+      <HowItWorks />
       <ShowcaseHomeLinks />
     </div>
   )

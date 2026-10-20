@@ -163,6 +163,21 @@ const es = {
   'links.examples': 'Ejemplos',
   'links.architecture': 'Arquitectura',
 
+  'how.title': 'Cómo funciona',
+  'how.lead':
+    'Pides el escaneo, un proceso aparte lo hace en segundo plano y el informe sale de reglas que citan su fuente.',
+  'how.handshakes':
+    'Solo handshakes TLS: no pide ninguna página ni intenta explotar nada. Mira qué ofrece el servidor y qué elige, versión a versión y grupo a grupo.',
+  'how.raw':
+    'Sondas en crudo: además de la biblioteca estándar de Go, construye ClientHello byte a byte para encontrar lo antiguo o roto (SSLv2, SSLv3, EXPORT, Diffie-Hellman débil) que una biblioteca moderna ni sabe pedir.',
+  'how.ssrf':
+    'Anti-SSRF: rechaza el dominio si alguna de sus direcciones es privada, reservada o local, y se conecta a la IP ya validada, nunca al nombre.',
+  'how.scoring':
+    'Puntuación con fuentes: la mitad de la nota depende del intercambio de claves híbrido con ML-KEM, y cada regla cita su RFC, CVE, borrador del IETF o publicación del NIST.',
+  'how.lab':
+    'Contrastado: un laboratorio de servidores TLS aislados, casi todos vulnerables a propósito, cuyos resultados se comparan con los de testssl.sh.',
+  'how.more': 'Todos los detalles en Arquitectura',
+
   'footer.privacy': 'Privacidad',
   'privacy.meta.title': 'Privacidad · QuantumReady',
   'privacy.meta.description':
@@ -398,6 +413,21 @@ const en: Record<ShowcaseKey, string> = {
   'links.label': 'More about QuantumReady',
   'links.examples': 'Examples',
   'links.architecture': 'Architecture',
+
+  'how.title': 'How it works',
+  'how.lead':
+    'You ask for the scan, a separate process runs it in the background, and the report comes from rules that cite their source.',
+  'how.handshakes':
+    'TLS handshakes only: it never requests a page or tries to exploit anything. It looks at what the server offers and what it chooses, version by version and group by group.',
+  'how.raw':
+    "Raw probes: besides Go's standard library, it builds ClientHello messages byte by byte to find what is old or broken (SSLv2, SSLv3, EXPORT, weak Diffie-Hellman) that a modern library cannot even ask for.",
+  'how.ssrf':
+    'Anti-SSRF: it refuses the domain if any of its addresses is private, reserved or local, and connects to the validated IP, never to the name.',
+  'how.scoring':
+    'Scoring with sources: half of the score depends on a hybrid key exchange with ML-KEM, and every rule cites its RFC, CVE, IETF draft or NIST publication.',
+  'how.lab':
+    "Cross-checked: a lab of isolated TLS servers, nearly all deliberately vulnerable, whose results are compared with testssl.sh's.",
+  'how.more': 'All the details in Architecture',
 
   'footer.privacy': 'Privacy',
   'privacy.meta.title': 'Privacy · QuantumReady',

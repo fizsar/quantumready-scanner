@@ -56,7 +56,7 @@ describe('M1 metrics', () => {
     Object.defineProperty(document, 'referrer', { value: 'https://www.linkedin.com/feed/?trk=x&id=123', configurable: true })
     api()
     renderAt('/')
-    await screen.findByRole('heading', { level: 2 })
+    await screen.findAllByRole('heading', { level: 2 })
     await userEvent.click(screen.getAllByRole('link', { name: 'Ejemplos' })[0])
     await screen.findByRole('heading', { level: 1, name: 'Ejemplos' })
     const evs = await sent()
