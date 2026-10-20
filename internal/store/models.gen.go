@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AuditLog struct {
@@ -28,6 +29,12 @@ type AuthToken struct {
 	CreatedAt time.Time
 	ExpiresAt time.Time
 	UsedAt    *time.Time
+}
+
+type BlockedTargetsDaily struct {
+	Day    pgtype.Date
+	Domain string
+	Count  int64
 }
 
 type DeletionTombstone struct {
@@ -158,6 +165,13 @@ type SignupCode struct {
 	ExpiresAt time.Time
 	UsedBy    *uuid.UUID
 	UsedAt    *time.Time
+}
+
+type UsageDaily struct {
+	Day   pgtype.Date
+	Event string
+	Dim   string
+	Count int64
 }
 
 type User struct {

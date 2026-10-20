@@ -5,6 +5,7 @@ import { ApiError, createScan, getAltcha, getTargets } from '../api'
 import { HostNotAllowed } from '../components/HostNotAllowed'
 import { ShowcaseHomeLinks } from '../components/ShowcaseLinks'
 import { useLang } from '../i18n'
+import { track } from '../metrics'
 import { usePageMeta } from '../usePageMeta'
 import { errorMessage } from '../verdict'
 
@@ -44,6 +45,7 @@ export function Home() {
         setProving(false)
       }
       const s = await createScan(h, lang, proof)
+      track({ e: 'scan_started', d: s.host })
       navigate(`/scans/${s.id}`, { state: s.reused ? { reusedAge: s.age_seconds ?? 0 } : undefined })
     } catch (e) {
       setProving(false)

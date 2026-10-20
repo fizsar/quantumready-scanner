@@ -8,14 +8,33 @@ QR_DIR=${QR_DIR:-/opt/quantumready}
 BACKUP_DIR=${BACKUP_DIR:-$QR_DIR/backups}
 RESTIC_MOUNTS=()
 
+# Tables whose rows never go into a backup (M1 usage counters and the domains
+# of refused scans, deleted after 30 days): pg_dump keeps their schema but not
+# their data, so a restore brings them back empty.
+NO_DATA_TABLES=(usage_daily blocked_targets_daily)
+
 # One JSON object {table: rows} for every table in the public schema, keys in
 # order, so a manifest and a restored database compare as plain strings.
-# shellcheck disable=SC2016,SC2034 # $ is SQL here; used by the scripts that source this
-MANIFEST_SQL='SELECT coalesce(json_object_agg(t.table_name,
-    (xpath($$/row/c/text()$$, query_to_xml(format($$SELECT count(*) AS c FROM %I.%I$$, t.table_schema, t.table_name), false, true, $$$$)))[1]::text::bigint
-    ORDER BY t.table_name), $${}$$)
+# MANIFEST_SQL counts every table; DUMP_MANIFEST_SQL (backup.sh) records 0 for
+# NO_DATA_TABLES, so the restore drill, which counts for real, proves they
+# came back empty.
+# shellcheck disable=SC2016 # $ is SQL here
+_rows='(xpath($$/row/c/text()$$, query_to_xml(format($$SELECT count(*) AS c FROM %I.%I$$, t.table_schema, t.table_name), false, true, $$$$)))[1]::text::bigint'
+# shellcheck disable=SC2016 # $ is SQL here
+_manifest_sql() {
+	printf 'SELECT coalesce(json_object_agg(t.table_name, %s ORDER BY t.table_name), $${}$$)
   FROM information_schema.tables t
-  WHERE t.table_schema = $$public$$ AND t.table_type = $$BASE TABLE$$'
+  WHERE t.table_schema = $$public$$ AND t.table_type = $$BASE TABLE$$' "$1"
+}
+_no_data=$(printf '$$%s$$,' "${NO_DATA_TABLES[@]}")
+# shellcheck disable=SC2034 # used by the scripts that source this
+MANIFEST_SQL=$(_manifest_sql "$_rows")
+# shellcheck disable=SC2034
+DUMP_MANIFEST_SQL=$(_manifest_sql "CASE WHEN t.table_name IN (${_no_data%,}) THEN 0 ELSE $_rows END")
+# shellcheck disable=SC2034
+DUMP_EXCLUDE=()
+for _t in "${NO_DATA_TABLES[@]}"; do DUMP_EXCLUDE+=("--exclude-table-data=public.$_t"); done
+unset _t _no_data
 
 # restic ARGS… — runs restic in a container as the calling user (restored
 # files stay ours), without a cache (small repository). RESTIC_MOUNTS adds -v
