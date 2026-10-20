@@ -2,10 +2,12 @@
 // owner (DATABASE_URL of the migrations, not a qr_* role).
 //
 //	qradmin stats [-days 30]
+//	qradmin demos list|show|delete
 //
 // stats prints the M1 usage counters: events per day, the most common values
 // of each event and the domains most often refused with a 403 (only those
-// asked for 3 times or more; they are kept 30 days).
+// asked for 3 times or more; they are kept 30 days). demos reads and deletes
+// the "Request a free demo" submissions (demos.go).
 package main
 
 import (
@@ -20,15 +22,15 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
 
-const usage = `usage: qradmin stats [-days N]   (usage counters of the last N days, UTC; 1-366, default 30)`
+const usage = `usage: qradmin stats [-days N]   (usage counters of the last N days, UTC; 1-366, default 30)
+       qradmin demos list|show|delete   (demo requests; qradmin demos for details)`
 
 // events in the order of the table columns (the closed list of migration 00015).
-var events = []string{"page_view", "visit_source", "scan_started", "scan_blocked_403", "under_the_hood_open", "json_download", "lang_switch"}
+var events = []string{"page_view", "visit_source", "scan_started", "scan_blocked_403", "under_the_hood_open", "json_download", "lang_switch", "demo_requested"}
 
 // topPerEvent is how many values of each event the summary lists.
 const topPerEvent = 15
@@ -41,6 +43,9 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, getenv func(string) string, out io.Writer) error {
+	if len(args) > 0 && args[0] == "demos" {
+		return demos(ctx, args[1:], getenv, out)
+	}
 	if len(args) == 0 || args[0] != "stats" {
 		return errors.New(usage)
 	}
@@ -53,11 +58,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, out io.
 	if *days < 1 || *days > 366 {
 		return errors.New("-days must be between 1 and 366")
 	}
-	dsn := getenv("DATABASE_URL")
-	if dsn == "" {
-		return errors.New("DATABASE_URL is required")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	pool, err := connect(ctx, getenv)
 	if err != nil {
 		return err
 	}

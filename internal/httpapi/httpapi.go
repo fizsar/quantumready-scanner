@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/fizsar/quantumready-saas/internal/altcha"
 )
 
 const defaultPingTimeout = 2 * time.Second
@@ -52,13 +54,27 @@ type Config struct {
 	// 1,000/day.
 	UsageLimiter *Limiter
 
+	// Demos enables POST /api/demo (demo.go); nil disables it.
+	Demos DemoStore
+	// DemoAltcha requires a proof of work on POST /api/demo and serves it
+	// (GET /api/demo/challenge); nil: none (no ALTCHA_HMAC_KEY).
+	DemoAltcha *altcha.Verifier
+	// DemoLimiter rate-limits POST /api/demo per client; nil means 3/min and
+	// 10/day. DemoChallengeLimiter, the challenges: nil means 30/min, 300/day.
+	DemoLimiter          *Limiter
+	DemoChallengeLimiter *Limiter
+	// DemoNotify tells support about each request; nil: nobody.
+	DemoNotify DemoNotifier
+
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
 
 type api struct {
-	cfg          Config
-	usageLimiter *Limiter
+	cfg                  Config
+	usageLimiter         *Limiter
+	demoLimiter          *Limiter
+	demoChallengeLimiter *Limiter
 }
 
 // NewRouter returns the root handler of the API.
@@ -78,7 +94,13 @@ func NewRouter(cfg Config) http.Handler {
 	if cfg.UsageLimiter == nil {
 		cfg.UsageLimiter = NewLimiter(60, 1000)
 	}
-	a := &api{cfg: cfg, usageLimiter: cfg.UsageLimiter}
+	if cfg.DemoLimiter == nil {
+		cfg.DemoLimiter = NewLimiter(3, 10)
+	}
+	if cfg.DemoChallengeLimiter == nil {
+		cfg.DemoChallengeLimiter = NewLimiter(30, 300)
+	}
+	a := &api{cfg: cfg, usageLimiter: cfg.UsageLimiter, demoLimiter: cfg.DemoLimiter, demoChallengeLimiter: cfg.DemoChallengeLimiter}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
@@ -98,6 +120,12 @@ func NewRouter(cfg Config) http.Handler {
 		}
 		if cfg.Usage != nil {
 			r.Post("/e", a.usageEvent)
+		}
+		if cfg.Demos != nil {
+			r.Post("/demo", a.createDemo)
+			if cfg.DemoAltcha != nil {
+				r.Get("/demo/challenge", a.demoChallenge)
+			}
 		}
 	})
 	return r

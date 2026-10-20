@@ -37,6 +37,17 @@ var messages = map[string]map[string]string{
 	"method_not_allowed":     {"es": "Método no permitido.", "en": "Method not allowed."},
 	"internal":               {"es": "Error interno. Inténtalo más tarde.", "en": "Internal error. Try again later."},
 
+	// Demo requests (POST /api/demo).
+	"bad_origin":        {"es": "Esta petición solo se acepta desde quantumready.fizsar.com.", "en": "This request is only accepted from quantumready.fizsar.com."},
+	"too_many_requests": {"es": "Demasiadas solicitudes. Espera un poco y vuelve a intentarlo.", "en": "Too many requests. Wait a little and try again."},
+	"invalid_proof":     {"es": "No se pudo comprobar que eres una persona. Recarga la página y vuelve a intentarlo.", "en": "We could not check you are a person. Reload the page and try again."},
+	"privacy_required":  {"es": "Para enviar la solicitud tienes que aceptar la política de privacidad.", "en": "To send the request you have to accept the privacy policy."},
+	"invalid_name":      {"es": "Escribe tu nombre (máximo 100 caracteres).", "en": "Enter your name (100 characters at most)."},
+	"invalid_company":   {"es": "Escribe el nombre de tu empresa (máximo 100 caracteres).", "en": "Enter your company name (100 characters at most)."},
+	"invalid_email":     {"es": "El email no es válido.", "en": "The email address is not valid."},
+	"invalid_domain":    {"es": "El dominio no es válido (por ejemplo, empresa.com).", "en": "The domain is not valid (for example, company.com)."},
+	"invalid_message":   {"es": "El mensaje es demasiado largo (máximo 2000 caracteres).", "en": "The message is too long (2000 characters at most)."},
+
 	// Scan failures (scans.error).
 	"blocked_address":    {"es": "El dominio apunta a una dirección interna o reservada; no se escanea.", "en": "The domain points to an internal or reserved address; it is not scanned."},
 	"invalid_target":     {"es": "El destino no es válido.", "en": "The target is not valid."},
