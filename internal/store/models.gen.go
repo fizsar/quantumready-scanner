@@ -17,6 +17,18 @@ type BlockedTargetsDaily struct {
 	Count  int64
 }
 
+type DemoRequest struct {
+	ID             uuid.UUID
+	CreatedAt      time.Time
+	Name           string
+	Email          string
+	Company        string
+	Domain         string
+	Message        string
+	Lang           string
+	PrivacyVersion string
+}
+
 type Finding struct {
 	ID       int64
 	ScanID   uuid.UUID
