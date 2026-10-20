@@ -62,7 +62,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	demoProof, err := demoConfig(os.Getenv)
+	demoOn, demoProof, err := demoConfig(os.Getenv)
 	if err != nil {
 		return err
 	}
@@ -88,6 +88,7 @@ func run(logger *slog.Logger) error {
 			Usage:          st,
 			Demos:          st,
 			DemoAltcha:     demoProof,
+			DemoEnabled:    demoOn,
 			Allowlist:      allow,
 			TrustedProxies: trusted,
 			Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
@@ -101,7 +102,8 @@ func run(logger *slog.Logger) error {
 	}
 
 	// What /privacy says is deleted: the domains of blocked scan requests (M1)
-	// after 30 days, demo requests after 12 months.
+	// after 30 days, demo requests after 12 months (also with DEMO_ENABLED off:
+	// rows stored while it was on must still go).
 	go purgeLoop(ctx, "blocked targets", func(ctx context.Context) (int64, error) {
 		return st.PurgeBlockedTargets(ctx, blockedTargetsKeepDays)
 	}, 24*time.Hour, logger)
@@ -114,7 +116,7 @@ func run(logger *slog.Logger) error {
 	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,
 		"allowlist", allow.Len(), "trusted_proxies", len(trusted),
 		"rate_per_minute", lim.perMinute, "rate_per_day", lim.perDay, "target_cooldown", lim.cooldown.String(),
-		"demo_proof_of_work", demoProof != nil)
+		"demo_enabled", demoOn, "demo_proof_of_work", demoProof != nil)
 
 	select {
 	case err := <-errCh:

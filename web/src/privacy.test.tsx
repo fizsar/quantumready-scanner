@@ -10,7 +10,7 @@ import { json, stubFetch } from './test/fixtures'
 import { forbiddenProseOnPrivacy, strip } from './test/forbidden'
 
 function renderAt(path: string, lang: Lang) {
-  stubFetch(() => json({ hosts: ['fizsar.com'], port: 443 }))
+  stubFetch(() => json({ hosts: ['fizsar.com'], port: 443, demo: true })) // the demo form on: /privacy with its section
   return render(
     <MemoryRouter initialEntries={[path]}>
       <LangProvider initial={lang}>

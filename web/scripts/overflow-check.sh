@@ -4,13 +4,13 @@
 # in a real headless Chromium (jsdom has no layout). Everything runs in a
 # throwaway internal Docker network: no published ports, no Internet.
 #
-#   web/scripts/overflow-check.sh [WIDTH] [PAGE...]   (default: / /architecture /examples /privacy /demo)
+#   web/scripts/overflow-check.sh [WIDTH] [PAGE...]   (default: / /architecture /examples /privacy)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 WIDTH=${1:-375}
 shift || true
 PAGES=("$@")
-[ ${#PAGES[@]} -gt 0 ] || PAGES=(/ /architecture /examples /privacy /demo)
+[ ${#PAGES[@]} -gt 0 ] || PAGES=(/ /architecture /examples /privacy)
 CHROME=${CHROME_IMAGE:-zenika/alpine-chrome:124}
 NODE=$(grep -m1 -E '^FROM node:' Dockerfile | awk '{print $2}')
 NGINX=$(grep -m1 -E '^FROM .*nginx' Dockerfile | awk '{print $2}')

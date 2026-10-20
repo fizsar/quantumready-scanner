@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { Link } from 'react-router'
 import { useShowcaseT } from '../i18n.showcase'
-import { DemoButton } from './DemoButton'
+import { DemoCta } from './DemoButton'
 import './HostNotAllowed.css'
 
 const CONTACT = 'soporte@fizsar.com'
@@ -21,10 +21,7 @@ export function HostNotAllowed({ targets, busy, onScan }: { targets: string[] | 
         {t('hna.title')}
       </h3>
       <p>{t('hna.why')}</p>
-      <p className="demo-cta">
-        <span className="muted">{t('demo.cta')}</span>
-        <DemoButton from="host_not_allowed" />
-      </p>
+      <DemoCta from="host_not_allowed" />
       {targets && targets.length > 0 && (
         <>
           <p>{t('hna.meanwhile')}</p>

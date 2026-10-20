@@ -3,6 +3,7 @@ import { Link, Route, Routes, useLocation } from 'react-router'
 import type { Lang } from './api'
 import { useLang } from './i18n'
 import { useShowcaseT } from './i18n.showcase'
+import { useDemoEnabled } from './features'
 import { pageView, track } from './metrics'
 import { Architecture } from './pages/Architecture'
 import { DemoPage } from './pages/DemoPage'
@@ -43,7 +44,7 @@ export default function App() {
           <Route path="/scans/:id" element={<ScanPage />} />
           <Route path="/architecture" element={<Architecture />} />
           <Route path="/privacy" element={<Privacy />} />
-          <Route path="/demo" element={<DemoPage />} />
+          <Route path="/demo" element={<DemoRoute />} />
           <Route path="/examples" element={<Suspense><Examples /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -97,6 +98,13 @@ function LangSwitch() {
       {opt('en', 'EN')}
     </div>
   )
+}
+
+/** /demo exists only while the server has the form on (DEMO_ENABLED). */
+function DemoRoute() {
+  const on = useDemoEnabled()
+  if (on === null) return null
+  return on ? <DemoPage /> : <NotFound />
 }
 
 function NotFound() {

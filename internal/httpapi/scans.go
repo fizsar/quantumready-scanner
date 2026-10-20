@@ -34,9 +34,13 @@ type createScanRequest struct {
 }
 
 // listTargets: GET /api/targets, the hosts that may be scanned (the
-// frontend shows them as buttons instead of keeping its own copy).
+// frontend shows them as buttons instead of keeping its own copy), and
+// whether the demo request form is on.
+// demoOn: the demo request form is served (the web hides it otherwise).
+func (a *api) demoOn() bool { return a.cfg.Demos != nil && a.cfg.DemoEnabled }
+
 func (a *api) listTargets(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort})
+	writeJSON(w, http.StatusOK, map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort, "demo": a.demoOn()})
 }
 
 // createScan: POST /api/scans {"host": "..."}.

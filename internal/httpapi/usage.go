@@ -94,7 +94,7 @@ func (a *api) usageEvent(w http.ResponseWriter, r *http.Request) {
 func (a *api) usageCounts(ev usageEvent, ownHost string) [][2]string {
 	switch ev.E {
 	case "page_view":
-		if ev.D != "" || !slices.Contains(usageRoutes, ev.P) || (!ev.Entry && ev.R != "") {
+		if ev.D != "" || !slices.Contains(usageRoutes, ev.P) || (!ev.Entry && ev.R != "") || (ev.P == "/demo" && !a.demoOn()) {
 			return nil
 		}
 		out := [][2]string{{"page_view", ev.P}}
@@ -121,7 +121,7 @@ func (a *api) usageCounts(ev usageEvent, ownHost string) [][2]string {
 			return nil
 		}
 	case "demo_requested":
-		if ev.P != "" || ev.Entry || ev.R != "" || !slices.Contains(demoSources, ev.D) {
+		if !a.demoOn() || ev.P != "" || ev.Entry || ev.R != "" || !slices.Contains(demoSources, ev.D) {
 			return nil
 		}
 	default: // scan_blocked_403 is counted by the API itself, never from the web

@@ -87,8 +87,10 @@ services:
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-5}
       RATE_LIMIT_PER_DAY: ${RATE_LIMIT_PER_DAY:-30}
       SCAN_TARGET_COOLDOWN: ${SCAN_TARGET_COOLDOWN:-2m}
-      # "Request a free demo": a proof of work when set (generated on the VPS),
-      # and the email to support, off until there is a mailer.
+      # "Request a free demo": off (portfolio); a proof of work when the key is
+      # set (generated on the VPS), and the email to support, off until there is
+      # a mailer.
+      DEMO_ENABLED: ${DEMO_ENABLED:-false}
       ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
       DEMO_NOTIFY: ${DEMO_NOTIFY:-false}
     ports:

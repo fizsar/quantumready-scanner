@@ -77,7 +77,7 @@ describe('403 host_not_allowed', () => {
       .getAllByRole('link')
       .map((a) => a.getAttribute('href')!)
       .filter((h) => h.startsWith('/'))
-    expect(internal).toEqual(['/demo', '/examples', '/architecture'])
+    expect(internal).toEqual(['/examples', '/architecture']) // the demo form is off by default (demoOff.test.tsx)
     for (const h of internal) {
       cleanup()
       renderAt(h, 'es')

@@ -181,7 +181,7 @@ const es = {
   'footer.privacy': 'Privacidad',
   'privacy.meta.title': 'Privacidad · QuantumReady',
   'privacy.meta.description':
-    'Qué datos trata QuantumReady: recuentos diarios en su propio servidor, sin cookies ni IPs guardadas, y lo que envías si pides una demo.',
+    'Qué datos trata QuantumReady: recuentos diarios en su propio servidor, sin cookies, sin guardar IPs y sin identificadores, y dónde están.',
   'privacy.title': 'Privacidad',
   'privacy.lead':
     'Lo que hace hoy esta web con los datos de quien la visita. La política de privacidad completa llegará con la beta.',
@@ -191,13 +191,14 @@ const es = {
   'privacy.counted.source':
     'Desde qué sitio llegas: solo su dominio (por ejemplo, linkedin.com) y solo en la primera página de la visita, nunca la dirección completa.',
   'privacy.counted.events':
-    'Algunos usos: escanear un dominio de demostración (cuál), abrir «Bajo el capó», descargar el JSON, cambiar de idioma y pedir una demo (solo desde qué botón, nunca lo que escribes).',
+    'Algunos usos: escanear un dominio de demostración (cuál), abrir «Bajo el capó», descargar el JSON y cambiar de idioma.',
+  'privacy.counted.demo': 'Pedir una demo: solo desde qué botón, nunca lo que escribes.',
   'privacy.counted.how':
     'Cada recuento es un número por día. No se guarda quién, ni a qué hora, ni nada que relacione un recuento con otro.',
   'privacy.not.title': 'Qué no hacemos',
   'privacy.not.cookies': 'No usamos cookies. Lo único que guarda tu navegador es el idioma, si lo cambias.',
   'privacy.not.ip':
-    'Ni los recuentos ni la base de datos guardan tu dirección IP, y los recuentos no llevan ningún identificador. Para frenar abusos, el servidor usa la IP en memoria para limitar las peticiones de cada cliente (también las del formulario de demo), sin guardarla en la base de datos.',
+    'Ni los recuentos ni la base de datos guardan tu dirección IP, y los recuentos no llevan ningún identificador. Para frenar abusos, el servidor usa la IP en memoria para limitar las peticiones de cada cliente, sin guardarla en la base de datos.',
   'privacy.not.thirdParty': 'No hay analítica ni publicidad de terceros: los recuentos se hacen en nuestro propio servidor.',
   'privacy.gpc.title': 'Control Global de Privacidad (GPC)',
   'privacy.gpc.p':
@@ -473,7 +474,7 @@ const en: Record<ShowcaseKey, string> = {
   'footer.privacy': 'Privacy',
   'privacy.meta.title': 'Privacy · QuantumReady',
   'privacy.meta.description':
-    'What data QuantumReady handles: daily counts on its own server, with no cookies or stored IPs, and what you send if you request a demo.',
+    'What data QuantumReady handles: daily counts on its own server, with no cookies, no stored IPs and no identifiers, and where it is.',
   'privacy.title': 'Privacy',
   'privacy.lead':
     'What this site does today with the data of its visitors. The full privacy policy will come with the beta.',
@@ -483,13 +484,14 @@ const en: Record<ShowcaseKey, string> = {
   'privacy.counted.source':
     'Which site you come from: only its domain (for example, linkedin.com) and only on the first page of the visit, never the full address.',
   'privacy.counted.events':
-    'Some uses: scanning a demo domain (which one), opening “Under the hood”, downloading the JSON, switching language and requesting a demo (only from which button, never what you write).',
+    'Some uses: scanning a demo domain (which one), opening “Under the hood”, downloading the JSON and switching language.',
+  'privacy.counted.demo': 'Requesting a demo: only from which button, never what you write.',
   'privacy.counted.how':
     'Each count is a number per day. Nothing is stored about who, at what time, or anything linking one count to another.',
   'privacy.not.title': 'What we do not do',
   'privacy.not.cookies': 'We use no cookies. The only thing your browser keeps is the language, if you change it.',
   'privacy.not.ip':
-    'Neither the counts nor the database store your IP address, and the counts carry no identifier. To curb abuse, the server uses the IP in memory to limit each client’s requests (the demo form’s too), without storing it in the database.',
+    'Neither the counts nor the database store your IP address, and the counts carry no identifier. To curb abuse, the server uses the IP in memory to limit each client’s requests, without storing it in the database.',
   'privacy.not.thirdParty': 'No third-party analytics or advertising: the counting happens on our own server.',
   'privacy.gpc.title': 'Global Privacy Control (GPC)',
   'privacy.gpc.p':

@@ -41,6 +41,7 @@ func demoAPI(t *testing.T, cfg Config) (http.Handler, *fakeDemos) {
 	t.Helper()
 	d := &fakeDemos{}
 	cfg.Demos = d
+	cfg.DemoEnabled = true
 	return NewRouter(cfg), d
 }
 
@@ -276,8 +277,20 @@ func TestDemoProofOfWork(t *testing.T) {
 }
 
 // The M1 event of the form: only where the button was, from a closed list.
+// usageDemoAPI: the M1 counters with the demo form on or off.
+func usageDemoAPI(t *testing.T, on bool) (http.Handler, *fakeUsage) {
+	t.Helper()
+	allow, err := ParseAllowlist("fizsar.com quantumready.fizsar.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := &fakeUsage{}
+	st := &fixtureStore{scans: map[uuid.UUID]store.Scan{}, findings: map[uuid.UUID][]store.Finding{}}
+	return NewRouter(Config{Usage: u, Scans: st, Allowlist: allow, Demos: &fakeDemos{}, DemoEnabled: on}), u
+}
+
 func TestDemoRequestedEvent(t *testing.T) {
-	h, u := usageAPI(t, nil)
+	h, u := usageDemoAPI(t, true)
 	for _, body := range []string{
 		`{"e":"demo_requested","d":"home"}`,
 		`{"e":"demo_requested","d":"host_not_allowed"}`,
@@ -294,5 +307,55 @@ func TestDemoRequestedEvent(t *testing.T) {
 	want := "demo_requested/home demo_requested/host_not_allowed demo_requested/examples demo_requested/direct page_view//demo"
 	if got := strings.Join(u.counts, " "); got != want {
 		t.Errorf("counted %q, want %q", got, want)
+	}
+}
+
+// DEMO_ENABLED off (the default): no form endpoints, the web is told so, and
+// neither the event nor /demo views are counted. On: all of it.
+func TestDemoDisabled(t *testing.T) {
+	v, err := altcha.New([]byte(strings.Repeat("k", 32)), 1000, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, on := range []bool{false, true} {
+		d := &fakeDemos{}
+		allow, _ := ParseAllowlist("fizsar.com")
+		st := &fixtureStore{scans: map[uuid.UUID]store.Scan{}, findings: map[uuid.UUID][]store.Finding{}}
+		h := NewRouter(Config{Scans: st, Allowlist: allow, Demos: d, DemoAltcha: v, DemoEnabled: on})
+		want := map[bool]int{false: http.StatusNotFound, true: http.StatusBadRequest}[on] // on: no proof given
+		if w := postDemo(h, demoReq{body: demoBody(nil)}); w.Code != want {
+			t.Errorf("enabled=%v: POST /api/demo %d, want %d", on, w.Code, want)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/demo/challenge", nil))
+		if want := map[bool]int{false: http.StatusNotFound, true: http.StatusOK}[on]; w.Code != want {
+			t.Errorf("enabled=%v: GET /api/demo/challenge %d, want %d", on, w.Code, want)
+		}
+		if d.count() != 0 {
+			t.Errorf("enabled=%v: stored %d", on, d.count())
+		}
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/targets", nil))
+		var targets struct{ Demo *bool }
+		if err := json.Unmarshal(w.Body.Bytes(), &targets); err != nil || targets.Demo == nil || *targets.Demo != on {
+			t.Errorf("enabled=%v: GET /api/targets %s", on, w.Body)
+		}
+
+		hu, u := usageDemoAPI(t, on)
+		postEvent(hu, evReq{body: `{"e":"demo_requested","d":"home"}`, origin: ownOrigin})
+		postEvent(hu, evReq{body: `{"e":"page_view","p":"/demo"}`, origin: ownOrigin})
+		postEvent(hu, evReq{body: `{"e":"page_view","p":"/"}`, origin: ownOrigin})
+		want2 := map[bool]string{false: "page_view//", true: "demo_requested/home page_view//demo page_view//"}[on]
+		if got := strings.Join(u.counts, " "); got != want2 {
+			t.Errorf("enabled=%v: counted %q, want %q", on, got, want2)
+		}
+	}
+	// Without a store there is nothing to turn on.
+	allow, _ := ParseAllowlist("fizsar.com")
+	h := NewRouter(Config{Scans: &fixtureStore{scans: map[uuid.UUID]store.Scan{}, findings: map[uuid.UUID][]store.Finding{}}, Allowlist: allow, DemoEnabled: true})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/targets", nil))
+	if !strings.Contains(w.Body.String(), `"demo":false`) {
+		t.Errorf("no store: %s", w.Body)
 	}
 }

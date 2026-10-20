@@ -1,4 +1,4 @@
-import { DemoButton } from '../components/DemoButton'
+import { DemoCta } from '../components/DemoButton'
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
 import { Report } from '../components/Report'
@@ -33,10 +33,7 @@ export default function Examples() {
         </h1>
         <p>{t('examples.lead')}</p>
         <p className="muted small">{t('examples.labNote')}</p>
-        <p className="demo-cta">
-          <span className="muted">{t('demo.cta')}</span>
-          <DemoButton from="examples" />
-        </p>
+        <DemoCta from="examples" />
         <nav aria-label={t('examples.nav')}>
           <ul className="examples-toc">
             {EXAMPLES.map(({ key, scans }) => {

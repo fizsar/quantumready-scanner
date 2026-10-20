@@ -99,7 +99,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-export function getTargets(): Promise<{ hosts: string[]; port: number }> {
+export function getTargets(): Promise<{ hosts: string[]; port: number; demo?: boolean }> {
   return request('/api/targets')
 }
 

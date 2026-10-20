@@ -17,8 +17,9 @@ function renderAt(path: string, lang: Lang = 'es', api?: Handler, state?: unknow
   const posts: { url: string; body: Record<string, unknown> }[] = []
   stubFetch(async (url, init) => {
     if (init?.method === 'POST') posts.push({ url, body: JSON.parse(String(init.body)) })
+    // The form is on in these tests (DEMO_ENABLED=true); demoOff.test.tsx covers it off.
+    if (url === '/api/targets') return json({ hosts: ['fizsar.com'], port: 443, demo: true })
     if (api) return api(url, init)
-    if (url === '/api/targets') return json({ hosts: ['fizsar.com'], port: 443 })
     if (url === '/api/demo/challenge') return json({ error: { code: 'not_found', message: 'No encontrado.' } }, 404)
     if (url.startsWith('/api/demo')) return json({ status: 'received' }, 202)
     return json(fizsarEn)
@@ -147,7 +148,7 @@ describe('/demo', () => {
   it('on /examples', async () => {
     renderAt('/examples', 'en')
     await screen.findByRole('heading', { level: 1, name: 'Examples' }, { timeout: 5000 })
-    expect(screen.getByRole('link', { name: 'Request a free demo' }).getAttribute('href')).toBe('/demo')
+    expect((await screen.findByRole('link', { name: 'Request a free demo' })).getAttribute('href')).toBe('/demo')
   })
 
   for (const lang of ['es', 'en'] as const) {

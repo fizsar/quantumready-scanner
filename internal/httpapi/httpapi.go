@@ -65,6 +65,11 @@ type Config struct {
 	DemoChallengeLimiter *Limiter
 	// DemoNotify tells support about each request; nil: nobody.
 	DemoNotify DemoNotifier
+	// DemoEnabled turns the form on (DEMO_ENABLED). Off (the default): no
+	// /api/demo routes (404), GET /api/targets says "demo": false and the
+	// demo_requested event and /demo page views are dropped. The store,
+	// the 12-month purge and qradmin demos do not depend on it.
+	DemoEnabled bool
 
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
@@ -121,7 +126,7 @@ func NewRouter(cfg Config) http.Handler {
 		if cfg.Usage != nil {
 			r.Post("/e", a.usageEvent)
 		}
-		if cfg.Demos != nil {
+		if cfg.Demos != nil && cfg.DemoEnabled {
 			r.Post("/demo", a.createDemo)
 			if cfg.DemoAltcha != nil {
 				r.Get("/demo/challenge", a.demoChallenge)
