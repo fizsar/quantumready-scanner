@@ -8,12 +8,21 @@
  * third-party minimum versions in their advice, e.g. "OpenSSL 3.5+": those come
  * from the scoring catalog and say nothing about our own stack.)
  */
+export const forbiddenLocation = /\bOVH\b|canad|beauharnois|\bVPS\b/i
+
 export const forbiddenEverywhere: RegExp[] = [
   /TRUSTED_PROXIES|X-Forwarded-For|trusted prox|proxies de confianza/i,
   /fizsar-qr|backblaze|\bb2\b|bucket|eu-central|s3\./i,
-  /\bOVH\b|canad|beauharnois|\bVPS\b/i,
+  forbiddenLocation,
   /RATE_LIMIT|SCAN_ALLOWLIST|SCAN_INTENSITY|QR_[A-Z]/,
 ]
+
+/**
+ * /privacy must say where the data is (the provider, the city and the
+ * country, decided on 20/10/2026), and nothing else about the server: the
+ * same list without the location (\bVPS\b stays out of its text anyway).
+ */
+export const forbiddenProseOnPrivacy = (): RegExp[] => [/\bVPS\b/i, ...forbiddenProse.filter((re) => re !== forbiddenLocation)]
 
 /** Also never in the pages' own words. */
 export const forbiddenProse: RegExp[] = [

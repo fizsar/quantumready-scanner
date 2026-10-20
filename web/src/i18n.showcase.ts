@@ -181,7 +181,7 @@ const es = {
   'footer.privacy': 'Privacidad',
   'privacy.meta.title': 'Privacidad · QuantumReady',
   'privacy.meta.description':
-    'Qué mide QuantumReady y qué no: recuentos diarios en su propio servidor, sin cookies, sin guardar IPs y sin identificadores.',
+    'Qué datos trata QuantumReady: recuentos diarios en su propio servidor, sin cookies ni IPs guardadas, y lo que envías si pides una demo.',
   'privacy.title': 'Privacidad',
   'privacy.lead':
     'Lo que hace hoy esta web con los datos de quien la visita. La política de privacidad completa llegará con la beta.',
@@ -191,13 +191,13 @@ const es = {
   'privacy.counted.source':
     'Desde qué sitio llegas: solo su dominio (por ejemplo, linkedin.com) y solo en la primera página de la visita, nunca la dirección completa.',
   'privacy.counted.events':
-    'Algunos usos: escanear un dominio de demostración (cuál), abrir «Bajo el capó», descargar el JSON y cambiar de idioma.',
+    'Algunos usos: escanear un dominio de demostración (cuál), abrir «Bajo el capó», descargar el JSON, cambiar de idioma y pedir una demo (solo desde qué botón, nunca lo que escribes).',
   'privacy.counted.how':
     'Cada recuento es un número por día. No se guarda quién, ni a qué hora, ni nada que relacione un recuento con otro.',
   'privacy.not.title': 'Qué no hacemos',
   'privacy.not.cookies': 'No usamos cookies. Lo único que guarda tu navegador es el idioma, si lo cambias.',
   'privacy.not.ip':
-    'Ni los recuentos ni la base de datos guardan tu dirección IP ni ningún identificador. Para frenar abusos, el servidor usa la IP en memoria para limitar las peticiones de cada cliente, sin guardarla en la base de datos.',
+    'Ni los recuentos ni la base de datos guardan tu dirección IP, y los recuentos no llevan ningún identificador. Para frenar abusos, el servidor usa la IP en memoria para limitar las peticiones de cada cliente (también las del formulario de demo), sin guardarla en la base de datos.',
   'privacy.not.thirdParty': 'No hay analítica ni publicidad de terceros: los recuentos se hacen en nuestro propio servidor.',
   'privacy.gpc.title': 'Control Global de Privacidad (GPC)',
   'privacy.gpc.p':
@@ -210,8 +210,49 @@ const es = {
   'privacy.scans.title': 'Informes de escaneo',
   'privacy.scans.p':
     'Cada escaneo guarda el dominio analizado y su resultado técnico, para mostrar el informe en su enlace. No guarda nada de quién lo lanzó.',
+  'privacy.demo.title': 'Si pides una demo',
+  'privacy.demo.what':
+    'Guardamos lo que escribes en el formulario: nombre, email, empresa, el dominio que quieres analizar y el mensaje, si lo pones, junto con el idioma, la fecha y la versión de esta página que aceptaste. Solo lo usamos para responderte y preparar la demo.',
+  'privacy.demo.keep':
+    'Se borra solo a los 12 meses. También está en las copias de seguridad cifradas, que se conservan hasta 6 meses: una solicitud borrada desaparece de ellas en ese plazo.',
+  'privacy.demo.rights':
+    'Para consultarla, corregirla o borrarla antes, escribe a soporte@fizsar.com desde el email que usaste.',
+  'privacy.demo.spam':
+    'Contra el spam, el formulario lleva un campo oculto que solo rellenan los robots y puede pedir a tu navegador una pequeña prueba de cálculo, sin servicios de terceros ni cookies.',
+  'privacy.where.title': 'Dónde están los datos',
+  'privacy.where.p':
+    'El servidor está en OVH, en Beauharnois (Canadá). Canadá tiene una decisión de adecuación de la Comisión Europea, que reconoce que protege los datos personales a un nivel equivalente al de la UE. Las copias de seguridad, cifradas, se guardan en la UE.',
   'privacy.contact.title': 'Contacto',
   'privacy.contact.p': 'Dudas o peticiones sobre privacidad:',
+  'privacy.version': 'Versión del 20 de octubre de 2026.',
+
+  'demo.button': 'Solicitar demo gratis',
+  'demo.cta': '¿Quieres ver cómo está tu dominio?',
+  'demo.meta.title': 'Solicitar demo · QuantumReady',
+  'demo.meta.description':
+    'Pide una demo gratis de QuantumReady con tu dominio: te escribimos para prepararla y explicarte el resultado.',
+  'demo.title': 'Solicitar demo gratis',
+  'demo.lead':
+    'Cuéntanos qué dominio quieres analizar y te escribimos para preparar la demo y explicarte el resultado. Es gratis y sin compromiso.',
+  'demo.ownership':
+    'Solo analizamos dominios de quien los controla: antes te pediremos confirmar que el dominio es tuyo o que tienes permiso.',
+  'demo.name': 'Nombre',
+  'demo.email': 'Email',
+  'demo.company': 'Empresa',
+  'demo.domain': 'Dominio que quieres analizar',
+  'demo.domainHint': 'empresa.com',
+  'demo.message': 'Mensaje',
+  'demo.optional': '(opcional)',
+  'demo.consent': 'He leído y acepto la',
+  'demo.consentLink': 'política de privacidad',
+  'demo.keep': 'Guardamos estos datos 12 meses, solo para responderte.',
+  'demo.submit': 'Enviar solicitud',
+  'demo.proving': 'Comprobando que no eres un robot…',
+  'demo.sending': 'Enviando…',
+  'demo.error.network': 'No se pudo enviar. Comprueba la conexión e inténtalo de nuevo.',
+  'demo.sent.title': 'Solicitud enviada',
+  'demo.sent.text': 'Gracias. Te escribiremos al email que nos has dado para preparar la demo.',
+  'demo.sent.examples': 'Mientras tanto, mira algunos informes de ejemplo',
 
   'examples.meta.title': 'Ejemplos · QuantumReady',
   'examples.meta.description':
@@ -432,7 +473,7 @@ const en: Record<ShowcaseKey, string> = {
   'footer.privacy': 'Privacy',
   'privacy.meta.title': 'Privacy · QuantumReady',
   'privacy.meta.description':
-    'What QuantumReady measures and what it does not: daily counts on its own server, no cookies, no stored IPs and no identifiers.',
+    'What data QuantumReady handles: daily counts on its own server, with no cookies or stored IPs, and what you send if you request a demo.',
   'privacy.title': 'Privacy',
   'privacy.lead':
     'What this site does today with the data of its visitors. The full privacy policy will come with the beta.',
@@ -442,13 +483,13 @@ const en: Record<ShowcaseKey, string> = {
   'privacy.counted.source':
     'Which site you come from: only its domain (for example, linkedin.com) and only on the first page of the visit, never the full address.',
   'privacy.counted.events':
-    'Some uses: scanning a demo domain (which one), opening “Under the hood”, downloading the JSON and switching language.',
+    'Some uses: scanning a demo domain (which one), opening “Under the hood”, downloading the JSON, switching language and requesting a demo (only from which button, never what you write).',
   'privacy.counted.how':
     'Each count is a number per day. Nothing is stored about who, at what time, or anything linking one count to another.',
   'privacy.not.title': 'What we do not do',
   'privacy.not.cookies': 'We use no cookies. The only thing your browser keeps is the language, if you change it.',
   'privacy.not.ip':
-    'Neither the counts nor the database store your IP address or any identifier. To curb abuse, the server uses the IP in memory to limit each client’s requests, without storing it in the database.',
+    'Neither the counts nor the database store your IP address, and the counts carry no identifier. To curb abuse, the server uses the IP in memory to limit each client’s requests (the demo form’s too), without storing it in the database.',
   'privacy.not.thirdParty': 'No third-party analytics or advertising: the counting happens on our own server.',
   'privacy.gpc.title': 'Global Privacy Control (GPC)',
   'privacy.gpc.p':
@@ -461,8 +502,49 @@ const en: Record<ShowcaseKey, string> = {
   'privacy.scans.title': 'Scan reports',
   'privacy.scans.p':
     'Each scan stores the analyzed domain and its technical result, to show the report at its link. It stores nothing about who started it.',
+  'privacy.demo.title': 'If you request a demo',
+  'privacy.demo.what':
+    'We keep what you write in the form: name, email, company, the domain you want analyzed and the message, if any, together with the language, the date and the version of this page you accepted. We only use it to answer you and prepare the demo.',
+  'privacy.demo.keep':
+    'It is deleted automatically after 12 months. It is also in the encrypted backups, which are kept up to 6 months: a deleted request disappears from them within that time.',
+  'privacy.demo.rights':
+    'To see it, correct it or have it deleted sooner, write to soporte@fizsar.com from the email address you used.',
+  'privacy.demo.spam':
+    'Against spam, the form has a hidden field that only bots fill in, and it may ask your browser for a small computing test, with no third-party services or cookies.',
+  'privacy.where.title': 'Where the data is',
+  'privacy.where.p':
+    'The server is at OVH in Beauharnois (Canada). Canada has an adequacy decision of the European Commission, which recognizes that it protects personal data at a level equivalent to the EU’s. The backups, encrypted, are kept in the EU.',
   'privacy.contact.title': 'Contact',
   'privacy.contact.p': 'Privacy questions or requests:',
+  'privacy.version': 'Version of 20 October 2026.',
+
+  'demo.button': 'Request a free demo',
+  'demo.cta': 'Want to see how your domain does?',
+  'demo.meta.title': 'Request a demo · QuantumReady',
+  'demo.meta.description':
+    'Request a free QuantumReady demo with your domain: we write to you to prepare it and explain the result.',
+  'demo.title': 'Request a free demo',
+  'demo.lead':
+    'Tell us which domain you want analyzed and we will write to you to prepare the demo and explain the result. It is free and without commitment.',
+  'demo.ownership':
+    'We only analyze domains of whoever controls them: first we will ask you to confirm the domain is yours or that you have permission.',
+  'demo.name': 'Name',
+  'demo.email': 'Email',
+  'demo.company': 'Company',
+  'demo.domain': 'Domain you want analyzed',
+  'demo.domainHint': 'company.com',
+  'demo.message': 'Message',
+  'demo.optional': '(optional)',
+  'demo.consent': 'I have read and accept the',
+  'demo.consentLink': 'privacy policy',
+  'demo.keep': 'We keep this data 12 months, only to answer you.',
+  'demo.submit': 'Send request',
+  'demo.proving': 'Checking you are not a robot…',
+  'demo.sending': 'Sending…',
+  'demo.error.network': 'It could not be sent. Check your connection and try again.',
+  'demo.sent.title': 'Request sent',
+  'demo.sent.text': 'Thank you. We will write to the email address you gave us to prepare the demo.',
+  'demo.sent.examples': 'Meanwhile, look at some example reports',
 
   'examples.meta.title': 'Examples · QuantumReady',
   'examples.meta.description':

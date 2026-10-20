@@ -4,18 +4,21 @@
 // asks for privacy (Global Privacy Control) or is driven by automation, and a
 // failure never reaches the page.
 
-export type Route = '/' | '/examples' | '/architecture' | '/privacy' | 'scan_report' | 'not_found'
+export type Route = '/' | '/examples' | '/architecture' | '/privacy' | '/demo' | 'scan_report' | 'not_found'
 export type Page = 'scan_report' | 'examples'
+/** Where the "Request a free demo" button was (never what the form says). */
+export type DemoSource = 'home' | 'host_not_allowed' | 'examples' | 'direct'
 
 export type UsageEvent =
   | { e: 'page_view'; p: Route; entry?: true; r?: string }
   | { e: 'scan_started'; d: string }
   | { e: 'under_the_hood_open' | 'json_download'; d: Page }
   | { e: 'lang_switch'; d: 'es' | 'en' }
+  | { e: 'demo_requested'; d: DemoSource }
 
 /** The route as counted: scan results are one bucket, never their id. */
 export function routeOf(pathname: string): Route {
-  if (pathname === '/' || pathname === '/examples' || pathname === '/architecture' || pathname === '/privacy') return pathname
+  if (pathname === '/' || pathname === '/examples' || pathname === '/architecture' || pathname === '/privacy' || pathname === '/demo') return pathname
   if (/^\/scans\/[^/]+\/?$/.test(pathname)) return 'scan_report'
   return 'not_found'
 }

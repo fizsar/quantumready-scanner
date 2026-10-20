@@ -77,7 +77,7 @@ describe('403 host_not_allowed', () => {
       .getAllByRole('link')
       .map((a) => a.getAttribute('href')!)
       .filter((h) => h.startsWith('/'))
-    expect(internal).toEqual(['/examples', '/architecture'])
+    expect(internal).toEqual(['/demo', '/examples', '/architecture'])
     for (const h of internal) {
       cleanup()
       renderAt(h, 'es')

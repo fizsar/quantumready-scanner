@@ -51,11 +51,24 @@ export function Privacy() {
         <p>{t('privacy.scans.p')}</p>
       </Section>
 
+      <Section id="privacy-demo" title={t('privacy.demo.title')}>
+        <p>{t('privacy.demo.what')}</p>
+        <p>{t('privacy.demo.keep')}</p>
+        <p>{t('privacy.demo.rights')}</p>
+        <p>{t('privacy.demo.spam')}</p>
+      </Section>
+
+      <Section id="privacy-where" title={t('privacy.where.title')}>
+        <p>{t('privacy.where.p')}</p>
+      </Section>
+
       <Section id="privacy-contact" title={t('privacy.contact.title')}>
         <p>
           {t('privacy.contact.p')} <a href={`mailto:${CONTACT}`}>{CONTACT}</a>
         </p>
       </Section>
+      {/* The date is PrivacyVersion in internal/httpapi/demo.go: change both together. */}
+      <p className="muted small">{t('privacy.version')}</p>
     </article>
   )
 }

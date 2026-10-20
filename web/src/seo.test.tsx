@@ -81,7 +81,7 @@ describe('robots.txt and sitemap.xml', () => {
   it('sitemap.xml lists the public pages', () => {
     const doc = new DOMParser().parseFromString(sitemap, 'application/xml')
     expect(doc.querySelector('parsererror')).toBeNull()
-    expect([...doc.getElementsByTagName('loc')].map((l) => l.textContent)).toEqual([SITE + '/', SITE + '/architecture', SITE + '/examples', SITE + '/privacy'])
+    expect([...doc.getElementsByTagName('loc')].map((l) => l.textContent)).toEqual([SITE + '/', SITE + '/architecture', SITE + '/examples', SITE + '/privacy', SITE + '/demo'])
   })
 })
 

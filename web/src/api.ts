@@ -1,6 +1,8 @@
 // Client for the QuantumReady API (docs/api.md). Same origin: in production
 // Caddy routes /api/*, in development Vite proxies it.
 
+import type { AltchaChallenge } from './altcha'
+
 export type Lang = 'es' | 'en'
 
 export type ScanStatus = 'queued' | 'running' | 'done' | 'failed'
@@ -118,4 +120,35 @@ export const isFinished = (s: ScanView) => s.status === 'done' || s.status === '
 /** Polling delay before attempt n (0-based): 1 s, 1.5 s, 2.25 s… up to 8 s. */
 export function pollDelay(n: number): number {
   return Math.min(1000 * 1.5 ** n, 8000)
+}
+
+/** What the "Request a free demo" form sends (POST /api/demo). */
+export interface DemoRequest {
+  name: string
+  email: string
+  company: string
+  domain: string
+  message: string
+  privacy: boolean
+  lang: Lang
+  website: string // honeypot: always empty for people
+  altcha?: string
+}
+
+/** The proof-of-work challenge of the demo form, or null when the server asks for none. */
+export async function getDemoChallenge(): Promise<AltchaChallenge | null> {
+  try {
+    return await request<AltchaChallenge>('/api/demo/challenge')
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null
+    throw e
+  }
+}
+
+export function createDemo(req: DemoRequest): Promise<{ status: string }> {
+  return request(`/api/demo?lang=${req.lang}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
 }
