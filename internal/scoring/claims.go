@@ -2,7 +2,7 @@ package scoring
 
 import "regexp"
 
-// ForbiddenClaims are what no report or page may say (decided on 26/10/2026):
+// ForbiddenClaims are what no report or page may say (decided on 24/10/2026):
 // QuantumReady is not official, certifies nothing against the ENS and NIS2
 // does not require post-quantum cryptography. The same patterns as
 // web/src/test/forbidden.ts (forbiddenClaims); internal/httpapi checks its
