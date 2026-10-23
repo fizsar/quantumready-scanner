@@ -16,7 +16,7 @@ NET=qr-tlslab
 RUNNER_LABEL=qr-tlslab=runner
 TESTSSL_IMAGE=ghcr.io/testssl/testssl.sh:3.2@sha256:51918b1e954df0acee8c08d3ad5ce306710e4fefe49ed0e0f92728ecf9e7ff34
 PROBE_IMAGE=qr-tlslab/openssl35:3.5.9
-GO_IMAGE=golang:1.27.2@sha256:820153096fda4de6ac1b7194d12e416b7dd8f4e9a33d17e0345b111b945162d8
+GO_IMAGE=golang:1.27.3@sha256:f20d83a83e18dbd2a4714b8ffd4b30b287b6243962dd75608e86abcc63ba4efc
 
 compose() { docker compose -f "$here/compose.yaml" "$@"; }
 # Listening sockets on the host: "proto local-address:port".
