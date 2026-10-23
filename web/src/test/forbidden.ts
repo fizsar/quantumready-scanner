@@ -43,10 +43,10 @@ export const stripData = (s: string) => strip(s).replace(/\b\d{1,3}(\.\d{1,3}){3
 
 /**
  * Claims no page or report may make, whatever the page (decided on
- * 26/10/2026): QuantumReady is not an official tool, does not certify
+ * 24/10/2026): QuantumReady is not an official tool, does not certify
  * anything against the ENS (or ISO 27001, NIS2) and NIS2 does not require
  * post-quantum cryptography. Mirrored in Go for the report texts
- * (internal/scoring/claims_test.go, the same patterns).
+ * (internal/scoring/claims.go, the same patterns).
  */
 export const forbiddenClaims: RegExp[] = [
   /\boficial(es|mente)?\b|\bofficial(ly)?\b/i,
