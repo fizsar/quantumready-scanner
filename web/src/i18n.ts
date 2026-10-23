@@ -5,7 +5,8 @@ const STORAGE_KEY = 'qr.lang'
 
 // UI strings. Finding texts, block labels and API error messages come from the
 // API in the requested language; these are the interface's own words.
-const dict = {
+// Exported for the claims test (test/forbidden.ts forbiddenClaims).
+export const dict = {
   es: {
     'meta.home': 'QuantumReady · Auditoría post-cuántica de tu web',
     'meta.scan': 'Resultado de {host} · QuantumReady',

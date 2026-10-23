@@ -40,3 +40,18 @@ export const strip = (s: string) => s.replace(/\b(TLS|SSL) ?v?\d(\.\d)?/g, '').r
 
 /** Scan data may show the scanned and resolved IPs (public DNS answers). */
 export const stripData = (s: string) => strip(s).replace(/\b\d{1,3}(\.\d{1,3}){3}\b/g, '')
+
+/**
+ * Claims no page or report may make, whatever the page (decided on
+ * 26/10/2026): QuantumReady is not an official tool, does not certify
+ * anything against the ENS (or ISO 27001, NIS2) and NIS2 does not require
+ * post-quantum cryptography. Mirrored in Go for the report texts
+ * (internal/scoring/claims_test.go, the same patterns).
+ */
+export const forbiddenClaims: RegExp[] = [
+  /\boficial(es|mente)?\b|\bofficial(ly)?\b/i,
+  /\bcertific\w*\s+(\w+\s+){0,2}ENS\b|\bENS[\s-]+certifi\w*/,
+  /\bcumpl\w*\s+(\w+\s+){0,2}ENS\b|\bcompl(y|ies|iant|iance)\s+(\w+\s+){0,2}ENS\b|\bENS[\s-]+compliant/,
+  /\bNIS\s?2\b[^.]{0,80}\b(exig\w*|oblig\w*|requier\w*|require[sd]?|mandat\w*)\b[^.]{0,80}(cu[aá]ntic|quantum|PQC|ML-KEM)/i,
+  /(cu[aá]ntic|quantum|PQC|ML-KEM)[^.]{0,80}\b(exigid\w*|obligatori\w*|required|mandatory|mandated)\b[^.]{0,40}\bNIS\s?2\b/i,
+]
