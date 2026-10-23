@@ -31,6 +31,14 @@ updates:
     groups:
       docker: { patterns: ["*"] }
 
+  # Every image is pinned by digest (tag@sha256:...; deploy/check_images.py
+  # fails CI otherwise), so new digests of the same tag, PostgreSQL minor
+  # releases included, arrive here as PRs and are deployed on purpose.
+  # Dependabot does not see the copies of the PostgreSQL digest in
+  # .github/workflows/ci.yml, deploy/backup/common.sh, deploy/backup/test.sh
+  # and deploy/test-predeploy-dump.sh: check_images.py fails the PR until they
+  # match deploy/compose.prod.yaml. Images run by scripts (Chromium,
+  # shellcheck, restic, sqlc, Trivy) and the TLS lab are bumped by hand.
   - package-ecosystem: docker-compose
     directories: [/, /deploy]
     schedule: { interval: weekly }

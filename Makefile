@@ -54,14 +54,16 @@ build: web/node_modules ## Build bin/{api,migrate,worker,qradmin,qrscan} and web
 sqlc: ## Regenerate internal/store from migrations/ and internal/store/queries/
 	docker run --rm --user $$(id -u):$$(id -g) -v "$$PWD:/src" -w /src $(SQLC_IMAGE) generate
 
-check-compose: ## Check the security policy of deploy/compose.prod.yaml (networks, limits, ports)
+check-compose: ## Check the security policy of deploy/compose.prod.yaml (networks, limits, ports, digests) and that every image is pinned
 	QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d \
 	docker compose -f deploy/compose.prod.yaml config --format json | python3 deploy/check_compose.py
+	python3 deploy/check_images.py
 
 test-deploy: ## Test the deploy helpers without the VPS (deploy.sh refs, check-installed.sh, predeploy-dump.sh)
 	bash deploy/test-deploy-ref.sh
 	bash deploy/test-check-installed.sh
 	bash deploy/test-predeploy-dump.sh
+	bash deploy/test-check-images.sh
 
 test-backup: ## Test the backup scripts (local restic repository, throwaway PostgreSQL)
 	bash deploy/backup/test.sh

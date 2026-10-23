@@ -26,7 +26,9 @@ x-database-url: &database-url "postgres://${POSTGRES_USER:?set in .env}:${POSTGR
 
 services:
   db:
-    image: postgres:17-alpine
+    # PostgreSQL 17.11 (tag 17-alpine), pinned by digest: updates, minor ones
+    # too, come as Dependabot PRs and are deployed on purpose (CLAUDE.md).
+    image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     <<: *hardening
     # uid 70 in the alpine image: no root entrypoint, so no capabilities needed.
     user: postgres
