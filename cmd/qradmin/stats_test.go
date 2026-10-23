@@ -59,7 +59,7 @@ func TestStats(t *testing.T) {
 		return ""
 	}
 	// day × event columns: page_view visit_source scan_started scan_blocked_403 ...
-	if got := fields("total"); got != "total 12 4 0 6 0 0 0" {
+	if got := fields("total"); got != "total 12 4 0 6 0 0 0 0" {
 		t.Errorf("total line: %q (the 40-day-old row must not count)", got)
 	}
 	if got := fields("/examples"); got != "/examples 2" {

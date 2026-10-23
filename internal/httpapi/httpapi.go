@@ -90,6 +90,23 @@ type Config struct {
 	// 1,000/day.
 	UsageLimiter *Limiter
 
+	// Demos enables POST /api/demo (demo.go); nil disables it.
+	Demos DemoStore
+	// DemoAltcha requires a proof of work on POST /api/demo and serves it
+	// (GET /api/demo/challenge); nil: none (no ALTCHA_HMAC_KEY).
+	DemoAltcha *altcha.Verifier
+	// DemoLimiter rate-limits POST /api/demo per client; nil means 3/min and
+	// 10/day. DemoChallengeLimiter, the challenges: nil means 30/min, 300/day.
+	DemoLimiter          *Limiter
+	DemoChallengeLimiter *Limiter
+	// DemoNotify tells support about each request; nil: nobody.
+	DemoNotify DemoNotifier
+	// DemoEnabled turns the form on (DEMO_ENABLED). Off (the default): no
+	// /api/demo routes (404), GET /api/targets says "demo": false and the
+	// demo_requested event and /demo page views are dropped. The store,
+	// the 12-month purge and qradmin demos do not depend on it.
+	DemoEnabled bool
+
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -102,8 +119,10 @@ type PublicLimits struct {
 }
 
 type api struct {
-	cfg          Config
-	usageLimiter *Limiter
+	cfg                  Config
+	usageLimiter         *Limiter
+	demoLimiter          *Limiter
+	demoChallengeLimiter *Limiter
 }
 
 // NewRouter returns the root handler of the API.
@@ -138,7 +157,13 @@ func NewRouter(cfg Config) http.Handler {
 	if cfg.UsageLimiter == nil {
 		cfg.UsageLimiter = NewLimiter(60, 1000)
 	}
-	a := &api{cfg: cfg, usageLimiter: cfg.UsageLimiter}
+	if cfg.DemoLimiter == nil {
+		cfg.DemoLimiter = NewLimiter(3, 10)
+	}
+	if cfg.DemoChallengeLimiter == nil {
+		cfg.DemoChallengeLimiter = NewLimiter(30, 300)
+	}
+	a := &api{cfg: cfg, usageLimiter: cfg.UsageLimiter, demoLimiter: cfg.DemoLimiter, demoChallengeLimiter: cfg.DemoChallengeLimiter}
 	a.authDefaults()
 
 	r := chi.NewRouter()
@@ -219,6 +244,12 @@ func NewRouter(cfg Config) http.Handler {
 		}
 		if cfg.Usage != nil {
 			r.Post("/e", a.usageEvent)
+		}
+		if cfg.Demos != nil && cfg.DemoEnabled {
+			r.Post("/demo", a.createDemo)
+			if cfg.DemoAltcha != nil {
+				r.Get("/demo/challenge", a.demoChallenge)
+			}
 		}
 	})
 	return r

@@ -1,0 +1,12 @@
+/* The "Request a free demo" link-button (home, the 403 block, /examples). */
+.demo-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem 1rem;
+}
+.btn-demo {
+  display: inline-block;
+  text-decoration: none;
+}

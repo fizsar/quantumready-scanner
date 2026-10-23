@@ -6,21 +6,25 @@ import (
 	"time"
 )
 
-// blockedTargetsKeepDays: how long the registrable domains of scan requests
-// refused with 403 are kept (M1; /privacy says so).
-const blockedTargetsKeepDays = 30
+// What the API deletes on its own, as /privacy says.
+const (
+	// blockedTargetsKeepDays: the registrable domains of scan requests
+	// refused with 403 (M1).
+	blockedTargetsKeepDays = 30
+	// demoRequestsKeepMonths: the "Request a free demo" submissions.
+	demoRequestsKeepMonths = 12
+)
 
-// purgeLoop deletes the 403 domains older than keepDays, at start and then
-// every interval, until ctx is done. A failure is logged and retried at the
-// next tick.
-func purgeLoop(ctx context.Context, purge func(context.Context, int32) (int64, error), keepDays int32, every time.Duration, log *slog.Logger) {
+// purgeLoop runs purge at start and then every interval, until ctx is done.
+// A failure is logged and retried at the next tick.
+func purgeLoop(ctx context.Context, what string, purge func(context.Context) (int64, error), every time.Duration, log *slog.Logger) {
 	run := func() {
-		n, err := purge(ctx, keepDays)
+		n, err := purge(ctx)
 		switch {
 		case err != nil && ctx.Err() == nil:
-			log.Warn("usage: purge blocked targets", "err", err)
+			log.Warn("purge failed", "what", what, "err", err)
 		case n > 0:
-			log.Info("usage: purged blocked targets", "rows", n, "older_than_days", keepDays)
+			log.Info("purged", "what", what, "rows", n)
 		}
 	}
 	run()

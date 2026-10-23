@@ -77,6 +77,14 @@ var messages = map[string]map[string]string{
 	"invalid_role":              {"es": "El rol no es válido (owner, admin o viewer).", "en": "The role is not valid (owner, admin or viewer)."},
 	"wrong_password":            {"es": "La contraseña actual no es correcta.", "en": "The current password is not correct."},
 
+	// Demo requests (POST /api/demo); bad_origin, invalid_name, invalid_email and
+	// invalid_domain are the accounts and domains ones above.
+	"too_many_requests": {"es": "Demasiadas solicitudes. Espera un poco y vuelve a intentarlo.", "en": "Too many requests. Wait a little and try again."},
+	"invalid_proof":     {"es": "No se pudo comprobar que eres una persona. Recarga la página y vuelve a intentarlo.", "en": "We could not check you are a person. Reload the page and try again."},
+	"privacy_required":  {"es": "Para enviar la solicitud tienes que aceptar la política de privacidad.", "en": "To send the request you have to accept the privacy policy."},
+	"invalid_company":   {"es": "Escribe el nombre de tu empresa (máximo 100 caracteres).", "en": "Enter your company name (100 characters at most)."},
+	"invalid_message":   {"es": "El mensaje es demasiado largo (máximo 2000 caracteres).", "en": "The message is too long (2000 characters at most)."},
+
 	// Scan failures (scans.error).
 	"blocked_address":    {"es": "El dominio apunta a una dirección interna o reservada; no se escanea.", "en": "The domain points to an internal or reserved address; it is not scanned."},
 	"invalid_target":     {"es": "El destino no es válido.", "en": "The target is not valid."},

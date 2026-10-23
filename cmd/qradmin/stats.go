@@ -16,7 +16,7 @@ import (
 )
 
 // events in the order of the table columns (the closed list of migration 00015).
-var events = []string{"page_view", "visit_source", "scan_started", "scan_blocked_403", "under_the_hood_open", "json_download", "lang_switch"}
+var events = []string{"page_view", "visit_source", "scan_started", "scan_blocked_403", "under_the_hood_open", "json_download", "lang_switch", "demo_requested"}
 
 // topPerEvent is how many values of each event the summary lists.
 const topPerEvent = 15

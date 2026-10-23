@@ -19,10 +19,11 @@ var files embed.FS
 func FS() fs.FS { return files }
 
 // outOfOrder is the one gap goose may fill below the newest applied
-// migration: phase 3 (00004–00014), when it reaches a production database
-// that already has 00015 (M1, deployed from the showcase branch before phase
-// 3). Any other missing migration is still an error. Remove after 3.7.
-var outOfOrder = struct{ from, to int64 }{4, 14}
+// migration: main's migrations (00004–00014 of phase 3 and 00016, the M1
+// grants), when they reach a production database that already has the ones
+// deployed from the showcase branch before phase 3 (00015 M1, 00017 demo
+// requests). Any other missing migration is still an error. Remove after 3.7.
+var outOfOrder = struct{ from, to int64 }{4, 16}
 
 // Up applies all pending migrations and returns the ones it ran. It holds a
 // PostgreSQL advisory lock, so concurrent runs are safe, and it is a no-op

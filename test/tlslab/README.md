@@ -12,7 +12,7 @@ make tlslab-test      # tests de integración del escáner (intensidad full y ba
 make tlslab-scan ARGS="-facts tls13"   # cmd/qrscan -lab dentro del laboratorio
 ```
 
-`make tlslab-test` y `tlslab-scan` ejecutan Go en un contenedor (`golang:1.27.2`, fijado por digest) conectado a la red del laboratorio, con el repositorio en solo lectura y la caché de módulos del host (el laboratorio no tiene Internet). Escriben en `results/` (los JSON se ignoran en git; `COMPARISON.md` se guarda). No van en la CI de cada push: tardan unos 10 minutos con la compilación de las imágenes.
+`make tlslab-test` y `tlslab-scan` ejecutan Go en un contenedor (`golang:1.27.3`, fijado por digest) conectado a la red del laboratorio, con el repositorio en solo lectura y la caché de módulos del host (el laboratorio no tiene Internet). Escriben en `results/` (los JSON se ignoran en git; `COMPARISON.md` se guarda). No van en la CI de cada push: tardan unos 10 minutos con la compilación de las imágenes.
 
 ## Aislamiento
 

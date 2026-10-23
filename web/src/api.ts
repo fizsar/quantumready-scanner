@@ -105,8 +105,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-/** open: any domain can be scanned; proof: a proof of work is required. */
-export function getTargets(): Promise<{ hosts: string[]; port: number; open?: boolean; proof?: boolean }> {
+/** open: any domain can be scanned; proof: a proof of work is required; demo: the demo request form is on. */
+export function getTargets(): Promise<{ hosts: string[]; port: number; open?: boolean; proof?: boolean; demo?: boolean }> {
   return request('/api/targets')
 }
 
@@ -277,4 +277,35 @@ export const isFinished = (s: ScanView) => s.status === 'done' || s.status === '
 /** Polling delay before attempt n (0-based): 1 s, 1.5 s, 2.25 s… up to 8 s. */
 export function pollDelay(n: number): number {
   return Math.min(1000 * 1.5 ** n, 8000)
+}
+
+/** What the "Request a free demo" form sends (POST /api/demo). */
+export interface DemoRequest {
+  name: string
+  email: string
+  company: string
+  domain: string
+  message: string
+  privacy: boolean
+  lang: Lang
+  website: string // honeypot: always empty for people
+  altcha?: string
+}
+
+/** The proof-of-work challenge of the demo form, or null when the server asks for none. */
+export async function getDemoChallenge(): Promise<AltchaChallenge | null> {
+  try {
+    return await request<AltchaChallenge>('/api/demo/challenge')
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null
+    throw e
+  }
+}
+
+export function createDemo(req: DemoRequest): Promise<{ status: string }> {
+  return request(`/api/demo?lang=${req.lang}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
 }

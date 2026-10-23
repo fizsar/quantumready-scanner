@@ -82,6 +82,10 @@ func run(logger *slog.Logger) error {
 	if origin == "" {
 		logger.Warn("PUBLIC_ORIGIN is empty: accounts (/api/auth) are disabled")
 	}
+	demoOn, _, err := demoConfig(os.Getenv) // the proof of work shares main's verifier (proof)
+	if err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -108,6 +112,9 @@ func run(logger *slog.Logger) error {
 		DB:             pool,
 		Scans:          st,
 		Usage:          st,
+		Demos:          st,
+		DemoAltcha:     proof, // one ALTCHA key and one replay cache for scans and demos
+		DemoEnabled:    demoOn,
 		Allowlist:      allow,
 		TrustedProxies: trusted,
 		Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
@@ -134,14 +141,22 @@ func run(logger *slog.Logger) error {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	// The domains of blocked scan requests (M1) are kept 30 days.
-	go purgeLoop(ctx, st.PurgeBlockedTargets, blockedTargetsKeepDays, 24*time.Hour, logger)
+	// What /privacy says is deleted: the domains of blocked scan requests (M1)
+	// after 30 days, demo requests after 12 months (also with DEMO_ENABLED off:
+	// rows stored while it was on must still go).
+	go purgeLoop(ctx, "blocked targets", func(ctx context.Context) (int64, error) {
+		return st.PurgeBlockedTargets(ctx, blockedTargetsKeepDays)
+	}, 24*time.Hour, logger)
+	go purgeLoop(ctx, "demo requests", func(ctx context.Context) (int64, error) {
+		return st.PurgeDemoRequests(ctx, demoRequestsKeepMonths)
+	}, 24*time.Hour, logger)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,
 		"allowlist", allow.Len(), "trusted_proxies", len(trusted),
-		"rate_per_minute", lim.perMinute, "rate_per_day", lim.perDay, "target_cooldown", lim.cooldown.String())
+		"rate_per_minute", lim.perMinute, "rate_per_day", lim.perDay, "target_cooldown", lim.cooldown.String(),
+		"demo_enabled", demoOn, "demo_proof_of_work", demoOn && proof != nil)
 
 	select {
 	case err := <-errCh:

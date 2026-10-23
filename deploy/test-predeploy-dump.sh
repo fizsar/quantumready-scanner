@@ -16,7 +16,7 @@ cat >"$fx/compose.yaml" <<'EOF'
 name: qr-predeploy-test
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     environment: { POSTGRES_USER: qr, POSTGRES_PASSWORD: test-only, POSTGRES_DB: quantumready }
     tmpfs: [/var/lib/postgresql/data]
     healthcheck:

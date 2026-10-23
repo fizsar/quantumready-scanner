@@ -1,9 +1,11 @@
 import { cleanup, configure } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
+import { resetFeaturesForTests } from '../features'
 
 // M1 metrics go through navigator.sendBeacon (jsdom has none): a stub keeps
 // them away from the fetch mocks of other tests; metrics tests read it.
 beforeEach(() => {
+  resetFeaturesForTests() // GET /api/targets is read once per page load
   Object.defineProperty(navigator, 'sendBeacon', { value: vi.fn(() => true), configurable: true, writable: true })
 })
 

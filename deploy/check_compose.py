@@ -6,6 +6,7 @@ Usage: docker compose -f deploy/compose.prod.yaml config --format json | python3
 Run by CI (and `make check-compose`). Exits 1 listing every violation.
 """
 import json
+import re
 import sys
 
 cfg = json.load(sys.stdin)
@@ -64,6 +65,15 @@ if "mailer" in services:
     # Credentials only over TLS (the mailer refuses them anyway).
     check(env.get("SMTP_SECURITY") in ("starttls", "tls"), "mailer: SMTP_SECURITY must default to starttls or tls")
     check(services["mailer"].get("profiles") == ["mail"], "mailer: must be behind the mail profile until configured")
+# Images: pinned by digest, so a deploy never pulls something nobody chose
+# (on 23/10/2026 the moving postgres:17-alpine tag recreated the database
+# with 17.11). Our own images are exempt: release.yml publishes them with an
+# immutable tag per commit (sha-<commit>), set by QR_TAG.
+OWN = "ghcr.io/fizsar/quantumready-saas-"
+for name, svc in services.items():
+    image = svc.get("image", "")
+    pinned = re.search(r"@sha256:[0-9a-f]{64}$", image) is not None
+    check(pinned or image.startswith(OWN), f"{name}: image {image!r} must be pinned by digest (name:tag@sha256:...)")
 
 if errors:
     print("compose policy violations:\n  " + "\n  ".join(errors))
