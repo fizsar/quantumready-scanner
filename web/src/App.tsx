@@ -4,10 +4,12 @@ import type { Lang } from './api'
 import { useAuth } from './auth'
 import { useLang } from './i18n'
 import { useShowcaseT } from './i18n.showcase'
+import { useDemoEnabled } from './features'
 import { pageView, track } from './metrics'
 import { AboutScans } from './pages/AboutScans'
 import { AccountPage, ForgotPage, LoginPage, RegisterPage, ResetPage, VerifyPage } from './pages/AccountPages'
 import { Architecture } from './pages/Architecture'
+import { DemoPage } from './pages/DemoPage'
 import { Privacy } from './pages/Privacy'
 import { Home } from './pages/Home'
 import { InvitePage } from './pages/InvitePage'
@@ -60,6 +62,7 @@ export default function App() {
           <Route path="/invite" element={<InvitePage />} />
           <Route path="/architecture" element={<Architecture />} />
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/demo" element={<DemoRoute />} />
           <Route path="/examples" element={<Suspense><Examples /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -134,6 +137,13 @@ function LangSwitch() {
       {opt('en', 'EN')}
     </div>
   )
+}
+
+/** /demo exists only while the server has the form on (DEMO_ENABLED). */
+function DemoRoute() {
+  const on = useDemoEnabled()
+  if (on === null) return null
+  return on ? <DemoPage /> : <NotFound />
 }
 
 function NotFound() {

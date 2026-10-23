@@ -4,7 +4,7 @@
 # og.html and commit both files.
 set -euo pipefail
 cd "$(dirname "$0")"
-CHROME=${CHROME_IMAGE:-zenika/alpine-chrome:124}
+CHROME=${CHROME_IMAGE:-zenika/alpine-chrome:124@sha256:eb3378c1ed0079f94db054a5fe1aaa790a254ec0d6bbc67eda052420d86a179d}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/fonts"

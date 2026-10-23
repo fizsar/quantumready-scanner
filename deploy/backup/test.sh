@@ -23,7 +23,7 @@ check() { # check DESCRIPTION COMMAND…
 
 # Lint with shellcheck if installed, else with its official image.
 sc=(shellcheck)
-command -v shellcheck >/dev/null || sc=(docker run --rm -v "$here/../..:/src:ro" -w /src koalaman/shellcheck:v0.10.0)
+command -v shellcheck >/dev/null || sc=(docker run --rm -v "$here/../..:/src:ro" -w /src koalaman/shellcheck:v0.10.0@sha256:2097951f02e735b613f4a34de20c40f937a6c8f18ecb170612c88c34517221fb)
 (cd "$here/../.." && "${sc[@]}" -x deploy/backup/*.sh deploy/*.sh) && ok shellcheck || bad shellcheck
 
 # Under $HOME, not /tmp: it is bind-mounted into containers.
@@ -38,7 +38,7 @@ mkdir -p "$fx/backups" "$fx/repo"
 cat >"$fx/compose.yaml" <<'EOF'
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

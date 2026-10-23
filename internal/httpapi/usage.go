@@ -34,9 +34,11 @@ const (
 
 // The closed lists. Anything else is dropped without a trace.
 var (
-	usageRoutes = []string{"/", "/examples", "/architecture", "/privacy", "/about-scans", "account", "scan_report", "not_found"}
+	usageRoutes = []string{"/", "/examples", "/architecture", "/privacy", "/about-scans", "/demo", "account", "scan_report", "not_found"}
 	usagePages  = []string{"scan_report", "examples"}
 	usageLangs  = []string{"es", "en"}
+	// demo_requested: where the "Request a demo" button was, never the form.
+	demoSources = []string{"home", "host_not_allowed", "examples", "direct"}
 )
 
 // botUA matches crawlers, link previews, monitors, scripts and headless
@@ -92,7 +94,7 @@ func (a *api) usageEvent(w http.ResponseWriter, r *http.Request) {
 func (a *api) usageCounts(ev usageEvent, ownHost string) [][2]string {
 	switch ev.E {
 	case "page_view":
-		if ev.D != "" || !slices.Contains(usageRoutes, ev.P) || (!ev.Entry && ev.R != "") {
+		if ev.D != "" || !slices.Contains(usageRoutes, ev.P) || (!ev.Entry && ev.R != "") || (ev.P == "/demo" && !a.demoOn()) {
 			return nil
 		}
 		out := [][2]string{{"page_view", ev.P}}
@@ -116,6 +118,10 @@ func (a *api) usageCounts(ev usageEvent, ownHost string) [][2]string {
 		}
 	case "lang_switch":
 		if ev.P != "" || ev.Entry || ev.R != "" || !slices.Contains(usageLangs, ev.D) {
+			return nil
+		}
+	case "demo_requested":
+		if !a.demoOn() || ev.P != "" || ev.Entry || ev.R != "" || !slices.Contains(demoSources, ev.D) {
 			return nil
 		}
 	default: // scan_blocked_403 is counted by the API itself, never from the web

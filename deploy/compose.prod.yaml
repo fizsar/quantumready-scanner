@@ -26,7 +26,9 @@ x-database-url: &database-url "postgres://${POSTGRES_USER:?set in .env}:${POSTGR
 
 services:
   db:
-    image: postgres:17-alpine
+    # PostgreSQL 17.11 (tag 17-alpine), pinned by digest: updates, minor ones
+    # too, come as Dependabot PRs and are deployed on purpose (CLAUDE.md).
+    image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     <<: *hardening
     # uid 70 in the alpine image: no root entrypoint, so no capabilities needed.
     user: postgres
@@ -96,9 +98,13 @@ services:
       # worker's pace, for the wait shown to visitors (same value as the worker).
       QR_PUBLIC_QUEUE_MAX: ${QR_PUBLIC_QUEUE_MAX:-100}
       WORKER_MAX_SCANS_PER_MINUTE: ${WORKER_MAX_SCANS_PER_MINUTE:-20}
+      # Proof of work for open public scans and the demo form (one key).
       ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
       # Closed beta: invited accounts cannot create organizations ("true" lifts it).
       BETA_INVITED_CAN_CREATE_ORGS: ${BETA_INVITED_CAN_CREATE_ORGS:-false}
+      # "Request a free demo": off (portfolio); the email to support, off.
+      DEMO_ENABLED: ${DEMO_ENABLED:-false}
+      DEMO_NOTIFY: ${DEMO_NOTIFY:-false}
     ports:
       - "127.0.0.1:8080:8080"
     networks:

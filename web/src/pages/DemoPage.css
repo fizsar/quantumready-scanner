@@ -1,0 +1,52 @@
+/* /demo and the "Request a free demo" buttons (showcase). Uses the tokens of index.css. */
+.demo {
+  width: min(100%, 46rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.demo .panel {
+  width: 100%;
+}
+.demo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+}
+.demo-form .input {
+  width: 100%;
+  max-width: 100%;
+}
+.demo-form textarea {
+  resize: vertical;
+  font: inherit;
+}
+.demo-form label {
+  margin-top: 0.4rem;
+}
+.demo-consent {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin-top: 0.8rem;
+}
+.demo-consent input {
+  margin-top: 0.3rem;
+  flex: none;
+}
+.demo-consent label {
+  margin-top: 0;
+}
+.demo-form .btn {
+  align-self: flex-start;
+  margin-top: 0.6rem;
+}
+/* The honeypot: out of sight and out of the tab order, still in the form. */
+.demo-hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}

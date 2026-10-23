@@ -46,11 +46,14 @@ type createScanRequest struct {
 }
 
 // listTargets: GET /api/targets: the demo hosts (the frontend shows them as
-// buttons), whether any domain may be scanned and whether a proof of work
-// is required.
+// buttons), whether any domain may be scanned, whether a proof of work is
+// required and whether the demo request form is on.
+// demoOn: the demo request form is served (the web hides it otherwise).
+func (a *api) demoOn() bool { return a.cfg.Demos != nil && a.cfg.DemoEnabled }
+
 func (a *api) listTargets(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort,
-		"open": a.cfg.PublicScanOpen, "proof": a.cfg.PublicScanOpen && a.cfg.Altcha != nil})
+		"open": a.cfg.PublicScanOpen, "proof": a.cfg.PublicScanOpen && a.cfg.Altcha != nil, "demo": a.demoOn()})
 }
 
 // slot is one rate-limit reservation, given back if no scan is started.

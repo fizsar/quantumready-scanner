@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useDemoEnabled } from '../features'
 import { useShowcaseT, type ShowcaseKey } from '../i18n.showcase'
 import { usePageMeta } from '../usePageMeta'
 import './Privacy.css'
@@ -9,6 +10,7 @@ const CONTACT = 'soporte@fizsar.com'
 export function Privacy() {
   const { t } = useShowcaseT()
   usePageMeta(t('privacy.meta.title'), false, t('privacy.meta.description'))
+  const demo = useDemoEnabled() === true
 
   const list = (keys: ShowcaseKey[]) => (
     <ul className="privacy-list">
@@ -30,7 +32,7 @@ export function Privacy() {
 
       <Section id="privacy-counted" title={t('privacy.counted.title')}>
         <p>{t('privacy.counted.lead')}</p>
-        {list(['privacy.counted.pages', 'privacy.counted.source', 'privacy.counted.events'])}
+        {list(['privacy.counted.pages', 'privacy.counted.source', 'privacy.counted.events', ...(demo ? (['privacy.counted.demo'] as const) : [])])}
         <p>{t('privacy.counted.how')}</p>
       </Section>
 
@@ -51,11 +53,26 @@ export function Privacy() {
         <p>{t('privacy.scans.p')}</p>
       </Section>
 
+      {demo && (
+        <Section id="privacy-demo" title={t('privacy.demo.title')}>
+          <p>{t('privacy.demo.what')}</p>
+          <p>{t('privacy.demo.keep')}</p>
+          <p>{t('privacy.demo.rights')}</p>
+          <p>{t('privacy.demo.spam')}</p>
+        </Section>
+      )}
+
+      <Section id="privacy-where" title={t('privacy.where.title')}>
+        <p>{t('privacy.where.p')}</p>
+      </Section>
+
       <Section id="privacy-contact" title={t('privacy.contact.title')}>
         <p>
           {t('privacy.contact.p')} <a href={`mailto:${CONTACT}`}>{CONTACT}</a>
         </p>
       </Section>
+      {/* The date is PrivacyVersion in internal/httpapi/demo.go: change both together. */}
+      <p className="muted small">{t('privacy.version')}</p>
     </article>
   )
 }

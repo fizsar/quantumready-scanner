@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router'
 import { solveAltcha } from '../altcha'
 import { ApiError, createScan, getAltcha, getTargets } from '../api'
 import { HostNotAllowed } from '../components/HostNotAllowed'
+import { DemoCta } from '../components/DemoButton'
+import { HowItWorks } from '../components/HowItWorks'
 import { ShowcaseHomeLinks } from '../components/ShowcaseLinks'
 import { useLang } from '../i18n'
 import { track } from '../metrics'
@@ -131,7 +133,10 @@ export function Home() {
           <Link to="/about-scans">{t('home.aboutScans')}</Link>
         </p>
       </section>
+      <DemoCta from="home" />
+      <HowItWorks />
       <ShowcaseHomeLinks />
     </div>
   )
 }
+

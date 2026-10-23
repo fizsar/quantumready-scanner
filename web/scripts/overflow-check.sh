@@ -11,7 +11,7 @@ WIDTH=${1:-375}
 shift || true
 PAGES=("$@")
 [ ${#PAGES[@]} -gt 0 ] || PAGES=(/ /architecture /examples /privacy)
-CHROME=${CHROME_IMAGE:-zenika/alpine-chrome:124}
+CHROME=${CHROME_IMAGE:-zenika/alpine-chrome:124@sha256:eb3378c1ed0079f94db054a5fe1aaa790a254ec0d6bbc67eda052420d86a179d}
 NODE=$(grep -m1 -E '^FROM node:' Dockerfile | awk '{print $2}')
 NGINX=$(grep -m1 -E '^FROM .*nginx' Dockerfile | awk '{print $2}')
 NET=qr-overflow-$$

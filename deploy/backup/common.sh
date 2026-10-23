@@ -3,7 +3,8 @@
 
 # restic runs from the official image, pinned by digest (bump tag and digest together).
 RESTIC_IMAGE=${RESTIC_IMAGE:-restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510}
-POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:17-alpine}
+# PostgreSQL 17.11, the same digest as deploy/compose.prod.yaml (check_images.py checks it).
+POSTGRES_IMAGE=${POSTGRES_IMAGE:-postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb}
 QR_DIR=${QR_DIR:-/opt/quantumready}
 BACKUP_DIR=${BACKUP_DIR:-$QR_DIR/backups}
 RESTIC_MOUNTS=()
