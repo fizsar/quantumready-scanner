@@ -20,3 +20,11 @@ web/dist/
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# Go binaries built at the root (go build ./cmd/...)
+/api
+/worker
+/migrate
+/mailer
+/qradmin
+/qrscan
