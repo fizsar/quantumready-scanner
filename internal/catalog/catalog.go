@@ -1,6 +1,14 @@
-package scoring
+// Package catalog holds what a user reads about a scan: the texts of the
+// findings and the labels of blocks, criteria, axes and severities, in every
+// language, rendered when a report is shown (ADR-0001, ADR-0002). It depends
+// on nothing else in the module; internal/scoring judges, this package words.
+package catalog
 
-import "strings"
+import (
+	"maps"
+	"slices"
+	"strings"
+)
 
 // Languages supported by the catalog. The first one is the fallback.
 var Languages = []string{"es", "en"}
@@ -431,4 +439,15 @@ var labels = map[string]map[string]string{
 	"noteval.non_standard_pqc_groups":                    {"es": "Grupos post-cuánticos no estándar", "en": "Non-standard post-quantum groups"},
 	"noteval.credential_suites":                          {"es": "Suites PSK, SRP, Kerberos y GOST (requieren credenciales o algoritmos que un escáner no tiene)", "en": "PSK, SRP, Kerberos and GOST suites (they need credentials or algorithms a scanner does not have)"},
 	"noteval.implementation_vulnerabilities":             {"es": "Vulnerabilidades de implementación (Heartbleed, ROBOT…)", "en": "Implementation vulnerabilities (Heartbleed, ROBOT…)"},
+}
+
+// Codes returns every finding code the catalog has texts for, sorted.
+func Codes() []string {
+	return slices.Sorted(maps.Keys(findingTexts))
+}
+
+// HasText reports whether code has its own text in lang (no fallback).
+func HasText(code, lang string) bool {
+	_, ok := findingTexts[code][lang]
+	return ok
 }

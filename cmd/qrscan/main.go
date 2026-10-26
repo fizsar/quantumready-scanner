@@ -27,6 +27,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fizsar/quantumready-saas/internal/catalog"
 	"github.com/fizsar/quantumready-saas/internal/scanner"
 	"github.com/fizsar/quantumready-saas/internal/scoring"
 )
@@ -95,31 +96,31 @@ func printReport(r *scanner.Result, s scoring.Result, lang string) {
 		pqc = t["yes"] + " (" + r.KeyExchange.Selected + ")"
 	}
 	fmt.Printf("PQC: %s · %s: %s · %s: %s\n", pqc,
-		scoring.Label("axis.quantum", lang), scoring.Label("severity."+s.QuantumRisk, lang),
-		scoring.Label("axis.current", lang), scoring.Label("severity."+s.CurrentRisk, lang))
+		catalog.Label("axis.quantum", lang), catalog.Label("severity."+s.QuantumRisk, lang),
+		catalog.Label("axis.current", lang), catalog.Label("severity."+s.CurrentRisk, lang))
 	if s.Cap != nil {
 		fmt.Printf("%s: %s (%s)\n", t["cap"], s.Cap.Grade, strings.Join(s.Cap.Codes, ", "))
 	}
 
 	fmt.Printf("\n%s\n", t["breakdown"])
 	for _, b := range s.Blocks {
-		fmt.Printf("  %-40s %3d/%d\n", scoring.Label("block."+b.ID, lang), b.Points, b.Max)
+		fmt.Printf("  %-40s %3d/%d\n", catalog.Label("block."+b.ID, lang), b.Points, b.Max)
 		for _, it := range b.Items {
-			fmt.Printf("    %-38s %3d/%d\n", scoring.Label("item."+it.ID, lang), it.Points, it.Max)
+			fmt.Printf("    %-38s %3d/%d\n", catalog.Label("item."+it.ID, lang), it.Points, it.Max)
 		}
 	}
 	if s.FloorPoints > 0 {
-		fmt.Printf("  %-40s +%d\n", scoring.Label("adjust.floor", lang), s.FloorPoints)
+		fmt.Printf("  %-40s +%d\n", catalog.Label("adjust.floor", lang), s.FloorPoints)
 	}
 
 	fmt.Printf("\n%s\n", t["findings"])
-	tctx := scoring.Context{ScanTime: r.StartedAt}
+	tctx := catalog.Context{ScanTime: r.StartedAt}
 	for _, f := range s.Findings {
 		tctx.Codes = append(tctx.Codes, f.Code)
 	}
 	for _, f := range s.Findings {
-		txt := scoring.DescribeIn(f.Code, f.Params, lang, tctx)
-		fmt.Printf("  [%s · %s] %s\n", scoring.Label("severity."+string(f.Severity), lang), scoring.Label("axis."+string(f.Axis), lang), txt.Title)
+		txt := catalog.DescribeIn(f.Code, f.Params, lang, tctx)
+		fmt.Printf("  [%s · %s] %s\n", catalog.Label("severity."+string(f.Severity), lang), catalog.Label("axis."+string(f.Axis), lang), txt.Title)
 		fmt.Printf("      %s\n", txt.Detail)
 		if txt.Remediation != "" {
 			fmt.Printf("      → %s: %s\n", t["fix"], txt.Remediation)
@@ -128,7 +129,7 @@ func printReport(r *scanner.Result, s scoring.Result, lang string) {
 
 	var ne []string
 	for _, c := range s.NotEvaluated {
-		ne = append(ne, scoring.Label("noteval."+c, lang))
+		ne = append(ne, catalog.Label("noteval."+c, lang))
 	}
 	fmt.Printf("\n%s: %s\n", t["noteval"], strings.Join(ne, "; "))
 }

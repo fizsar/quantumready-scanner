@@ -28,7 +28,7 @@ linters:
       - path: _test\.go
         linters: [noctx, gosec]
       # Bilingual user-facing texts: the English spell checker flags Spanish words.
-      - path: internal/scoring/catalog\.go
+      - path: internal/catalog/catalog\.go
         linters: [misspell]
       # Spanish comparison table written for docs/validation.md.
       - path: internal/scanner/tlslab_test\.go

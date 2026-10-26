@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fizsar/quantumready-saas/internal/catalog"
 	"github.com/fizsar/quantumready-saas/internal/scanner"
 )
 
@@ -444,20 +445,20 @@ func TestLegacySuites(t *testing.T) {
 func TestForwardSecrecyNaming(t *testing.T) {
 	want := map[string]string{"es": "Secreto hacia adelante (forward secrecy)", "en": "Forward secrecy"}
 	for lang, name := range want {
-		if got := Label("block.forward_secrecy", lang); got != name {
+		if got := catalog.Label("block.forward_secrecy", lang); got != name {
 			t.Errorf("%s block label = %q, want %q", lang, got, name)
 		}
-		if got := Describe("FS_ALL", nil, lang).Title; got != name {
+		if got := catalog.Describe("FS_ALL", nil, lang).Title; got != name {
 			t.Errorf("%s FS_ALL title = %q, want %q", lang, got, name)
 		}
 	}
 	for _, code := range []string{"FS_PARTIAL", "FS_NONE"} {
-		if es := Describe(code, nil, "es").Title; !strings.Contains(es, "secreto hacia adelante (forward secrecy)") {
+		if es := catalog.Describe(code, nil, "es").Title; !strings.Contains(es, "secreto hacia adelante (forward secrecy)") {
 			t.Errorf("%s es title = %q", code, es)
 		}
 	}
 	for _, lang := range []string{"es", "en"} {
-		if r := Describe("KEX_SINGLE_HYBRID", map[string]string{"group": "X25519MLKEM768"}, lang).Remediation; !strings.Contains(r, "OpenSSL") || !strings.Contains(r, "Caddy") {
+		if r := catalog.Describe("KEX_SINGLE_HYBRID", map[string]string{"group": "X25519MLKEM768"}, lang).Remediation; !strings.Contains(r, "OpenSSL") || !strings.Contains(r, "Caddy") {
 			t.Errorf("%s KEX_SINGLE_HYBRID remediation does not mention server software: %q", lang, r)
 		}
 	}
@@ -530,8 +531,8 @@ func TestCatalog(t *testing.T) {
 	for _, in := range inputs {
 		for _, f := range Evaluate(in).Findings {
 			emitted[f.Code] = true
-			for _, lang := range Languages {
-				txt := Describe(f.Code, f.Params, lang)
+			for _, lang := range catalog.Languages {
+				txt := catalog.Describe(f.Code, f.Params, lang)
 				if txt.Title == "" || txt.Detail == "" || txt.Title == f.Code {
 					t.Errorf("%s/%s: missing text", f.Code, lang)
 				}
@@ -546,12 +547,12 @@ func TestCatalog(t *testing.T) {
 			}
 		}
 	}
-	for code, byLang := range findingTexts {
+	for _, code := range catalog.Codes() {
 		if !emitted[code] {
 			t.Errorf("catalog entry %s is never emitted by the test cases", code)
 		}
-		for _, lang := range Languages {
-			if _, ok := byLang[lang]; !ok {
+		for _, lang := range catalog.Languages {
+			if !catalog.HasText(code, lang) {
 				t.Errorf("%s: no %s text", code, lang)
 			}
 		}
@@ -572,13 +573,13 @@ func TestCatalog(t *testing.T) {
 	}
 	labelKeys = append(labelKeys, "severity.none", "axis.quantum", "axis.current", "adjust.floor")
 	for _, k := range labelKeys {
-		for _, lang := range Languages {
-			if l := Label(k, lang); l == k || l == "" {
+		for _, lang := range catalog.Languages {
+			if l := catalog.Label(k, lang); l == k || l == "" {
 				t.Errorf("label %s/%s missing", k, lang)
 			}
 		}
 	}
-	if Describe("KEX_NO_HYBRID", nil, "fr").Title != Describe("KEX_NO_HYBRID", nil, "es").Title {
+	if catalog.Describe("KEX_NO_HYBRID", nil, "fr").Title != catalog.Describe("KEX_NO_HYBRID", nil, "es").Title {
 		t.Error("unknown language should fall back to Spanish")
 	}
 }
