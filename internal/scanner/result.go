@@ -8,7 +8,11 @@ import (
 
 // SchemaVersion identifies the JSON layout of Result. Bump it on breaking
 // changes: results are stored as JSON and scored later.
-const SchemaVersion = 1
+//
+// Version 2 (milestone 2.8.4) adds, all optional, so a version 1 result reads
+// the same: ProbeLog, an ErrorCode beside every Error (TrustErrorCode beside
+// TrustError) and the OIDs of the chain. Scoring reads none of them.
+const SchemaVersion = 2
 
 // Status is the outcome of a single probe.
 type Status string
@@ -71,6 +75,10 @@ type Result struct {
 	Connections int `json:"connections,omitempty"`
 	// Raw holds what the raw ClientHello probes found (intensity full).
 	Raw *RawResult `json:"raw,omitempty"`
+
+	// ProbeLog (schema 2) is every connection the scan made, as it went on
+	// the wire.
+	ProbeLog *ProbeLog `json:"probe_log,omitempty"`
 }
 
 // RawResult is what the raw ClientHello probes (internal/scanner/rawtls)
@@ -153,8 +161,9 @@ type RawProtocol struct {
 	Status Status `json:"status"`
 	// Ciphers: for SSLv2 the cipher kinds the server listed, for SSLv3 the
 	// suite it picked.
-	Ciphers []string `json:"ciphers,omitempty"`
-	Error   string   `json:"error,omitempty"`
+	Ciphers   []string `json:"ciphers,omitempty"`
+	Error     string   `json:"error,omitempty"`
+	ErrorCode string   `json:"error_code,omitempty"` // stable, see errorCode
 }
 
 // RawSuite is a suite accepted in a raw probe, with the attributes scoring needs.
@@ -212,6 +221,7 @@ type Handshake struct {
 	Group       string `json:"group,omitempty"`
 	GroupID     uint16 `json:"group_id,omitempty"`
 	Error       string `json:"error,omitempty"`
+	ErrorCode   string `json:"error_code,omitempty"`
 }
 
 // KeyExchange describes the key exchange groups: the one the server picks for
@@ -229,19 +239,21 @@ type KeyExchange struct {
 
 // GroupProbe is the result of offering a single key exchange group.
 type GroupProbe struct {
-	Name   string `json:"name"`
-	ID     uint16 `json:"id"`
-	Hybrid bool   `json:"hybrid"` // classical + ML-KEM hybrid
-	Status Status `json:"status"`
-	Error  string `json:"error,omitempty"`
+	Name      string `json:"name"`
+	ID        uint16 `json:"id"`
+	Hybrid    bool   `json:"hybrid"` // classical + ML-KEM hybrid
+	Status    Status `json:"status"`
+	Error     string `json:"error,omitempty"`
+	ErrorCode string `json:"error_code,omitempty"`
 }
 
 // VersionProbe is the result of offering a single protocol version.
 type VersionProbe struct {
-	Version string `json:"version"`
-	ID      uint16 `json:"id"`
-	Status  Status `json:"status"`
-	Error   string `json:"error,omitempty"`
+	Version   string `json:"version"`
+	ID        uint16 `json:"id"`
+	Status    Status `json:"status"`
+	Error     string `json:"error,omitempty"`
+	ErrorCode string `json:"error_code,omitempty"`
 }
 
 // CipherSuite is a TLS 1.2 (or earlier) cipher suite accepted by the server.
@@ -269,12 +281,13 @@ type Certificate struct {
 	Curve              string `json:"curve,omitempty"`
 	SignatureAlgorithm string `json:"signature_algorithm"`
 
-	Trusted       bool   `json:"trusted"` // chains to a trusted root, valid now
-	TrustError    string `json:"trust_error,omitempty"`
-	HostnameMatch bool   `json:"hostname_match"`
-	Expired       bool   `json:"expired"`
-	NotYetValid   bool   `json:"not_yet_valid"`
-	SelfSigned    bool   `json:"self_signed"`
+	Trusted        bool   `json:"trusted"` // chains to a trusted root, valid now
+	TrustError     string `json:"trust_error,omitempty"`
+	TrustErrorCode string `json:"trust_error_code,omitempty"` // stable, see trustErrorCode
+	HostnameMatch  bool   `json:"hostname_match"`
+	Expired        bool   `json:"expired"`
+	NotYetValid    bool   `json:"not_yet_valid"`
+	SelfSigned     bool   `json:"self_signed"`
 
 	OCSPStapled bool `json:"ocsp_stapled"`
 	// Signed Certificate Timestamps (Certificate Transparency): embedded in the
@@ -293,6 +306,10 @@ type ChainCert struct {
 	KeySize            int       `json:"key_size"`
 	SignatureAlgorithm string    `json:"signature_algorithm"`
 	NotAfter           time.Time `json:"not_after"`
+	// The algorithm identifiers as sent (schema 2), also those crypto/x509
+	// does not know (SLH-DSA, drafts…).
+	SignatureOID string `json:"signature_oid,omitempty"`
+	PublicKeyOID string `json:"public_key_oid,omitempty"`
 }
 
 // Checks crypto/tls cannot perform. Codes are stable; their explanation lives

@@ -53,20 +53,29 @@ type Alert struct {
 	Description uint8
 }
 
+// alertNames is the IANA TLS Alert Description registry.
 var alertNames = map[uint8]string{
-	0: "close_notify", 10: "unexpected_message", 20: "bad_record_mac", 40: "handshake_failure",
-	42: "bad_certificate", 47: "illegal_parameter", 50: "decode_error", 51: "decrypt_error",
-	70: "protocol_version", 71: "insufficient_security", 80: "internal_error",
-	86: "inappropriate_fallback", 90: "user_canceled", 109: "missing_extension",
-	110: "unsupported_extension", 112: "unrecognized_name",
+	0: "close_notify", 10: "unexpected_message", 20: "bad_record_mac", 21: "decryption_failed",
+	22: "record_overflow", 30: "decompression_failure", 40: "handshake_failure", 41: "no_certificate",
+	42: "bad_certificate", 43: "unsupported_certificate", 44: "certificate_revoked", 45: "certificate_expired",
+	46: "certificate_unknown", 47: "illegal_parameter", 48: "unknown_ca", 49: "access_denied",
+	50: "decode_error", 51: "decrypt_error", 52: "too_many_cids_requested", 60: "export_restriction",
+	70: "protocol_version", 71: "insufficient_security", 80: "internal_error", 86: "inappropriate_fallback",
+	90: "user_canceled", 100: "no_renegotiation", 109: "missing_extension", 110: "unsupported_extension",
+	111: "certificate_unobtainable", 112: "unrecognized_name", 113: "bad_certificate_status_response",
+	114: "bad_certificate_hash_value", 115: "unknown_psk_identity", 116: "certificate_required",
+	117: "general_error", 120: "no_application_protocol", 121: "ech_required",
 }
 
-func (a Alert) String() string {
-	if n, ok := alertNames[a.Description]; ok {
+// AlertName is the IANA name of an alert description ("alert(n)" if unassigned).
+func AlertName(description uint8) string {
+	if n, ok := alertNames[description]; ok {
 		return n
 	}
-	return fmt.Sprintf("alert(%d)", a.Description)
+	return fmt.Sprintf("alert(%d)", description)
 }
+
+func (a Alert) String() string { return AlertName(a.Description) }
 
 // ServerHello is a parsed ServerHello or HelloRetryRequest.
 type ServerHello struct {
@@ -251,7 +260,17 @@ type recordReader struct {
 	lr   *limitedReader
 	hs   []byte // handshake bytes not yet returned
 	seen int    // handshake messages returned
+	// observe (ParseServerFlight) ends the stream with errEncrypted where
+	// encryption starts: an application_data record, or a ChangeCipherSpec
+	// once ccsEnds is set (TLS 1.0–1.2, where it precedes the encrypted
+	// Finished). Exchange never reads that far.
+	observe, ccsEnds bool
 }
+
+// errEncrypted marks the end of what an observer can read in clear.
+var errEncrypted = errors.New("rawtls: encrypted records follow")
+
+const recordApplicationData uint8 = 23
 
 func newRecordReader(r io.Reader, limit int) *recordReader {
 	if limit <= 0 {
@@ -283,6 +302,9 @@ func (rr *recordReader) next() (typ uint8, body []byte, alert *Alert, err error)
 			return 0, nil, nil, err
 		}
 		ctype, length := hdr[0], int(hdr[3])<<8|int(hdr[4])
+		if rr.observe && len(rr.hs) == 0 && (ctype == recordApplicationData || ctype == recordChangeCipherSpec && rr.ccsEnds) {
+			return 0, nil, nil, errEncrypted
+		}
 		if ctype != recordHandshake && ctype != recordAlert && ctype != recordChangeCipherSpec {
 			return 0, nil, nil, malformed("record type %d", ctype)
 		}

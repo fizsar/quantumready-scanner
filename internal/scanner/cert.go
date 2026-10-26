@@ -10,6 +10,9 @@ import (
 	"encoding/asn1"
 	"encoding/binary"
 	"time"
+
+	"golang.org/x/crypto/cryptobyte"
+	cbasn1 "golang.org/x/crypto/cryptobyte/asn1"
 )
 
 // analyzeCertificate describes the chain sent by the server (leaf first) and
@@ -59,7 +62,7 @@ func analyzeCertificate(chain []*x509.Certificate, st *tls.ConnectionState, host
 	})
 	c.Trusted = err == nil
 	if err != nil {
-		c.TrustError = err.Error()
+		c.TrustError, c.TrustErrorCode = err.Error(), trustErrorCode(err)
 	}
 	c.HostnameMatch = leaf.VerifyHostname(host) == nil
 
@@ -69,6 +72,7 @@ func analyzeCertificate(chain []*x509.Certificate, st *tls.ConnectionState, host
 		if subj == "" {
 			subj = cc.Subject.String()
 		}
+		sigOID, keyOID := algorithmOIDs(cc)
 		c.Chain = append(c.Chain, ChainCert{
 			Subject:            subj,
 			Issuer:             cc.Issuer.CommonName,
@@ -76,9 +80,32 @@ func analyzeCertificate(chain []*x509.Certificate, st *tls.ConnectionState, host
 			KeySize:            sz,
 			SignatureAlgorithm: cc.SignatureAlgorithm.String(),
 			NotAfter:           cc.NotAfter.UTC(),
+			SignatureOID:       sigOID,
+			PublicKeyOID:       keyOID,
 		})
 	}
 	return c
+}
+
+// algorithmOIDs reads, from the certificate as sent, the OID of its signature
+// algorithm (tbsCertificate.signature) and of its public key
+// (subjectPublicKeyInfo.algorithm), "" if they do not parse. crypto/x509 maps
+// them to its own constants, and to "unknown" for any it does not support.
+func algorithmOIDs(c *x509.Certificate) (sig, key string) {
+	tbs := cryptobyte.String(c.RawTBSCertificate)
+	var body, alg cryptobyte.String
+	var oid asn1.ObjectIdentifier
+	if tbs.ReadASN1(&body, cbasn1.SEQUENCE) &&
+		body.SkipOptionalASN1(cbasn1.Tag(0).Constructed().ContextSpecific()) && // version
+		body.SkipASN1(cbasn1.INTEGER) && // serialNumber
+		body.ReadASN1(&alg, cbasn1.SEQUENCE) && alg.ReadASN1ObjectIdentifier(&oid) {
+		sig = oid.String()
+	}
+	spki := cryptobyte.String(c.RawSubjectPublicKeyInfo)
+	if spki.ReadASN1(&body, cbasn1.SEQUENCE) && body.ReadASN1(&alg, cbasn1.SEQUENCE) && alg.ReadASN1ObjectIdentifier(&oid) {
+		key = oid.String()
+	}
+	return sig, key
 }
 
 // oidSCTList is the X.509 extension carrying embedded SCTs (RFC 6962, 3.3).

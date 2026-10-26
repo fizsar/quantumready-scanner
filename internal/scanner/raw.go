@@ -4,13 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"slices"
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -48,39 +48,64 @@ func (o rawOutcome) errString() string {
 }
 
 // exchange opens one connection (same semaphore, anti-SSRF dialer and
-// timeout as the crypto/tls probes, within the budget) and runs fn on it.
-func (rs *rawScan) exchange(ctx context.Context, fn func(net.Conn) error) error {
+// timeout as the crypto/tls probes, within the budget) and runs fn on it. It
+// returns the recorded connection (nil if none was made) and when it
+// started, for the probe log.
+func (rs *rawScan) exchange(ctx context.Context, fn func(net.Conn) error) (*recordingConn, time.Time, error) {
+	start := time.Now()
 	if rs.used.Add(1) > rs.budget {
 		rs.used.Add(-1)
 		rs.exhausted.Store(true)
-		return errBudget
+		return nil, start, errBudget
 	}
 	if err := rs.s.acquire(ctx); err != nil {
-		return err
+		return nil, start, err
 	}
 	defer rs.s.release()
 	ctx, cancel := context.WithTimeout(ctx, rs.s.opts.HandshakeTimeout)
 	defer cancel()
 	rs.t.conns.Add(1)
+	start = time.Now()
 	conn, err := rs.s.dial(ctx, rs.t.addr)
 	if err != nil {
-		return fmt.Errorf("connect: %w", err)
+		return nil, start, &connectError{err}
 	}
 	defer conn.Close()
 	if dl, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(dl)
 	}
-	return fn(conn)
+	rc := &recordingConn{Conn: conn}
+	return rc, start, fn(rc)
 }
 
-func (rs *rawScan) hello(ctx context.Context, h *rawtls.Hello, readKeyExchange bool) rawOutcome {
+// hello sends h, classifies the answer and logs the probe under tag. check,
+// if set, judges a ServerHello that does not answer the probe's question
+// (another version, no HelloRetryRequest), before it is logged.
+func (rs *rawScan) hello(ctx context.Context, tag probeTag, h *rawtls.Hello, readKeyExchange bool, check func(*rawtls.ServerHello) (Status, error)) rawOutcome {
 	var resp *rawtls.Response
-	err := rs.exchange(ctx, func(c net.Conn) error {
+	rc, start, err := rs.exchange(ctx, func(c net.Conn) error {
 		var err error
 		resp, err = rawtls.Exchange(c, h, rawtls.Options{ReadKeyExchange: readKeyExchange})
 		return err
 	})
-	return classifyRaw(resp, err)
+	o := classifyRaw(resp, err)
+	if o.status == Supported && check != nil {
+		if st, cerr := check(o.resp.ServerHello); cerr != nil {
+			o.status, o.err = st, cerr
+		}
+	}
+	rs.t.log.add(clientRaw, tag, start, rc, o.status, o.err, nil)
+	return o
+}
+
+// otherVersion is the check of probes that offer one version.
+func otherVersion(v uint16) func(*rawtls.ServerHello) (Status, error) {
+	return func(sh *rawtls.ServerHello) (Status, error) {
+		if sh.Version != v {
+			return NotSupported, &outcomeError{"other_version", "server answered " + rawtls.VersionName(sh.Version)}
+		}
+		return Supported, nil
+	}
 }
 
 // classifyRaw maps a raw exchange to supported / not supported / error.
@@ -92,7 +117,7 @@ func classifyRaw(resp *rawtls.Response, err error) rawOutcome {
 	case resp != nil && resp.ServerHello != nil:
 		return rawOutcome{status: Supported, resp: resp, err: err}
 	case resp != nil && resp.Alert != nil:
-		return rawOutcome{status: NotSupported, resp: resp, err: fmt.Errorf("alert %s", resp.Alert)}
+		return rawOutcome{status: NotSupported, resp: resp, err: &alertError{*resp.Alert}}
 	case errors.Is(err, rawtls.ErrUnoffered), errors.Is(err, io.EOF), errors.Is(err, syscall.ECONNRESET):
 		return rawOutcome{status: NotSupported, err: err}
 	}
@@ -206,7 +231,7 @@ func (rs *rawScan) sslv2(ctx context.Context) {
 		ids = append(ids, c.ID)
 	}
 	var resp *rawtls.SSLv2Response
-	err := rs.exchange(ctx, func(c net.Conn) error {
+	rc, start, err := rs.exchange(ctx, func(c net.Conn) error {
 		var err error
 		resp, err = rawtls.ExchangeSSLv2(c, ids)
 		return err
@@ -226,8 +251,13 @@ func (rs *rawScan) sslv2(ctx context.Context) {
 		p.Status = NotSupported
 	default:
 		o := classifyRaw(nil, err)
-		p.Status, p.Error = o.status, o.errString()
+		p.Status, p.Error, p.ErrorCode = o.status, o.errString(), errorCode(o.err)
 	}
+	var r *ProbeResponse
+	if rc != nil {
+		r = sslv2Response(resp, rc.out, rc.in, err)
+	}
+	rs.t.log.add(clientRaw, probeTag{purpose: PurposeSSLv2}, start, rc, p.Status, err, r)
 	rs.mu.Lock()
 	rs.res.SSLv2 = p
 	rs.mu.Unlock()
@@ -235,20 +265,16 @@ func (rs *rawScan) sslv2(ctx context.Context) {
 
 func (rs *rawScan) sslv3(ctx context.Context) {
 	h := &rawtls.Hello{Version: rawtls.VersionSSL30, Suites: candidateSuites(rawtls.VersionSSL30, nil), NoExtensions: true}
-	o := rs.hello(ctx, h, true)
-	p := RawProtocol{Status: o.status, Error: o.errString()}
+	o := rs.hello(ctx, probeTag{purpose: PurposeSSLv3}, h, true, otherVersion(rawtls.VersionSSL30))
+	p := RawProtocol{Status: o.status, Error: o.errString(), ErrorCode: errorCode(o.err)}
 	if o.status == Supported {
 		sh := o.resp.ServerHello
-		if sh.Version != rawtls.VersionSSL30 {
-			p = RawProtocol{Status: NotSupported, Error: "server answered " + rawtls.VersionName(sh.Version)}
-		} else {
-			p.Ciphers = []string{rawtls.SuiteName(sh.CipherSuite)}
-			rs.noteDH(o, sh.Version)
-			suite, _ := rawtls.SuiteByID(sh.CipherSuite)
-			rs.mu.Lock()
-			rs.sslv3Suite = rawSuite(suite, rawtls.VersionSSL30)
-			rs.mu.Unlock()
-		}
+		p.Ciphers = []string{rawtls.SuiteName(sh.CipherSuite)}
+		rs.noteDH(o, sh.Version)
+		suite, _ := rawtls.SuiteByID(sh.CipherSuite)
+		rs.mu.Lock()
+		rs.sslv3Suite = rawSuite(suite, rawtls.VersionSSL30)
+		rs.mu.Unlock()
 	}
 	rs.mu.Lock()
 	rs.res.SSLv3 = p
@@ -299,10 +325,10 @@ func (rs *rawScan) suites(ctx context.Context, v uint16, goFound map[uint16]map[
 	if detect {
 		offer = candidateSuites(v, nil)
 	}
-	version := func(st Status, err string) {
+	version := func(st Status, err error) {
 		if detect {
 			rs.mu.Lock()
-			rs.res.Versions = append(rs.res.Versions, VersionProbe{Version: rawtls.VersionName(v), ID: v, Status: st, Error: err})
+			rs.res.Versions = append(rs.res.Versions, VersionProbe{Version: rawtls.VersionName(v), ID: v, Status: st, Error: errText(err), ErrorCode: errorCode(err)})
 			rs.mu.Unlock()
 			detect = false
 		}
@@ -313,21 +339,17 @@ func (rs *rawScan) suites(ctx context.Context, v uint16, goFound map[uint16]map[
 		if v == rawtls.VersionSSL30 { // SSLv3 clients sent no extensions
 			h = &rawtls.Hello{Version: v, Suites: offer, NoExtensions: true}
 		}
-		o := rs.hello(ctx, h, true)
+		o := rs.hello(ctx, probeTag{PurposeSuites, rawtls.VersionName(v)}, h, true, otherVersion(v))
 		switch o.status {
-		case NotSupported:
-			version(NotSupported, o.errString())
+		case NotSupported: // refused, or the server does not speak v
+			version(NotSupported, o.err)
 			return true
 		case ProbeFailed:
-			version(ProbeFailed, o.errString())
+			version(ProbeFailed, o.err)
 			return false
 		}
 		sh := o.resp.ServerHello
-		if sh.Version != v { // the server does not speak v
-			version(NotSupported, "server answered "+rawtls.VersionName(sh.Version))
-			return true
-		}
-		version(Supported, "")
+		version(Supported, nil)
 		if slices.Contains(remaining, sh.CipherSuite) { // new, not a suite already found
 			rs.noteDH(o, v)
 			s, _ := rawtls.SuiteByID(sh.CipherSuite)
@@ -397,7 +419,7 @@ func (rs *rawScan) tls13Suites(ctx context.Context) {
 	for len(remaining) > 0 {
 		h := &rawtls.Hello{Version: rawtls.VersionTLS12, SupportedVersions: []uint16{rawtls.VersionTLS13}, Suites: remaining,
 			ServerName: rs.t.sni, Groups: groups, KeyShares: []rawtls.KeyShare{ks}}
-		o := rs.hello(ctx, h, false)
+		o := rs.hello(ctx, probeTag{purpose: PurposeTLS13Suites}, h, false, nil)
 		switch o.status {
 		case NotSupported:
 			rs.setTLS13Suites(true)
@@ -444,12 +466,17 @@ func (rs *rawScan) tls13Groups(ctx context.Context) {
 	for len(remaining) > 0 {
 		h := &rawtls.Hello{Version: rawtls.VersionTLS12, SupportedVersions: []uint16{rawtls.VersionTLS13}, Suites: tls13SuiteIDs(),
 			ServerName: rs.t.sni, Groups: remaining}
-		o := rs.hello(ctx, h, false)
-		switch {
-		case o.status == NotSupported:
+		o := rs.hello(ctx, probeTag{purpose: PurposeTLS13Groups}, h, false, func(sh *rawtls.ServerHello) (Status, error) {
+			if !sh.HelloRetry { // a ServerHello without a key share we sent: cannot tell
+				return ProbeFailed, &outcomeError{"no_hello_retry", "server answered without a HelloRetryRequest"}
+			}
+			return Supported, nil
+		})
+		switch o.status {
+		case NotSupported:
 			rs.setTLS13Groups(found, true)
 			return
-		case o.status == ProbeFailed || !o.resp.ServerHello.HelloRetry:
+		case ProbeFailed:
 			rs.setTLS13Groups(found, false)
 			return
 		}
@@ -514,7 +541,7 @@ func (rs *rawScan) tls12Curves(ctx context.Context, v uint16) {
 	var found []RawGroup
 	for len(remaining) > 0 {
 		h := &rawtls.Hello{Version: v, Suites: suites, ServerName: rs.t.sni, Groups: remaining}
-		o := rs.hello(ctx, h, true)
+		o := rs.hello(ctx, probeTag{PurposeTLS12Curves, rawtls.VersionName(v)}, h, true, nil)
 		switch o.status {
 		case NotSupported:
 			rs.setTLS12Curves(found, false, true)

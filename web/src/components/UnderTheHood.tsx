@@ -3,7 +3,28 @@ import { useLocation } from 'react-router'
 import type { ScanView } from '../api'
 import { useShowcaseT, type ShowcaseKey } from '../i18n.showcase'
 import { track } from '../metrics'
-import { downloadJSON, hex, otherRawProbes, parseError, probeRows, resultOf, suitesByVersion, versionsTried, type Offer, type Reply, type ScanResult } from '../underTheHood'
+import {
+  downloadJSON,
+  expandOffer,
+  groupName,
+  hex,
+  isGrease,
+  offeredVersions,
+  otherRawProbes,
+  parseError,
+  probeRows,
+  resultOf,
+  signatureName,
+  suitesByVersion,
+  versionName,
+  versionsTried,
+  type LogOffer,
+  type LogProbe,
+  type Offer,
+  type ProbeLog,
+  type Reply,
+  type ScanResult,
+} from '../underTheHood'
 import './UnderTheHood.css'
 
 type T = (key: ShowcaseKey, vars?: Record<string, string | number>) => string
@@ -69,7 +90,7 @@ export function UnderTheHood({ scan, anchor = 'under-the-hood', level = 1 }: { s
         <Versions r={r} t={t} />
         <Groups r={r} t={t} />
         <Suites r={r} t={t} />
-        <Probes r={r} t={t} />
+        {r.probe_log ? <LogProbes log={r.probe_log} t={t} /> : <Probes r={r} t={t} />}
       </div>
       </Levels.Provider>
     </section>
@@ -247,6 +268,138 @@ function Probes({ r, t }: { r: ScanResult; t: T }) {
       </ol>
       {r.raw && <p className="muted small">{rawNote(otherRawProbes(r), t)}</p>}
     </section>
+  )
+}
+
+// Schema 2: the probe log, every connection as it went on the wire.
+function LogProbes({ log, t }: { log: ProbeLog; t: T }) {
+  const { Sub } = useContext(Levels)
+  return (
+    <section className="uth-section" aria-label={t('uth.probes.title')}>
+      <Sub className="uth-h">{t('uth.probes.title')}</Sub>
+      <p className="muted small">{t('uth.log.lead', { n: log.probes.length })}</p>
+      <ol className="uth-probes uth-log">
+        {log.probes.map((p, i) => {
+          const offer = p.offer !== undefined ? expandOffer(log, p.offer) : undefined
+          return (
+            <li key={i} className={`uth-probe reply-${logReplyKind(p)}`}>
+              <span className="uth-src">{t(p.client === 'raw' ? 'uth.source.raw' : 'uth.source.cryptotls')}</span>
+              <span className="uth-offer">
+                <span className="sr-only">{t('uth.col.offered')}: </span>
+                <strong>{purposeText(p, t)}</strong>
+                {offer && <span className="mono"> · {offerSummary(offer, t)}</span>}
+              </span>
+              <span className="uth-arrow" aria-hidden="true">
+                →
+              </span>
+              <span className="uth-reply">
+                <span className="sr-only">{t('uth.col.reply')}: </span>
+                <LogReply p={p} t={t} />
+              </span>
+              {offer && <OfferDetails offer={offer} t={t} />}
+            </li>
+          )
+        })}
+      </ol>
+    </section>
+  )
+}
+
+function logReplyKind(p: LogProbe) {
+  switch (p.response.type) {
+    case 'server_hello':
+    case 'hello_retry_request':
+    case 'sslv2_server_hello':
+      return p.response.alert ? 'alert' : 'hello'
+    case 'alert':
+    case 'sslv2_error':
+      return 'alert'
+    case 'timeout':
+      return 'timeout'
+    case 'closed':
+      return 'closed'
+  }
+  return 'other'
+}
+
+const PURPOSES = ['default', 'group', 'version', 'suites', 'sslv2', 'sslv3', 'tls13_suites', 'tls13_groups', 'tls12_curves'] as const
+
+function purposeText(p: LogProbe, t: T) {
+  const known = PURPOSES.find((k) => k === p.purpose)
+  return known ? t(`uth.purpose.${known}`, { subject: p.subject ?? '' }) : [p.purpose, p.subject].filter(Boolean).join(' ')
+}
+
+const shortList = (names: string[], max = 4) => (names.length > max ? [...names.slice(0, max), '…'] : names).join(', ')
+
+function offerSummary(o: LogOffer, t: T) {
+  const parts = [offeredVersions(o).map(versionName).join('/')]
+  if (o.sslv2) parts.push(t('uth.offer.ciphers', { n: o.sslv2_ciphers?.length ?? 0 }))
+  else parts.push(t('uth.offer.suites', { n: (o.suites ?? []).filter((s) => !isGrease(s)).length }))
+  if (o.groups?.length) parts.push(t('uth.offer.groups', { list: shortList(o.groups.map(groupName)) }))
+  if (o.key_shares !== undefined) parts.push(t('uth.offer.keyShares', { list: o.key_shares.map(groupName).join(', ') || t('uth.none') }))
+  if (o.signature_schemes?.length) parts.push(t('uth.offer.signatures', { n: o.signature_schemes.filter((s) => !isGrease(s)).length }))
+  if (o.alpn?.length) parts.push('ALPN ' + o.alpn.join(', '))
+  return parts.filter(Boolean).join(' · ')
+}
+
+function LogReply({ p, t }: { p: LogProbe; t: T }) {
+  const r = p.response
+  const known = ['server_hello', 'hello_retry_request', 'alert', 'closed', 'timeout', 'not_tls', 'sslv2_server_hello', 'sslv2_error', 'no_connection', 'not_sent'] as const
+  const type = known.find((k) => k === r.type)
+  const facts = [
+    r.retry_group_name && t('uth.resp.retry', { group: r.retry_group_name }),
+    r.version && versionName(r.version),
+    r.cipher_suite_name,
+    r.group_name,
+    r.dh_bits && t('uth.resp.dh', { bits: r.dh_bits }),
+    r.sslv2_ciphers && t('uth.reply.ciphers', { n: r.sslv2_ciphers }),
+  ].filter(Boolean)
+  const ok = type === 'server_hello' || type === 'hello_retry_request' || type === 'sslv2_server_hello'
+  return (
+    <>
+      <span className={ok ? 'ok' : type === 'timeout' ? 'warn' : 'bad'}>{type ? t(`uth.resp.${type}`) : r.type}</span>
+      {facts.length > 0 && <span className="mono"> · {facts.join(' · ')}</span>}
+      {r.alert && (
+        <span className="bad">
+          {' · '}
+          {t('uth.reply.alert', { code: r.alert.code, name: r.alert.name })}{' '}
+          <span className="muted">({t(r.alert.encrypted ? 'uth.resp.encrypted' : r.alert.level === 1 ? 'uth.resp.warning' : 'uth.resp.fatal')})</span>
+        </span>
+      )}
+      <span className="muted small">
+        {' · '}
+        {t('uth.ms', { ms: p.duration_ms })}
+        {p.error_code && <> · <span className="mono">{p.error_code}</span></>}
+      </span>
+    </>
+  )
+}
+
+function OfferDetails({ offer: o, t }: { offer: LogOffer; t: T }) {
+  const rows: [string, string][] = [
+    [t('uth.offer.d.versions'), offeredVersions(o).map(versionName).join(', ')],
+    [o.sslv2 ? t('uth.offer.d.ciphers') : t('uth.offer.d.suites'), o.sslv2 ? (o.sslv2_ciphers ?? []).map((c) => '0x' + c.toString(16).padStart(6, '0')).join(' ') : (o.suites ?? []).map((s) => (isGrease(s) ? 'GREASE' : hex(s))).join(' ')],
+    [t('uth.offer.d.groups'), (o.groups ?? []).map(groupName).join(', ')],
+    [t('uth.offer.d.keyShares'), o.key_shares === undefined ? '' : o.key_shares.map(groupName).join(', ') || t('uth.offer.d.emptyKeyShare')],
+    [t('uth.offer.d.signatures'), (o.signature_schemes ?? []).map(signatureName).join(', ')],
+    [t('uth.offer.d.signaturesCert'), (o.signature_schemes_cert ?? []).map(signatureName).join(', ')],
+    ['ALPN', (o.alpn ?? []).join(', ')],
+    [t('uth.offer.d.extensions'), (o.extensions ?? []).map((e) => (isGrease(e) ? 'GREASE' : String(e))).join(', ')],
+  ]
+  return (
+    <details className="uth-offer-details">
+      <summary>{t('uth.offer.d.title')}</summary>
+      <dl className="uth-facts">
+        {rows
+          .filter(([, v]) => v)
+          .map(([k, v]) => (
+            <div key={k} className="uth-fact">
+              <dt>{k}</dt>
+              <dd className="mono">{v}</dd>
+            </div>
+          ))}
+      </dl>
+    </details>
   )
 }
 

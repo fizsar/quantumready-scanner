@@ -78,7 +78,108 @@ export interface ScanResult {
     tls12_curves: { name: string; id: number }[] | null
     tls12_curves_complete: boolean
   }
+  /** Schema 2 (milestone 2.8.4): every connection as it went on the wire. */
+  probe_log?: ProbeLog
 }
+
+/** A ClientHello as sent (internal/scanner/probelog.go, Offer). */
+export interface LogOffer {
+  sslv2?: boolean
+  legacy_version?: number
+  supported_versions?: number[]
+  suites?: number[]
+  sslv2_ciphers?: number[]
+  groups?: number[]
+  key_shares?: number[]
+  signature_schemes?: number[]
+  signature_schemes_cert?: number[]
+  alpn?: string[]
+  extensions?: number[]
+  // An enumeration's offer: offers[like] without what the previous probes found.
+  like?: number
+  suites_removed?: number[]
+  groups_removed?: number[]
+}
+
+export interface LogResponse {
+  type: string
+  version?: number
+  cipher_suite?: number
+  cipher_suite_name?: string
+  group?: number
+  group_name?: string
+  retry_group?: number
+  retry_group_name?: string
+  dh_bits?: number
+  sslv2_ciphers?: number
+  alert?: { level?: number; code: number; name: string; encrypted?: boolean }
+}
+
+export interface LogProbe {
+  client: string
+  purpose: string
+  subject?: string
+  offer?: number
+  response: LogResponse
+  status: ProbeStatus
+  error?: string
+  error_code?: string
+  start_ms: number
+  duration_ms: number
+}
+
+export interface ProbeLog {
+  offers: LogOffer[]
+  probes: LogProbe[]
+}
+
+/** Offer i in full: an enumeration's offers are stored as differences (as ProbeLog.Offer in Go). */
+export function expandOffer(log: ProbeLog, i: number): LogOffer | undefined {
+  const o = log.offers[i]
+  if (!o) return undefined
+  if (o.like === undefined) return o
+  if (o.like >= i) return undefined // only earlier entries: no cycles
+  const base = expandOffer(log, o.like)
+  if (!base) return undefined
+  return {
+    ...base,
+    suites: (base.suites ?? []).filter((id) => !o.suites_removed?.includes(id)),
+    groups: (base.groups ?? []).filter((id) => !o.groups_removed?.includes(id)),
+  }
+}
+
+/** GREASE values (RFC 8701): 0x0a0a, 0x1a1a… 0xfafa. */
+export const isGrease = (id: number) => (id & 0x0f0f) === 0x0a0a && id >> 8 === (id & 0xff)
+
+const VERSIONS: Record<number, string> = { 0x0002: 'SSLv2', 0x0300: 'SSLv3', 0x0301: 'TLS 1.0', 0x0302: 'TLS 1.1', 0x0303: 'TLS 1.2', 0x0304: 'TLS 1.3' }
+export const versionName = (id: number) => (isGrease(id) ? 'GREASE' : (VERSIONS[id] ?? hex(id)))
+
+// IANA TLS Supported Groups, the ones a scan meets most.
+const GROUPS: Record<number, string> = {
+  0x0017: 'secp256r1', 0x0018: 'secp384r1', 0x0019: 'secp521r1', 0x001d: 'x25519', 0x001e: 'x448',
+  0x001a: 'brainpoolP256r1', 0x001b: 'brainpoolP384r1', 0x001c: 'brainpoolP512r1', 0x0015: 'secp224r1',
+  0x0100: 'ffdhe2048', 0x0101: 'ffdhe3072', 0x0102: 'ffdhe4096', 0x0103: 'ffdhe6144', 0x0104: 'ffdhe8192',
+  0x0200: 'MLKEM512', 0x0201: 'MLKEM768', 0x0202: 'MLKEM1024',
+  0x11eb: 'SecP256r1MLKEM768', 0x11ec: 'X25519MLKEM768', 0x11ed: 'SecP384r1MLKEM1024', 0x6399: 'X25519Kyber768Draft00',
+}
+export const groupName = (id: number) => (isGrease(id) ? 'GREASE' : (GROUPS[id] ?? hex(id)))
+
+// IANA TLS SignatureScheme.
+const SIGS: Record<number, string> = {
+  0x0201: 'rsa_pkcs1_sha1', 0x0202: 'dsa_sha1', 0x0203: 'ecdsa_sha1', 0x0301: 'rsa_sha224', 0x0302: 'dsa_sha224', 0x0303: 'ecdsa_sha224',
+  0x0401: 'rsa_pkcs1_sha256', 0x0402: 'dsa_sha256', 0x0403: 'ecdsa_secp256r1_sha256',
+  0x0501: 'rsa_pkcs1_sha384', 0x0502: 'dsa_sha384', 0x0503: 'ecdsa_secp384r1_sha384',
+  0x0601: 'rsa_pkcs1_sha512', 0x0602: 'dsa_sha512', 0x0603: 'ecdsa_secp521r1_sha512',
+  0x0804: 'rsa_pss_rsae_sha256', 0x0805: 'rsa_pss_rsae_sha384', 0x0806: 'rsa_pss_rsae_sha512',
+  0x0807: 'ed25519', 0x0808: 'ed448', 0x0809: 'rsa_pss_pss_sha256', 0x080a: 'rsa_pss_pss_sha384', 0x080b: 'rsa_pss_pss_sha512',
+  0x081a: 'ecdsa_brainpoolP256r1tls13_sha256', 0x081b: 'ecdsa_brainpoolP384r1tls13_sha384', 0x081c: 'ecdsa_brainpoolP512r1tls13_sha512',
+  0x0904: 'mldsa44', 0x0905: 'mldsa65', 0x0906: 'mldsa87',
+}
+export const signatureName = (id: number) => (isGrease(id) ? 'GREASE' : (SIGS[id] ?? hex(id)))
+
+/** The versions an offer proposes: supported_versions, or the legacy version alone. */
+export const offeredVersions = (o: LogOffer) =>
+  (o.supported_versions?.length ? o.supported_versions : o.legacy_version !== undefined ? [o.legacy_version] : []).filter((v) => !isGrease(v))
 
 /** The scanner facts of a report, when the API sent them. */
 export function resultOf(report: Report): ScanResult | undefined {

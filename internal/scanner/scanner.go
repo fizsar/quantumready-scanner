@@ -105,6 +105,7 @@ type target struct {
 	sni   string // "" for IP literals
 	addr  netip.AddrPort
 	conns *atomic.Int32 // connections opened by this scan
+	log   *probeLog     // every connection, as sent and received (nil: not logged)
 }
 
 // Scan probes host:port (port 0 means 443). It returns an error only when no
@@ -131,7 +132,7 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	if err != nil {
 		return nil, err
 	}
-	t := target{host: name, sni: name, addr: netip.AddrPortFrom(ip, uint16(port)), conns: new(atomic.Int32)}
+	t := target{host: name, sni: name, addr: netip.AddrPortFrom(ip, uint16(port)), conns: new(atomic.Int32), log: newProbeLog()}
 	if literal.IsValid() {
 		t.sni = ""
 	}
@@ -152,7 +153,7 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	}
 
 	// Browser-like handshake first: it tells us whether the target speaks TLS at all.
-	base := s.handshake(ctx, t, &tls.Config{MinVersion: tls.VersionTLS12, CurvePreferences: BrowserGroups})
+	base := s.handshake(ctx, t, &tls.Config{MinVersion: tls.VersionTLS12, CurvePreferences: BrowserGroups}, probeTag{purpose: PurposeDefault}, nil)
 	if base.status == ProbeFailed {
 		return nil, fmt.Errorf("%w: %w", ErrUnreachable, base.err)
 	}
@@ -186,15 +187,15 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 		g.Go(func() error {
 			p := s.probeGroup(ctx, t, id)
 			keep(p)
-			res.KeyExchange.Groups[i] = GroupProbe{Name: groupName(id), ID: uint16(id), Hybrid: isHybrid(id), Status: p.status, Error: p.errString()}
+			res.KeyExchange.Groups[i] = GroupProbe{Name: groupName(id), ID: uint16(id), Hybrid: isHybrid(id), Status: p.status, Error: p.errString(), ErrorCode: errorCode(p.err)}
 			return nil
 		})
 	}
 	for i, v := range probedVersions {
 		g.Go(func() error {
-			p := s.handshake(ctx, t, versionConfig(v))
+			p := s.handshake(ctx, t, versionConfig(v), probeTag{PurposeVersion, tls.VersionName(v)}, nil)
 			keep(p)
-			res.Versions[i] = VersionProbe{Version: tls.VersionName(v), ID: v, Status: p.status, Error: p.errString()}
+			res.Versions[i] = VersionProbe{Version: tls.VersionName(v), ID: v, Status: p.status, Error: p.errString(), ErrorCode: errorCode(p.err)}
 			if v == tls.VersionTLS13 && p.state != nil {
 				res.TLS13Suite = tls.CipherSuiteName(p.state.CipherSuite)
 			}
@@ -225,6 +226,7 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 		res.Certificate = analyzeCertificate(certs, state, t.host, s.opts.Now(), s.opts.RootCAs)
 	}
 	res.Connections = int(t.conns.Load())
+	res.ProbeLog = t.log.result()
 	res.DurationMS = s.opts.Now().Sub(start).Milliseconds()
 	return res, nil
 }
@@ -237,12 +239,12 @@ func (s *Scanner) probeGroup(ctx context.Context, t target, id tls.CurveID) prob
 	if isHybrid(id) {
 		cfg.MinVersion = tls.VersionTLS13
 	}
-	p := s.handshake(ctx, t, cfg)
-	if p.status == Supported && p.state.CurveID != id {
-		p.status = NotSupported
-		p.err = fmt.Errorf("server negotiated %s instead", groupName(p.state.CurveID))
-	}
-	return p
+	return s.handshake(ctx, t, cfg, probeTag{PurposeGroup, groupName(id)}, func(st *tls.ConnectionState) error {
+		if st.CurveID != id {
+			return &outcomeError{"other_group", fmt.Sprintf("server negotiated %s instead", groupName(st.CurveID))}
+		}
+		return nil
+	})
 }
 
 // versionConfig offers exactly one version with every suite and group Go has.
@@ -266,7 +268,7 @@ func (s *Scanner) enumerateSuites(ctx context.Context, t target, v uint16) (foun
 			MaxVersion:       v,
 			CipherSuites:     remaining,
 			CurvePreferences: ClassicGroups,
-		})
+		}, probeTag{PurposeSuites, tls.VersionName(v)}, nil)
 		switch p.status {
 		case NotSupported:
 			return found, true

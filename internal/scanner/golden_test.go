@@ -27,7 +27,9 @@ func goldenServers(t *testing.T) (*testPKI, map[string]int) {
 }
 
 // goldenNormalize turns a result into comparable JSON: the port is random,
-// and fields added after the golden file (all optional) are dropped.
+// and fields added after the golden file (all optional) are dropped, with
+// schema_version set back to 1: so the test also proves that schema 2 only
+// adds fields.
 func goldenNormalize(t *testing.T, r *Result, dropNew bool) map[string]any {
 	t.Helper()
 	b, err := json.Marshal(r)
@@ -43,12 +45,33 @@ func goldenNormalize(t *testing.T, r *Result, dropNew bool) map[string]any {
 		for _, k := range newOptionalFields {
 			delete(m, k)
 		}
+		dropKeys(m, schema2Keys)
+		m["schema_version"] = float64(1)
 	}
 	return m
 }
 
 // newOptionalFields are the Result fields added in milestone 2.7.3.
 var newOptionalFields = []string{"intensity", "connections", "raw"}
+
+// schema2Keys are the keys schema 2 (milestone 2.8.4) adds, at any depth.
+var schema2Keys = []string{"probe_log", "error_code", "trust_error_code", "signature_oid", "public_key_oid"}
+
+func dropKeys(v any, keys []string) {
+	switch x := v.(type) {
+	case map[string]any:
+		for _, k := range keys {
+			delete(x, k)
+		}
+		for _, e := range x {
+			dropKeys(e, keys)
+		}
+	case []any:
+		for _, e := range x {
+			dropKeys(e, keys)
+		}
+	}
+}
 
 func TestBasicIntensityMatchesGolden(t *testing.T) {
 	path := filepath.Join("testdata", "basic_golden.json")

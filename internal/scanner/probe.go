@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // probe is the raw outcome of one handshake.
@@ -29,7 +30,7 @@ func (p probe) errString() string {
 }
 
 func (p probe) summary() Handshake {
-	h := Handshake{Status: p.status, Error: p.errString()}
+	h := Handshake{Status: p.status, Error: p.errString(), ErrorCode: errorCode(p.err)}
 	if p.state != nil {
 		h.Version = tls.VersionName(p.state.Version)
 		h.CipherSuite = tls.CipherSuiteName(p.state.CipherSuite)
@@ -41,11 +42,13 @@ func (p probe) summary() Handshake {
 	return h
 }
 
-// handshake runs one TLS handshake against t with cfg. Certificate validation
-// is disabled here on purpose: the chain is captured and judged separately
-// (analyzeCertificate), so that an invalid certificate does not hide the
-// protocol facts.
-func (s *Scanner) handshake(ctx context.Context, t target, cfg *tls.Config) probe {
+// handshake runs one TLS handshake against t with cfg and records it in the
+// scan's probe log under tag. check, if set, turns a completed handshake that
+// does not answer the probe's question into "not supported" (before it is
+// logged). Certificate validation is disabled here on purpose: the chain is
+// captured and judged separately (analyzeCertificate), so that an invalid
+// certificate does not hide the protocol facts.
+func (s *Scanner) handshake(ctx context.Context, t target, cfg *tls.Config, tag probeTag, check func(*tls.ConnectionState) error) probe {
 	if err := s.acquire(ctx); err != nil {
 		return probe{status: ProbeFailed, err: err}
 	}
@@ -57,11 +60,15 @@ func (s *Scanner) handshake(ctx context.Context, t target, cfg *tls.Config) prob
 	if t.conns != nil {
 		t.conns.Add(1)
 	}
+	start := time.Now()
 	conn, err := s.dial(ctx, t.addr)
 	if err != nil {
-		return probe{status: ProbeFailed, err: fmt.Errorf("connect: %w", err)}
+		p := probe{status: ProbeFailed, err: &connectError{err}}
+		t.log.add(clientCryptoTLS, tag, start, nil, p.status, p.err, nil)
+		return p
 	}
 	defer conn.Close()
+	rc := &recordingConn{Conn: conn}
 
 	var certs []*x509.Certificate
 	cfg = cfg.Clone()
@@ -81,12 +88,21 @@ func (s *Scanner) handshake(ctx context.Context, t target, cfg *tls.Config) prob
 		return nil
 	}
 
-	tc := tls.Client(conn, cfg)
+	tc := tls.Client(rc, cfg)
+	var p probe
 	if err := tc.HandshakeContext(ctx); err != nil {
-		return probe{status: classify(err), certs: certs, err: err}
+		p = probe{status: classify(err), certs: certs, err: err}
+	} else {
+		st := tc.ConnectionState()
+		p = probe{status: Supported, state: &st, certs: certs}
+		if check != nil {
+			if err := check(&st); err != nil {
+				p.status, p.err = NotSupported, err
+			}
+		}
 	}
-	st := tc.ConnectionState()
-	return probe{status: Supported, state: &st, certs: certs}
+	t.log.add(clientCryptoTLS, tag, start, rc, p.status, p.err, nil)
+	return p
 }
 
 // classify decides whether a failed handshake means "the server refuses what
