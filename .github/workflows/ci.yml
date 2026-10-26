@@ -58,6 +58,8 @@ jobs:
         run: make fuzz FUZZTIME=10s
       - name: Compose security policy
         run: make check-compose
+      - name: No binaries, no files over 1 MB
+        run: make check-files
       - name: Deploy helpers (no VPS)
         run: make test-deploy
       - name: sqlc generated code is up to date
