@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/fizsar/quantumready-saas/internal/catalog"
 	"github.com/fizsar/quantumready-saas/internal/scoring"
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
@@ -207,7 +208,7 @@ type findingView struct {
 	Severity      string `json:"severity"`
 	SeverityLabel string `json:"severity_label"`
 	Category      string `json:"category"`
-	scoring.Text
+	catalog.Text
 }
 
 func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
@@ -247,14 +248,14 @@ func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
 		ScoringVersion: s.ScoringVersion, Score: s.Score, Grade: s.Grade, ScoreGrade: s.ScoreGrade,
 		FloorPoints: s.FloorPoints, PQC: s.PQC,
 		SelectedGroup: facts.KeyExchange.Selected, TLSVersion: facts.Default.Version,
-		QuantumRisk: labeled{s.QuantumRisk, scoring.Label("severity."+s.QuantumRisk, lang)},
-		CurrentRisk: labeled{s.CurrentRisk, scoring.Label("severity."+s.CurrentRisk, lang)},
+		QuantumRisk: labeled{s.QuantumRisk, catalog.Label("severity."+s.QuantumRisk, lang)},
+		CurrentRisk: labeled{s.CurrentRisk, catalog.Label("severity."+s.CurrentRisk, lang)},
 		Result:      sc.Result,
 	}
 	// Finding parameters by code: some titles use them, e.g. "({bits} bits)".
 	params := make(map[string]map[string]string, len(rows))
 	// Some texts depend on the scan: its date and its other findings.
-	tctx := scoring.Context{ScanTime: sc.CreatedAt}
+	tctx := catalog.Context{ScanTime: sc.CreatedAt}
 	if sc.StartedAt != nil {
 		tctx.ScanTime = *sc.StartedAt
 	}
@@ -269,13 +270,13 @@ func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
 	if s.Cap != nil {
 		rep.Cap = &capView{Grade: s.Cap.Grade}
 		for _, c := range s.Cap.Codes {
-			rep.Cap.Codes = append(rep.Cap.Codes, labeled{c, scoring.DescribeIn(c, params[c], lang, tctx).Title})
+			rep.Cap.Codes = append(rep.Cap.Codes, labeled{c, catalog.DescribeIn(c, params[c], lang, tctx).Title})
 		}
 	}
 	for _, b := range s.Blocks {
-		bv := blockView{ID: b.ID, Label: scoring.Label("block."+b.ID, lang), Points: b.Points, Max: b.Max}
+		bv := blockView{ID: b.ID, Label: catalog.Label("block."+b.ID, lang), Points: b.Points, Max: b.Max}
 		for _, it := range b.Items {
-			bv.Items = append(bv.Items, itemView{it.ID, scoring.Label("item."+it.ID, lang), it.Points, it.Max})
+			bv.Items = append(bv.Items, itemView{it.ID, catalog.Label("item."+it.ID, lang), it.Points, it.Max})
 		}
 		rep.Blocks = append(rep.Blocks, bv)
 	}
@@ -286,14 +287,14 @@ func (a *api) view(r *http.Request, sc store.Scan) (*scanView, error) {
 			return nil, err
 		}
 		rep.Findings = append(rep.Findings, findingView{
-			Code: f.Code, Axis: f.Axis, AxisLabel: scoring.Label("axis."+f.Axis, lang),
-			Severity: f.Severity, SeverityLabel: scoring.Label("severity."+f.Severity, lang),
-			Category: f.Category, Text: scoring.DescribeIn(f.Code, params, lang, tctx),
+			Code: f.Code, Axis: f.Axis, AxisLabel: catalog.Label("axis."+f.Axis, lang),
+			Severity: f.Severity, SeverityLabel: catalog.Label("severity."+f.Severity, lang),
+			Category: f.Category, Text: catalog.DescribeIn(f.Code, params, lang, tctx),
 		})
 	}
 	rep.NotEvaluated = make([]labeled, 0, len(s.NotEvaluated))
 	for _, c := range s.NotEvaluated {
-		rep.NotEvaluated = append(rep.NotEvaluated, labeled{c, scoring.Label("noteval."+c, lang)})
+		rep.NotEvaluated = append(rep.NotEvaluated, labeled{c, catalog.Label("noteval."+c, lang)})
 	}
 	v.Report = rep
 	return v, nil
