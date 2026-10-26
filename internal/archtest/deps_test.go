@@ -13,13 +13,15 @@ import (
 const module = "github.com/fizsar/quantumready-saas/"
 
 // public are the packages that must stay importable from another module one
-// day (ADR-0008: the engine, the evaluators and the catalog of texts): they
-// must not reach the API, the database, the queue or any server-side concern.
+// day (ADR-0008: the engine, the evaluators, the catalog of texts and the
+// report model): they must not reach the API, the database, the queue or any
+// server-side concern.
 var public = []string{
 	"internal/scanner",
 	"internal/scanner/rawtls",
 	"internal/scoring",
 	"internal/catalog",
+	"internal/report",
 	"internal/domains",
 }
 
