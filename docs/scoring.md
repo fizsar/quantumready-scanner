@@ -110,7 +110,7 @@ Cada hallazgo tiene `code` estable, `axis` (`quantum`/`current`), `severity` (`c
 
 ### Referencias por hallazgo
 
-La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/scoring/references_test.go`) comprueba que cada código del catálogo tiene aquí una fila con al menos una fuente (RFC, CVE, borrador del IETF, publicación del NIST/FIPS o votación del CA/Browser Forum), que cada fuente es un enlace a su sitio oficial (rfc-editor.org, nvd.nist.gov, csrc.nist.gov, datatracker.ietf.org o cabforum.org) con su título en «Fuentes», y que no sobra ninguna fila. Quedan fuera tres códigos que no juzgan al servidor, sino que dicen que el escaneo no pudo comprobar algo (no puntúan, ver «Lo que no puntúa»): `SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN` y `CERT_MISSING`.
+La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/catalog/references_test.go`) comprueba que cada código del catálogo tiene aquí una fila con al menos una fuente (RFC, CVE, borrador del IETF, publicación del NIST/FIPS o votación del CA/Browser Forum), que cada fuente es un enlace a su sitio oficial (rfc-editor.org, nvd.nist.gov, csrc.nist.gov, datatracker.ietf.org o cabforum.org) con su título en «Fuentes», y que no sobra ninguna fila. Quedan fuera tres códigos que no juzgan al servidor, sino que dicen que el escaneo no pudo comprobar algo (no puntúan, ver «Lo que no puntúa»): `SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN` y `CERT_MISSING`.
 
 | Código | Referencia |
 |---|---|
