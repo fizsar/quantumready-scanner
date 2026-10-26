@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/fizsar/quantumready-saas/internal/domains"
-	"github.com/fizsar/quantumready-saas/internal/scoring"
+	"github.com/fizsar/quantumready-saas/internal/report"
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
 
@@ -258,63 +258,10 @@ type scanView struct {
 	AgeSeconds *int       `json:"age_seconds,omitempty"` // with reused: how old the result is (since it finished)
 	// A queued public scan: its place among public scans (1: next) and a
 	// rough wait from the worker's pace. Organizations' scans are not counted.
-	QueuePosition   *int64  `json:"queue_position,omitempty"`
-	QueueETASeconds *int64  `json:"queue_eta_seconds,omitempty"`
-	Lang            string  `json:"lang"`
-	Report          *report `json:"report,omitempty"` // done
-}
-
-type report struct {
-	ScoringVersion string          `json:"scoring_version"`
-	Score          int             `json:"score"`
-	Grade          string          `json:"grade"`
-	ScoreGrade     string          `json:"score_grade"`
-	FloorPoints    int             `json:"floor_points,omitempty"`
-	Cap            *capView        `json:"cap,omitempty"`
-	PQC            bool            `json:"pqc"`
-	SelectedGroup  string          `json:"selected_group,omitempty"`
-	TLSVersion     string          `json:"tls_version,omitempty"`
-	QuantumRisk    labeled         `json:"quantum_risk"`
-	CurrentRisk    labeled         `json:"current_risk"`
-	Blocks         []blockView     `json:"blocks"`
-	Findings       []findingView   `json:"findings"`
-	NotEvaluated   []labeled       `json:"not_evaluated"`
-	Result         json.RawMessage `json:"result"` // raw scanner facts
-}
-
-type labeled struct {
-	Code  string `json:"code"`
-	Label string `json:"label"`
-}
-
-type capView struct {
-	Grade string    `json:"grade"`
-	Codes []labeled `json:"findings"`
-}
-
-type blockView struct {
-	ID     string     `json:"id"`
-	Label  string     `json:"label"`
-	Points int        `json:"points"`
-	Max    int        `json:"max"`
-	Items  []itemView `json:"items,omitempty"`
-}
-
-type itemView struct {
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Points int    `json:"points"`
-	Max    int    `json:"max"`
-}
-
-type findingView struct {
-	Code          string `json:"code"`
-	Axis          string `json:"axis"`
-	AxisLabel     string `json:"axis_label"`
-	Severity      string `json:"severity"`
-	SeverityLabel string `json:"severity_label"`
-	Category      string `json:"category"`
-	scoring.Text
+	QueuePosition   *int64           `json:"queue_position,omitempty"`
+	QueueETASeconds *int64           `json:"queue_eta_seconds,omitempty"`
+	Lang            string           `json:"lang"`
+	Report          *report.Document `json:"report,omitempty"` // done (internal/report)
 }
 
 func (a *api) view(r *http.Request, t store.Tenant, sc store.Scan) (*scanView, error) {
@@ -337,81 +284,38 @@ func (a *api) view(r *http.Request, t store.Tenant, sc store.Scan) (*scanView, e
 	if sc.Status != "done" {
 		return v, nil
 	}
-
-	var s scoring.Result
-	if err := json.Unmarshal(sc.Scoring, &s); err != nil {
-		return nil, err
-	}
-	var facts struct {
-		Default struct {
-			Version string `json:"version"`
-		} `json:"default"`
-		KeyExchange struct {
-			Selected string `json:"selected"`
-		} `json:"key_exchange"`
-	}
-	if err := json.Unmarshal(sc.Result, &facts); err != nil {
-		return nil, err
-	}
-	rows, err := a.cfg.Scans.FindingsFor(r.Context(), t, sc.ID)
+	in, err := a.reportInput(r.Context(), t, sc, lang)
 	if err != nil {
 		return nil, err
 	}
+	if v.Report, err = report.Build(in); err != nil {
+		return nil, err
+	}
+	return v, nil
+}
 
-	rep := &report{
-		ScoringVersion: s.ScoringVersion, Score: s.Score, Grade: s.Grade, ScoreGrade: s.ScoreGrade,
-		FloorPoints: s.FloorPoints, PQC: s.PQC,
-		SelectedGroup: facts.KeyExchange.Selected, TLSVersion: facts.Default.Version,
-		QuantumRisk: labeled{s.QuantumRisk, scoring.Label("severity."+s.QuantumRisk, lang)},
-		CurrentRisk: labeled{s.CurrentRisk, scoring.Label("severity."+s.CurrentRisk, lang)},
-		Result:      sc.Result,
-	}
-	// Finding parameters by code: some titles use them, e.g. "({bits} bits)".
-	params := make(map[string]map[string]string, len(rows))
-	// Some texts depend on the scan: its date and its other findings.
-	tctx := scoring.Context{ScanTime: sc.CreatedAt}
+// reportInput gathers what is stored about a finished scan for report.Build.
+func (a *api) reportInput(ctx context.Context, t store.Tenant, sc store.Scan, lang string) (report.Input, error) {
+	in := report.Input{Result: sc.Result, ScanTime: sc.CreatedAt, Lang: lang}
 	if sc.StartedAt != nil {
-		tctx.ScanTime = *sc.StartedAt
+		in.ScanTime = *sc.StartedAt
 	}
-	for _, f := range rows {
-		var p map[string]string
-		if err := json.Unmarshal(f.Params, &p); err != nil {
-			return nil, err
-		}
-		params[f.Code] = p
-		tctx.Codes = append(tctx.Codes, f.Code)
+	if err := json.Unmarshal(sc.Scoring, &in.Scoring); err != nil {
+		return in, err
 	}
-	if s.Cap != nil {
-		rep.Cap = &capView{Grade: s.Cap.Grade}
-		for _, c := range s.Cap.Codes {
-			rep.Cap.Codes = append(rep.Cap.Codes, labeled{c, scoring.DescribeIn(c, params[c], lang, tctx).Title})
-		}
+	rows, err := a.cfg.Scans.FindingsFor(ctx, t, sc.ID)
+	if err != nil {
+		return in, err
 	}
-	for _, b := range s.Blocks {
-		bv := blockView{ID: b.ID, Label: scoring.Label("block."+b.ID, lang), Points: b.Points, Max: b.Max}
-		for _, it := range b.Items {
-			bv.Items = append(bv.Items, itemView{it.ID, scoring.Label("item."+it.ID, lang), it.Points, it.Max})
-		}
-		rep.Blocks = append(rep.Blocks, bv)
-	}
-	rep.Findings = make([]findingView, 0, len(rows))
+	in.Findings = make([]report.Finding, 0, len(rows))
 	for _, f := range rows {
 		var params map[string]string
 		if err := json.Unmarshal(f.Params, &params); err != nil {
-			return nil, err
+			return in, err
 		}
-		rep.Findings = append(rep.Findings, findingView{
-			Code: f.Code, Axis: f.Axis, AxisLabel: scoring.Label("axis."+f.Axis, lang),
-			Severity: f.Severity, SeverityLabel: scoring.Label("severity."+f.Severity, lang),
-			Category: f.Category, Text: scoring.DescribeIn(f.Code, params, lang, tctx),
-		})
+		in.Findings = append(in.Findings, report.Finding{Code: f.Code, Axis: f.Axis, Severity: f.Severity, Category: f.Category, Params: params})
 	}
-	rep.NotEvaluated = make([]labeled, 0, len(s.NotEvaluated))
-	for _, c := range s.NotEvaluated {
-		rep.NotEvaluated = append(rep.NotEvaluated, labeled{c, scoring.Label("noteval."+c, lang)})
-	}
-	v.Report = rep
-	return v, nil
+	return in, nil
 }
 
 // altchaChallenge: GET /api/altcha, a proof-of-work challenge for POST
