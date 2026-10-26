@@ -104,6 +104,18 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # The backup scripts that run on the VPS: shellcheck of every deploy script,
+  # then backup and restore drill against a throwaway PostgreSQL and a local
+  # restic repository (docker and python3 only; no B2, no VPS).
+  backup:
+    name: Backup scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: make test-backup
+
   docker:
     name: Docker (${{ matrix.image }})
     runs-on: ubuntu-latest
