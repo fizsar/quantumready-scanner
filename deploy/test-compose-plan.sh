@@ -2,7 +2,7 @@
 # Tests deploy/compose-plan.sh (what deploy.sh tells before `up`, and the
 # database guard) on a throwaway compose project, and checks the plan against
 # what compose then really does. Needs docker. No VPS.
-# shellcheck disable=SC2015,SC2317 # ok/FAIL reporting never fails; cleanup runs from the trap
+# shellcheck disable=SC2015,SC2016,SC2317 # ok/FAIL reporting never fails; $ in single quotes is text searched for in deploy.sh; cleanup runs from the trap
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=deploy/compose-plan.sh
