@@ -85,7 +85,21 @@ Detalle por aspecto: `test/tlslab/results/COMPARISON.md` (se regenera con `make 
 - **Curvas ECDHE que solo existen en SSLv3** (`ssl3`: secp256r1). Un cliente SSLv3 no envía `supported_groups`, así que no las sondeamos; el resultado lo marca como **no evaluado** (`legacy_groups`), no como "no soportado". Sin efecto en la nota: SSLv3 ya limita a C.
 - **Suites por versión por debajo de TLS 1.2**: para ahorrar conexiones, en TLS 1.1, 1.0 y SSLv3 solo buscamos las suites que no aparecieron en una versión superior (sí detectamos qué versiones están activas). El conjunto total de suites coincide con el de testssl.sh en todos los servidores; lo que no listamos es la repetición de la misma suite en varias versiones.
 - **Orden de preferencia del servidor**: sigue "no evaluado" (decisión del plan del 2.7).
+- **Certificado de los servidores con los que `crypto/tls` no completa ningún handshake** (`ssl2`, `ssl3`, `export`, `dhe1024`, `secp224`): testssl.sh lo lee y nosotros no. El certificado sale de los handshakes de `crypto/tls`; las sondas en crudo lo ven en claro (TLS 1.0–1.2) pero no lo leen. Queda como **no evaluado** (`CERT_MISSING`, y desde el 2.8.5 `pq_certificate`). Leerlo de esas sondas es una mejora posible.
 - **Vulnerabilidades de implementación** (Heartbleed, ROBOT…): fuera del alcance; tampoco se pidieron a testssl.sh.
+
+### Hito 2.8.5: certificados post-cuánticos (ML-DSA)
+
+Dos servidores más en el laboratorio, con OpenSSL 3.5.9 y certificados ML-DSA-65 (FIPS 204) generados al construir la imagen:
+
+| Servidor | Versiones | Certificados | Ofreciendo ML-DSA (como Chrome) | Sin ML-DSA (como Firefox) | testssl.sh 3.2 |
+|---|---|---|---|---|---|
+| `mldsa-dual` | TLS 1.2, 1.3 | ML-DSA-65 y ECDSA P-256, elegidos según `signature_algorithms` | ML-DSA-65 (firma del handshake `mldsa65`) | ECDSA (firma `ecdsa_secp256r1_sha256`) | ve los 2 certificados (ECDSA y ML-DSA-65) y ML-DSA-65 entre las firmas de TLS 1.3: igual |
+| `mldsa-only` | solo TLS 1.3 | solo ML-DSA-65 | ML-DSA-65 | el servidor rechaza la conexión (alerta 40, `handshake_failure`) | ve 1 certificado ML-DSA-65: igual |
+
+Protocolos, suites y grupos también coinciden con testssl.sh en los dos. El certificado que ve un cliente sin ML-DSA lo lee una sonda en crudo de TLS 1.3 que descifra la respuesta del servidor (deriva las claves del handshake de su propio key share y se detiene tras el CertificateVerify, sin enviar nunca Finished): `crypto/tls` de Go 1.27 ofrece ML-DSA siempre y no deja quitarlo. Las mismas comprobaciones, con servidores de Go 1.27 (que también sirve certificados ML-DSA), están en los tests de `internal/scanner` y `internal/scanner/rawtls`, y con certificados SLH-DSA generados por OpenSSL en `internal/scanner/testdata/pqcerts`.
+
+Nota con el modelo 2026.2 (`internal/scoring`, `TestLabPostQuantumCertificates`): tal como se escanean, 85 · F los dos (el certificado autofirmado limita a F, como en todo el laboratorio); con el certificado hecho válido, `mldsa-dual` 95 · B (las suites CBC de TLS 1.2 de OpenSSL) y `mldsa-only` 95 · A, exactamente la misma nota que con un certificado ECDSA: el certificado post-cuántico no suma (`CERT_PQ_SIGNATURE`, informativo). `mldsa-only` tiene además `CERT_PQ_NO_CLASSICAL_FALLBACK` (gravedad media, sin tope).
 
 ### Mediciones y tiempo máximo por escaneo
 

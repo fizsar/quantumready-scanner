@@ -79,6 +79,44 @@ type Result struct {
 	// ProbeLog (schema 2) is every connection the scan made, as it went on
 	// the wire.
 	ProbeLog *ProbeLog `json:"probe_log,omitempty"`
+
+	// CertificateSelection (schema 2, milestone 2.8.5) is which certificate
+	// the server presents to a client that offers ML-DSA signatures and to
+	// one that does not.
+	CertificateSelection *CertificateSelection `json:"certificate_selection,omitempty"`
+}
+
+// CertificateSelection compares the certificate a server presents to a
+// client that offers ML-DSA signatures (as Chrome does; the browser-like
+// probe) with the one it presents to a client that does not (as Firefox or
+// an older client; a raw TLS 1.3 probe with Firefox's signature schemes that
+// decrypts the server's flight to read it, intensity full).
+type CertificateSelection struct {
+	// WithMLDSA is nil when no certificate was seen.
+	WithMLDSA *PresentedCert `json:"with_mldsa,omitempty"`
+	// WithoutMLDSA is nil when the server presented none: see WithoutStatus.
+	WithoutMLDSA *PresentedCert `json:"without_mldsa,omitempty"`
+	// WithoutStatus is supported (a certificate came), not_supported (the
+	// server refused the handshake) or error (it could not be told); empty
+	// when the probe did not run (intensity basic, no TLS 1.3).
+	WithoutStatus    Status `json:"without_status,omitempty"`
+	WithoutError     string `json:"without_error,omitempty"`
+	WithoutErrorCode string `json:"without_error_code,omitempty"`
+}
+
+// PresentedCert is the leaf a server presented, by the OIDs it carries.
+type PresentedCert struct {
+	KeyAlgorithm       string `json:"key_algorithm,omitempty"` // ML-DSA-65, ECDSA… ("" if unknown: see KeyOID)
+	KeyOID             string `json:"key_oid"`
+	SignatureAlgorithm string `json:"signature_algorithm,omitempty"`
+	SignatureOID       string `json:"signature_oid"`
+	SHA256             string `json:"sha256"` // of the leaf, to tell two certificates apart
+	// PostQuantum: the leaf's key is ML-DSA or SLH-DSA, so the handshake is
+	// signed with a post-quantum algorithm.
+	PostQuantum bool `json:"post_quantum"`
+	// PostQuantumChain: some certificate of the chain has a post-quantum key
+	// or signature.
+	PostQuantumChain bool `json:"post_quantum_chain,omitempty"`
 }
 
 // RawResult is what the raw ClientHello probes (internal/scanner/rawtls)
@@ -328,6 +366,14 @@ const (
 // NotEvalCredentialSuites (intensity full): PSK, SRP, Kerberos and GOST
 // suites need credentials or algorithms a scanner does not have.
 const NotEvalCredentialSuites = "credential_suites" //nolint:gosec // a code name, not a credential
+
+// Post-quantum certificates (milestone 2.8.5): no certificate was seen with
+// an offer that includes ML-DSA; or a post-quantum one was, and whether the
+// server has a classical one for clients without ML-DSA could not be told.
+const (
+	NotEvalPQCertificate         = "pq_certificate"
+	NotEvalPQCertificateFallback = "pq_certificate_fallback"
+)
 
 // notEvaluated is the list for intensity basic (unchanged since milestone 2.1).
 var notEvaluated = []string{

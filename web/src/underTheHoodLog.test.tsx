@@ -11,6 +11,7 @@ import fizsarEs from './test/lab/fizsar.es.json'
 import labEn from './test/lab/export.en.json'
 import labEs from './test/lab/export.es.json'
 import fizsarV2 from './test/v2/fizsar.result.json'
+import mldsaOnlyV2 from './test/v2/mldsa-only.result.json'
 import tls12V2 from './test/v2/tls12.result.json'
 import { expandOffer, groupName, isGrease, offeredVersions, signatureName, versionName, type ProbeLog, type ScanResult } from './underTheHood'
 
@@ -132,5 +133,44 @@ describe('names', () => {
     expect(versionName(0x0002)).toBe('SSLv2')
     expect(offeredVersions({ legacy_version: 0x0303, supported_versions: [0x7a7a, 0x0304, 0x0303] })).toEqual([0x0304, 0x0303])
     expect(offeredVersions({ legacy_version: 0x0300 })).toEqual([0x0300])
+  })
+})
+
+// Milestone 2.8.5: the lab's mldsa-only server (OpenSSL 3.5, an ML-DSA-65
+// certificate and no classical one), as the scanner saw it.
+describe('Under the hood: certificates by offer and the details 2.8.5 adds', () => {
+  const panel = async (scan: ScanView) => {
+    const { items } = await probeList(scan, 'es')
+    return { items, region: screen.getByRole('region', { name: 'Bajo el capó' }) }
+  }
+
+  it('says which certificate the server presents with and without ML-DSA', async () => {
+    const { items, region } = await panel(withResult(fizsarEs, mldsaOnlyV2))
+    const certs = within(region).getByRole('region', { name: 'Certificado según la oferta' })
+    expect(certs.textContent).toContain('Ofreciendo firmas ML-DSA, como Chrome: ML-DSA-65 (post-cuántico; OID 2.16.840.1.101.3.4.3.18)')
+    expect(certs.textContent).toContain('Sin firmas ML-DSA, como Firefox o un cliente antiguo: el servidor rechazó la conexión')
+    expect(items[0].textContent).toContain('certificado ML-DSA-65')
+    const probe = items.find((li) => li.textContent?.includes('Certificado sin ML-DSA'))!
+    expect(probe.textContent).toContain('Alerta 40 handshake_failure')
+    expect(probe.textContent).toContain('(fatal)')
+    expect(probe.textContent).toContain('alert:40')
+  })
+
+  it('an alert whose level is not known says so; a second ClientHello is shown', async () => {
+    const r = structuredClone(fizsarV2) as unknown as ScanResult
+    const log = r.probe_log!
+    log.probes[0].response = { type: 'server_hello', version: 0x0304, alert: { code: 116, name: 'certificate_required', encrypted: true } }
+    log.offers.push({ legacy_version: 0x0303, supported_versions: [0x0304], suites: [0x1301], groups: [0x001d, 0x0017], key_shares: [0x0017] })
+    log.probes[1].response = { type: 'hello_retry_request', retry_group: 0x0017, retry_group_name: 'secp256r1', version: 0x0304 }
+    log.probes[1].retry_offer = log.offers.length - 1
+    const { items } = await panel(withResult(fizsarEs, r))
+    expect(items[0].textContent).toContain('Alerta 116 certificate_required (nivel desconocido: alerta cifrada)')
+    expect(items[1].textContent).toContain('segundo ClientHello con key share secp256r1')
+    expect(within(items[1]).getByText('Segundo ClientHello (tras el HelloRetryRequest)')).toBeTruthy()
+  })
+
+  it('scans from before show no certificate section', async () => {
+    const { region } = await panel(withResult(fizsarEs, fizsarV2))
+    expect(within(region).queryByRole('region', { name: 'Certificado según la oferta' })).toBeNull()
   })
 })

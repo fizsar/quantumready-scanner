@@ -93,6 +93,8 @@ type ServerHello struct {
 	HelloRetry bool
 	// KeyShareGroup is the TLS 1.3 key_share group (or the HRR selected_group).
 	KeyShareGroup uint16
+	// KeyShareData is the server's key share (TLS 1.3 ServerHello).
+	KeyShareData []byte
 	// DowngradeSentinel is set when a TLS 1.3 server negotiated a lower
 	// version and said so in Random (RFC 8446, section 4.1.3).
 	DowngradeSentinel bool
@@ -156,6 +158,7 @@ func ParseServerHello(body []byte) (*ServerHello, error) {
 					if !data.ReadUint16LengthPrefixed(&key) || key.Empty() {
 						return nil, malformed("bad key_share")
 					}
+					sh.KeyShareData = slices.Clone([]byte(key))
 				}
 				if !data.Empty() {
 					return nil, malformed("bad key_share")

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -165,15 +166,19 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	}
 
 	var (
-		mu    sync.Mutex
-		certs = base.certs
-		state = base.state
+		mu       sync.Mutex
+		certs    = base.certs
+		state    = base.state
+		rawCerts = base.raw
 	)
 	keep := func(p probe) { // first certificate chain seen, in case the default handshake failed
 		mu.Lock()
 		defer mu.Unlock()
 		if len(certs) == 0 && len(p.certs) > 0 {
 			certs, state = p.certs, p.state
+		}
+		if len(rawCerts) == 0 && len(p.raw) > 0 {
+			rawCerts = p.raw
 		}
 	}
 
@@ -218,8 +223,18 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	})
 	_ = g.Wait()
 	res.LegacySuitesComplete = legacy10 && legacy11
+	// Every crypto/tls probe offers ML-DSA signatures (Go 1.27 does, as
+	// Chrome): the certificate seen is the one such a client gets. The raw
+	// probes add the one a client without them gets.
+	res.CertificateSelection = &CertificateSelection{WithMLDSA: presented(rawCerts)}
 	if s.opts.Intensity == IntensityFull {
 		s.runRaw(ctx, t, res)
+	}
+	switch sel := res.CertificateSelection; {
+	case sel.WithMLDSA == nil:
+		res.NotEvaluated = append(slices.Clone(res.NotEvaluated), NotEvalPQCertificate)
+	case sel.WithMLDSA.PostQuantum && sel.WithoutStatus != Supported && sel.WithoutStatus != NotSupported:
+		res.NotEvaluated = append(slices.Clone(res.NotEvaluated), NotEvalPQCertificateFallback)
 	}
 
 	if len(certs) > 0 {

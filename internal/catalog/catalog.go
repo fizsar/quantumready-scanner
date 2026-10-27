@@ -365,11 +365,25 @@ var findingTexts = map[string]langTexts{
 	},
 	"CERT_CLASSICAL_SIGNATURE": {
 		"es": {Title: "Firma clásica ({key}): riesgo cuántico futuro",
-			Detail:      "La identidad del servidor se demuestra con {key}, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. Hoy no hay certificados post-cuánticos (ML-DSA) en la web pública. No afecta a la nota.",
+			Detail:      "La identidad del servidor se demuestra con {key}, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes.{pq_selection} No afecta a la nota.",
 			Remediation: "Nada que hacer todavía en la firma. {renewal_advice}"},
 		"en": {Title: "Classical signature ({key}): future quantum risk",
-			Detail:      "The server proves its identity with {key}, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before. There are no post-quantum (ML-DSA) certificates on the public web yet. It does not affect the grade.",
+			Detail:      "The server proves its identity with {key}, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before.{pq_selection} It does not affect the grade.",
 			Remediation: "Nothing to do on the signature yet. {renewal_advice}"},
+	},
+	"CERT_PQ_SIGNATURE": {
+		"es": {Title: "Certificado post-cuántico ({algorithm})",
+			Detail: "Al ofrecerle firmas ML-DSA, como hace Chrome, el servidor presentó un certificado {algorithm}: demuestra su identidad con un algoritmo de firma post-cuántico, diseñado para resistir a un ordenador cuántico. Es informativo: en el modelo 2026.2 no cambia la nota."},
+		"en": {Title: "Post-quantum certificate ({algorithm})",
+			Detail: "Offered ML-DSA signatures, as Chrome does, the server presented a {algorithm} certificate: it proves its identity with a post-quantum signature algorithm, designed to resist a quantum computer. Informational: in model 2026.2 it does not change the grade."},
+	},
+	"CERT_PQ_NO_CLASSICAL_FALLBACK": {
+		"es": {Title: "Solo certificado post-cuántico: sin respaldo clásico",
+			Detail:      "Con una oferta sin firmas ML-DSA, como la de Firefox o la de un cliente antiguo, el servidor no presentó un certificado clásico: rechazó la conexión o volvió a presentar el {algorithm}. Los clientes que no aceptan ML-DSA no pueden conectarse. No debilita el cifrado, pero deja fuera a esos visitantes.",
+			Remediation: "Configura también un certificado clásico (ECDSA o RSA) junto al {algorithm}: el servidor elegirá en cada conexión según las firmas que ofrezca el cliente (en OpenSSL, un segundo par de certificado y clave; en nginx, dos directivas ssl_certificate)."},
+		"en": {Title: "Post-quantum certificate only: no classical fallback",
+			Detail:      "To an offer without ML-DSA signatures, such as Firefox's or an older client's, the server did not present a classical certificate: it refused the connection or presented the {algorithm} one again. Clients that do not accept ML-DSA cannot connect. It does not weaken encryption, but it locks those visitors out.",
+			Remediation: "Also configure a classical certificate (ECDSA or RSA) beside the {algorithm} one: the server will choose on each connection from the signatures the client offers (in OpenSSL, a second certificate and key pair; in nginx, two ssl_certificate directives)."},
 	},
 	"CERT_AUTOMATED_SHORT": {
 		"es": {Title: "Certificado de vida corta ({days} días)", Detail: "Una validez tan corta solo es viable con renovación automatizada, que es lo que permitirá cambiar a certificados post-cuánticos sin esfuerzo."},
@@ -439,6 +453,8 @@ var labels = map[string]map[string]string{
 	"noteval.non_standard_pqc_groups":                    {"es": "Grupos post-cuánticos no estándar", "en": "Non-standard post-quantum groups"},
 	"noteval.credential_suites":                          {"es": "Suites PSK, SRP, Kerberos y GOST (requieren credenciales o algoritmos que un escáner no tiene)", "en": "PSK, SRP, Kerberos and GOST suites (they need credentials or algorithms a scanner does not have)"},
 	"noteval.implementation_vulnerabilities":             {"es": "Vulnerabilidades de implementación (Heartbleed, ROBOT…)", "en": "Implementation vulnerabilities (Heartbleed, ROBOT…)"},
+	"noteval.pq_certificate":                             {"es": "Certificado post-cuántico (no se vio ningún certificado)", "en": "Post-quantum certificate (no certificate was seen)"},
+	"noteval.pq_certificate_fallback":                    {"es": "Certificado clásico de respaldo para clientes sin ML-DSA", "en": "Classical fallback certificate for clients without ML-DSA"},
 }
 
 // Codes returns every finding code the catalog has texts for, sorted.

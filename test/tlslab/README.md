@@ -46,6 +46,8 @@ make tlslab-scan ARGS="-facts tls13"   # cmd/qrscan -lab dentro del laboratorio
 | `tls12` | OpenSSL 3.5.9 | solo TLS 1.2 | Camellia, ARIA, CCM, CCM_8; DHE de 2048 bits; ECDHE con brainpoolP256r1 y secp256r1 |
 | `modern` | OpenSSL 3.5.9 | TLS 1.2 y 1.3 | El caso típico de hoy: bien configurado y sin PQC. Solo ECDHE con AEAD (AES-GCM, ChaCha20-Poly1305) y las 3 suites AEAD de TLS 1.3; grupos x25519 y secp256r1, ningún grupo post-cuántico ni híbrido |
 | `kyber` | Go 1.23.12 | solo TLS 1.3 | PQC solo en borrador (`X25519Kyber768Draft00`, 0x6399) más x25519; sin ML-KEM estándar |
+| `mldsa-dual` | OpenSSL 3.5.9 | TLS 1.2 y 1.3 | Certificado ML-DSA-65 y certificado ECDSA P-256: presenta uno u otro según las firmas que ofrezca el cliente (hito 2.8.5) |
+| `mldsa-only` | OpenSSL 3.5.9 | solo TLS 1.3 | Solo certificado ML-DSA-65, sin respaldo clásico: rechaza a los clientes que no ofrecen ML-DSA (hito 2.8.5) |
 
 `reference/` guarda la salida de testssl.sh (JSON y texto) de cada servidor: es la referencia para la comparación del hito 2.7.3.
 

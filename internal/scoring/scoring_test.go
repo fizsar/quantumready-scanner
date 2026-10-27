@@ -517,6 +517,7 @@ func TestCatalog(t *testing.T) {
 		}),
 		apply(func(r *scanner.Result) { r.Certificate.SCTsEmbedded = 0 }),
 		apply(func(r *scanner.Result) { r.Certificate = nil }),
+		pqCertificate(scanner.NotSupported, nil), // CERT_PQ_SIGNATURE, CERT_PQ_NO_CLASSICAL_FALLBACK (pqcert_test.go)
 	}
 	inputs := extra
 	for _, r := range labResults(t) { // model 2026.2: raw probe findings

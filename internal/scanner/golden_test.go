@@ -55,7 +55,7 @@ func goldenNormalize(t *testing.T, r *Result, dropNew bool) map[string]any {
 var newOptionalFields = []string{"intensity", "connections", "raw"}
 
 // schema2Keys are the keys schema 2 (milestone 2.8.4) adds, at any depth.
-var schema2Keys = []string{"probe_log", "error_code", "trust_error_code", "signature_oid", "public_key_oid"}
+var schema2Keys = []string{"probe_log", "error_code", "trust_error_code", "signature_oid", "public_key_oid", "certificate_selection"}
 
 func dropKeys(v any, keys []string) {
 	switch x := v.(type) {

@@ -80,6 +80,13 @@ export interface ScanResult {
   }
   /** Schema 2 (milestone 2.8.4): every connection as it went on the wire. */
   probe_log?: ProbeLog
+  /** Milestone 2.8.5: the certificate presented with and without ML-DSA in the offer. */
+  certificate_selection?: {
+    with_mldsa?: PresentedCert
+    without_mldsa?: PresentedCert
+    without_status?: ProbeStatus
+    without_error_code?: string
+  }
 }
 
 /** A ClientHello as sent (internal/scanner/probelog.go, Offer). */
@@ -113,6 +120,20 @@ export interface LogResponse {
   dh_bits?: number
   sslv2_ciphers?: number
   alert?: { level?: number; code: number; name: string; encrypted?: boolean }
+  // Milestone 2.8.5: the leaf the server presented, and its CertificateVerify scheme.
+  certificate?: PresentedCert
+  handshake_signature?: number
+}
+
+/** A certificate as presented, by its OIDs (internal/scanner/result.go). */
+export interface PresentedCert {
+  key_algorithm?: string
+  key_oid: string
+  signature_algorithm?: string
+  signature_oid: string
+  sha256: string
+  post_quantum: boolean
+  post_quantum_chain?: boolean
 }
 
 export interface LogProbe {
@@ -120,6 +141,7 @@ export interface LogProbe {
   purpose: string
   subject?: string
   offer?: number
+  retry_offer?: number // the second ClientHello, after a HelloRetryRequest
   response: LogResponse
   status: ProbeStatus
   error?: string

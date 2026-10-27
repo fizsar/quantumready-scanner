@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // clientHelloWant is a testdata/clienthello/*.want.json file: the lists of a
@@ -337,4 +338,53 @@ func FuzzParseServerFlight(f *testing.F) {
 			t.Fatal("key exchange without a TLS 1.0–1.2 ServerHello")
 		}
 	})
+}
+
+// After a HelloRetryRequest the client sends a second ClientHello in clear:
+// both are read, with the key share the server asked for in the second.
+func TestParseClientHellosAfterRetry(t *testing.T) {
+	// Over TCP: on a synchronous net.Pipe both ends would write their
+	// ChangeCipherSpec at once after the HelloRetryRequest and block.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		c, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		_ = tls.Server(c, &tls.Config{Certificates: []tls.Certificate{testCert(t)}, CurvePreferences: []tls.CurveID{tls.CurveP256}}).Handshake()
+	}()
+	conn, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+	rec := &recorder{Conn: conn}
+	if err := tls.Client(rec, &tls.Config{ServerName: "rawtls.test", InsecureSkipVerify: true,
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256}}).Handshake(); err != nil {
+		t.Fatal(err)
+	}
+	chs, err := ParseClientHellos(rec.out.Bytes())
+	if err != nil || len(chs) != 2 {
+		t.Fatalf("%d hellos, %v", len(chs), err)
+	}
+	if !slices.Equal(chs[0].KeyShares, []uint16{x25519}) || !slices.Equal(chs[1].KeyShares, []uint16{secp256r1}) ||
+		!slices.Equal(chs[0].Suites, chs[1].Suites) {
+		t.Errorf("first %+v\nsecond %+v", chs[0], chs[1])
+	}
+	// Without a retry, one; a TLS 1.2 handshake goes on with a ClientKeyExchange, not a hello.
+	conn12, _ := tlsServer(t, &tls.Config{MaxVersion: tls.VersionTLS12})
+	rec12 := &recorder{Conn: conn12}
+	_ = tls.Client(rec12, &tls.Config{ServerName: "rawtls.test", InsecureSkipVerify: true}).Handshake()
+	if chs, err := ParseClientHellos(rec12.out.Bytes()); err != nil || len(chs) != 1 {
+		t.Errorf("TLS 1.2: %d hellos, %v", len(chs), err)
+	}
+	if _, err := ParseClientHellos([]byte("GET /")); err == nil {
+		t.Error("not TLS, parsed")
+	}
 }

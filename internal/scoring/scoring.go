@@ -460,8 +460,10 @@ func (e *evaluator) certificate() {
 		}
 	}
 
+	// A post-quantum key (ML-DSA, SLH-DSA; milestone 2.8.5) is a sound key:
+	// it gets the key points, as ECDSA does, and nothing more in 2026.2.
 	keyOK := (c.KeyAlgorithm == "RSA" && c.KeySize >= 2048) ||
-		(c.KeyAlgorithm == "ECDSA" && c.KeySize >= 256) || c.KeyAlgorithm == "Ed25519"
+		(c.KeyAlgorithm == "ECDSA" && c.KeySize >= 256) || c.KeyAlgorithm == "Ed25519" || postQuantumKey(c)
 	if !keyOK && (c.KeyAlgorithm == "RSA" || c.KeyAlgorithm == "ECDSA") {
 		e.add("CERT_WEAK_KEY", AxisCurrent, High, CatCertificate, map[string]string{"key": keyLabel(c)})
 		e.capAt("C", "CERT_WEAK_KEY")
@@ -476,8 +478,28 @@ func (e *evaluator) certificate() {
 	// Future quantum risk: every WebPKI signature today is classical. Not
 	// harvest-now-decrypt-later (a signature only has to hold during the
 	// handshake), so it never costs points.
+	sel := e.r.CertificateSelection
 	if c.KeyAlgorithm == "RSA" || c.KeyAlgorithm == "ECDSA" || c.KeyAlgorithm == "Ed25519" {
-		e.add("CERT_CLASSICAL_SIGNATURE", AxisQuantum, Low, CatCertificate, map[string]string{"key": keyLabel(c)})
+		params := map[string]string{"key": keyLabel(c)}
+		if sel != nil && sel.WithMLDSA != nil && !sel.WithMLDSA.PostQuantum {
+			params["pq_offered"] = "1" // offered ML-DSA, as Chrome does, it chose this one
+		}
+		e.add("CERT_CLASSICAL_SIGNATURE", AxisQuantum, Low, CatCertificate, params)
+	}
+
+	// Post-quantum certificate (milestone 2.8.5): informational in 2026.2.
+	// Without a classical one for clients that do not offer ML-DSA, those
+	// clients cannot connect: an availability problem today, not a
+	// confidentiality one (medium, no cap).
+	if sel != nil && sel.WithMLDSA != nil && sel.WithMLDSA.PostQuantum {
+		alg := sel.WithMLDSA.KeyAlgorithm
+		if alg == "" {
+			alg = sel.WithMLDSA.KeyOID
+		}
+		e.add("CERT_PQ_SIGNATURE", AxisQuantum, Info, CatCertificate, map[string]string{"algorithm": alg})
+		if sel.WithoutStatus == scanner.NotSupported || sel.WithoutMLDSA != nil && sel.WithoutMLDSA.PostQuantum {
+			e.add("CERT_PQ_NO_CLASSICAL_FALLBACK", AxisCurrent, Medium, CatCertificate, map[string]string{"algorithm": alg})
+		}
 	}
 
 	automated, reason := automation(c)
@@ -824,8 +846,21 @@ func issuerName(c *scanner.Certificate) string {
 }
 
 func keyLabel(c *scanner.Certificate) string {
+	if c.KeySize == 0 { // post-quantum keys: the name says it all
+		return c.KeyAlgorithm
+	}
 	if c.Curve != "" {
 		return c.KeyAlgorithm + " " + c.Curve
 	}
 	return c.KeyAlgorithm + "-" + strconv.Itoa(c.KeySize)
+}
+
+// postQuantumKey reports whether the leaf's key is ML-DSA or SLH-DSA, by its
+// OID (schema 2).
+func postQuantumKey(c *scanner.Certificate) bool {
+	if len(c.Chain) == 0 {
+		return false
+	}
+	_, ok := scanner.PostQuantumOID(c.Chain[0].PublicKeyOID)
+	return ok
 }

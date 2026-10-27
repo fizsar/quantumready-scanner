@@ -57,6 +57,44 @@ func ParseClientHello(b []byte) (*ClientHelloInfo, error) {
 	return parseClientHelloBody(body)
 }
 
+// ParseClientHellos parses every ClientHello the client sent in clear: the
+// first, and after a HelloRetryRequest the second (TLS 1.3 sends it in
+// clear too, after an optional ChangeCipherSpec). It stops at the first
+// other message or where encryption starts, and returns what it read with
+// the error that stopped it, if the first one does not parse.
+func ParseClientHellos(b []byte) ([]*ClientHelloInfo, error) {
+	if len(b) >= 2 && b[0]&0x80 != 0 {
+		ch, err := ParseSSLv2ClientHello(b)
+		if err != nil {
+			return nil, err
+		}
+		return []*ClientHelloInfo{ch}, nil
+	}
+	rr := newRecordReader(bytes.NewReader(b), len(b)+5+maxRecord)
+	rr.observe = true
+	var out []*ClientHelloInfo
+	for {
+		typ, body, alert, err := rr.next()
+		if err != nil || alert != nil || typ != typeClientHello {
+			if len(out) == 0 {
+				if err == nil {
+					err = malformed("no ClientHello")
+				}
+				return nil, err
+			}
+			return out, nil
+		}
+		ch, err := parseClientHelloBody(body)
+		if err != nil {
+			if len(out) == 0 {
+				return nil, err
+			}
+			return out, nil
+		}
+		out = append(out, ch)
+	}
+}
+
 func parseClientHelloBody(body []byte) (*ClientHelloInfo, error) {
 	s := cryptobyte.String(body)
 	ch := &ClientHelloInfo{}

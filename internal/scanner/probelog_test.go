@@ -155,7 +155,16 @@ func TestProbeLogHelloRetry(t *testing.T) {
 	pki := newTestPKI(t)
 	port := startTLS(t, &tls.Config{Certificates: []tls.Certificate{pki.leaf(t, leafOpts{})}, CurvePreferences: []tls.CurveID{tls.CurveP256}})
 	r := scan(t, newTestScanner(pki, Options{}), port)
-	resp := logged(r, PurposeDefault, "")[0].Response
+	p := logged(r, PurposeDefault, "")[0]
+	resp := p.Response
+	// The second ClientHello, as sent: the same offer with the key share asked for.
+	if p.RetryOffer == nil {
+		t.Fatal("no second ClientHello logged")
+	}
+	first, second := offerOfRecord(t, r, p), r.ProbeLog.Offers[*p.RetryOffer]
+	if !slices.Equal(second.KeyShares, []uint16{uint16(tls.CurveP256)}) || !slices.Equal(second.Groups, first.Groups) || slices.Equal(first.KeyShares, second.KeyShares) {
+		t.Errorf("first %+v\nsecond %+v", first, second)
+	}
 	if resp.Type != RespHelloRetryRequest || resp.RetryGroup != uint16(tls.CurveP256) || resp.RetryGroupName != "secp256r1" ||
 		resp.Version != tls.VersionTLS13 || resp.Group != uint16(tls.CurveP256) || resp.CipherSuiteName == "" {
 		t.Errorf("%+v", resp)

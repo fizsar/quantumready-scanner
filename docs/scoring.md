@@ -102,7 +102,8 @@ Pruebas: `internal/scoring/lab_test.go` puntúa el resultado real de los 10 serv
 
 - **Lo "no evaluado"** (lo que `crypto/tls` no puede comprobar: SSLv3, suites DHE…, ver `docs/scanner.md`) **nunca suma ni resta**: se muestra aparte. Un test lo verifica (`TestNotEvaluatedNeverAffectsTheScore`).
 - **Una sonda con error** (timeout, red) no cuenta como soportado ni como no soportado: no da puntos y genera `SCAN_PARTIAL` (y `KEX_HYBRID_UNKNOWN` si afecta al intercambio de claves).
-- **Informativos sin efecto en la nota**: firma clásica del certificado (`CERT_CLASSICAL_SIGNATURE`), AES-128 y Grover (`SYM_AES128`: NIST sigue considerando AES-128 adecuado), transparencia de certificados (`CERT_CT`, distingue SCT incrustados y entregados en el handshake).
+- **Certificados post-cuánticos (hito 2.8.5)**: el escáner pide el certificado ofreciendo firmas ML-DSA (como Chrome) y sin ellas (como Firefox o un cliente antiguo; ver docs/scanner.md). `CERT_PQ_SIGNATURE` (eje cuántico, informativo) dice que el servidor presenta un certificado ML-DSA o SLH-DSA cuando se le ofrece; en 2026.2 no suma: una clave ML-DSA o SLH-DSA cuenta en el criterio «clave» igual que una ECDSA, ni más ni menos. `CERT_PQ_NO_CLASSICAL_FALLBACK` (eje actual, **gravedad media**, sin tope) dice que, sin ML-DSA en la oferta, el servidor rechaza la conexión o vuelve a presentar el certificado post-cuántico: los clientes sin ML-DSA no pueden conectarse. Es media y no alta porque no debilita el cifrado ni la autenticación de quien sí conecta: es un problema de disponibilidad, pero deja fuera a una parte grande de los visitantes (en octubre de 2026, Firefox no ofrece ML-DSA). Si no se puede saber (intensidad básica, error de la sonda), queda como no evaluado (`pq_certificate_fallback`); si no se vio ningún certificado, `pq_certificate`.
+- **Informativos sin efecto en la nota**: firma clásica del certificado (`CERT_CLASSICAL_SIGNATURE`; desde el 2.8.5 dice si el servidor la eligió aunque se le ofreció ML-DSA), AES-128 y Grover (`SYM_AES128`: NIST sigue considerando AES-128 adecuado), transparencia de certificados (`CERT_CT`, distingue SCT incrustados y entregados en el handshake).
 
 ## Hallazgos
 
@@ -145,6 +146,8 @@ La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/catalog/refe
 | `CERT_WEAK_KEY` | [NIST SP 800-131A Rev. 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final) |
 | `CERT_WEAK_SIGNATURE` | [RFC 9155](https://www.rfc-editor.org/rfc/rfc9155); [NIST SP 800-131A Rev. 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final) |
 | `CERT_CLASSICAL_SIGNATURE` | [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final) (ML-DSA); [FIPS 205](https://csrc.nist.gov/pubs/fips/205/final) (SLH-DSA) |
+| `CERT_PQ_SIGNATURE` | [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final) (ML-DSA); [FIPS 205](https://csrc.nist.gov/pubs/fips/205/final) (SLH-DSA); [draft-ietf-tls-mldsa](https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/) (ML-DSA en TLS 1.3); [draft-ietf-lamps-dilithium-certificates](https://datatracker.ietf.org/doc/draft-ietf-lamps-dilithium-certificates/) (ML-DSA en X.509) |
+| `CERT_PQ_NO_CLASSICAL_FALLBACK` | [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) (4.4.2.2: el servidor elige el certificado según `signature_algorithms`); [draft-ietf-tls-mldsa](https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/) |
 | `CERT_CT`, `CERT_CT_MISSING` | [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) |
 | `CERT_AUTOMATED_ACME`, `CERT_NOT_AUTOMATED` | [RFC 8555](https://www.rfc-editor.org/rfc/rfc8555) (ACME) |
 | `CERT_AUTOMATED_SHORT` | [CA/Browser Forum, SC081v3](https://cabforum.org/2025/04/11/ballot-sc081v3-introduce-schedule-of-reducing-validity-and-data-reuse-periods/) (validez máxima de 47 días en 2029) |
@@ -177,6 +180,8 @@ La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/catalog/refe
 | RFC 10024 | Post-Quantum Traditional (PQ/T) Hybrid Key Agreement Mechanisms for TLS 1.3 | https://www.rfc-editor.org/rfc/rfc10024 |
 | draft-ietf-tls-mlkem | ML-KEM Post-Quantum Key Agreement for TLS 1.3 | https://datatracker.ietf.org/doc/draft-ietf-tls-mlkem/ |
 | draft-tls-westerbaan-xyber768d00 | X25519Kyber768Draft00 hybrid post-quantum key agreement | https://datatracker.ietf.org/doc/draft-tls-westerbaan-xyber768d00/ |
+| draft-ietf-tls-mldsa | Use of ML-DSA in TLS 1.3 | https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/ |
+| draft-ietf-lamps-dilithium-certificates | Internet X.509 Public Key Infrastructure -- Algorithm Identifiers for the Module-Lattice-Based Digital Signature Algorithm (ML-DSA) | https://datatracker.ietf.org/doc/draft-ietf-lamps-dilithium-certificates/ |
 | CVE-2013-0169 | Lucky Thirteen: CBC padding timing attack in TLS/DTLS | https://nvd.nist.gov/vuln/detail/CVE-2013-0169 |
 | CVE-2014-3566 | POODLE: SSL 3.0 CBC padding oracle | https://nvd.nist.gov/vuln/detail/CVE-2014-3566 |
 | CVE-2015-0204 | FREAK: RSA EXPORT key downgrade | https://nvd.nist.gov/vuln/detail/CVE-2015-0204 |

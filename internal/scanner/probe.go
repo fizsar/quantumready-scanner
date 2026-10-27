@@ -19,6 +19,7 @@ type probe struct {
 	status Status
 	state  *tls.ConnectionState // nil unless Supported
 	certs  []*x509.Certificate  // captured even if the handshake fails later
+	raw    [][]byte             // the same, as sent (DER), also any crypto/x509 cannot parse
 	err    error
 }
 
@@ -71,14 +72,16 @@ func (s *Scanner) handshake(ctx context.Context, t target, cfg *tls.Config, tag 
 	rc := &recordingConn{Conn: conn}
 
 	var certs []*x509.Certificate
+	var raw [][]byte
 	cfg = cfg.Clone()
 	cfg.ServerName = t.sni
 	cfg.InsecureSkipVerify = true
 	// Every probe must be a full handshake: no session resumption.
 	cfg.SessionTicketsDisabled = true
 	cfg.ClientSessionCache = nil
-	cfg.VerifyPeerCertificate = func(raw [][]byte, _ [][]*x509.Certificate) error {
-		for _, der := range raw {
+	cfg.VerifyPeerCertificate = func(chain [][]byte, _ [][]*x509.Certificate) error {
+		raw = chain
+		for _, der := range chain {
 			c, err := x509.ParseCertificate(der)
 			if err != nil {
 				break // crypto/tls has already parsed them; keep what we have
@@ -91,17 +94,23 @@ func (s *Scanner) handshake(ctx context.Context, t target, cfg *tls.Config, tag 
 	tc := tls.Client(rc, cfg)
 	var p probe
 	if err := tc.HandshakeContext(ctx); err != nil {
-		p = probe{status: classify(err), certs: certs, err: err}
+		p = probe{status: classify(err), certs: certs, raw: raw, err: err}
 	} else {
 		st := tc.ConnectionState()
-		p = probe{status: Supported, state: &st, certs: certs}
+		p = probe{status: Supported, state: &st, certs: certs, raw: raw}
 		if check != nil {
 			if err := check(&st); err != nil {
 				p.status, p.err = NotSupported, err
 			}
 		}
 	}
-	t.log.add(clientCryptoTLS, tag, start, rc, p.status, p.err, nil)
+	var resp *ProbeResponse
+	if tag.purpose == PurposeDefault && len(raw) > 0 { // the certificate a client offering ML-DSA gets
+		r := responseOf(rc.out, rc.in, p.err)
+		r.Certificate = presented(raw)
+		resp = &r
+	}
+	t.log.add(clientCryptoTLS, tag, start, rc, p.status, p.err, resp)
 	return p
 }
 

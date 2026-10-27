@@ -31,6 +31,7 @@ type rawScan struct {
 
 	mu  sync.Mutex
 	res RawResult
+	sel *CertificateSelection // the scan's, filled by certificateWithoutMLDSA
 }
 
 // rawOutcome is one raw probe, classified like the crypto/tls probes.
@@ -127,7 +128,7 @@ func classifyRaw(resp *rawtls.Response, err error) rawOutcome {
 // runRaw runs every raw probe after the crypto/tls ones (it needs their
 // results) and fills res.Raw.
 func (s *Scanner) runRaw(ctx context.Context, t target, res *Result) {
-	rs := &rawScan{s: s, t: t, budget: int32(min(s.opts.RawProbeBudget, 1<<20))} //nolint:gosec // bounded
+	rs := &rawScan{s: s, t: t, budget: int32(min(s.opts.RawProbeBudget, 1<<20)), sel: res.CertificateSelection} //nolint:gosec // bounded
 	found := goFound(res)
 
 	var g errgroup.Group
@@ -148,6 +149,7 @@ func (s *Scanner) runRaw(ctx context.Context, t target, res *Result) {
 		return nil
 	})
 	g.Go(func() error { rs.tls13Suites(ctx); return nil })
+	g.Go(func() error { rs.certificateWithoutMLDSA(ctx, res); return nil })
 	_ = g.Wait()
 
 	// Groups need to know whether TLS 1.3 / ECDHE is there at all.
@@ -571,4 +573,97 @@ func (rs *rawScan) setTLS12Curves(found []RawGroup, explicit, complete bool) {
 	rs.mu.Lock()
 	rs.res.TLS12Curves, rs.res.ExplicitCurve, rs.res.TLS12CurvesComplete = found, explicit, complete
 	rs.mu.Unlock()
+}
+
+// FirefoxSignatureSchemes is the signature_algorithms list of Firefox 157
+// (captured on 26/10/2026, rawtls/testdata/clienthello): no ML-DSA.
+var FirefoxSignatureSchemes = []uint16{0x0403, 0x0503, 0x0603, 0x0804, 0x0805, 0x0806, 0x0401, 0x0501, 0x0601, 0x0203, 0x0201}
+
+// certificateProbeGroup is the group of the certificate probe's one key
+// share: the one the browser-like offer got in TLS 1.3, or another group the
+// server accepted, so that no HelloRetryRequest is needed.
+func certificateProbeGroup(res *Result) (uint16, bool) {
+	if id := res.Default.GroupID; id != 0 && res.Default.Version == "TLS 1.3" && rawtls.KeyShareSupported(id) {
+		return id, true
+	}
+	for _, g := range res.KeyExchange.Groups {
+		if g.Status == Supported && rawtls.KeyShareSupported(g.ID) {
+			return g.ID, true
+		}
+	}
+	return 0, false
+}
+
+// certificateWithoutMLDSA asks, in TLS 1.3 (the only version with ML-DSA),
+// with the browser-like groups and Firefox's signature schemes, which
+// certificate the server presents to a client without ML-DSA. The server
+// refuses (alert, closed connection) only when it has no certificate it can
+// use with those schemes.
+func (rs *rawScan) certificateWithoutMLDSA(ctx context.Context, res *Result) {
+	if versionStatusOf(res, tls.VersionTLS13) != Supported {
+		return
+	}
+	tag := probeTag{PurposeCertificate, "without ML-DSA"}
+	group, ok := certificateProbeGroup(res)
+	if !ok {
+		err := &outcomeError{"no_key_share", "no accepted group the probe can make a key share for"}
+		rs.t.log.add(clientRaw, tag, time.Now(), nil, ProbeFailed, err, &ProbeResponse{Type: RespNotSent})
+		rs.setCertificateWithout(nil, ProbeFailed, err)
+		return
+	}
+	groups := uint16s(BrowserGroups)
+	if !slices.Contains(groups, group) {
+		groups = append(groups, group)
+	}
+	var f *rawtls.CertificateFlight
+	rc, start, err := rs.exchange(ctx, func(c net.Conn) error {
+		var err error
+		f, err = rawtls.ExchangeCertificate(c, rawtls.CertificateProbe{ServerName: rs.t.sni, Suites: []uint16{0x1301, 0x1303, 0x1302},
+			Groups: groups, KeyShareGroup: group, SignatureSchemes: FirefoxSignatureSchemes})
+		return err
+	})
+	status := ProbeFailed
+	var cert *PresentedCert
+	switch {
+	case err == nil && f != nil && len(f.Chain) > 0:
+		status, cert = Supported, presented(f.Chain)
+	case f != nil && f.Alert != nil:
+		status, err = NotSupported, &alertError{*f.Alert}
+	case errors.Is(err, io.EOF), errors.Is(err, syscall.ECONNRESET):
+		status = NotSupported
+	case err == nil:
+		err = &outcomeError{"no_certificate", "the server sent no certificate"}
+	}
+	var resp *ProbeResponse
+	if rc != nil {
+		r := responseOf(rc.out, rc.in, err)
+		r.Certificate = cert
+		if f != nil {
+			r.HandshakeSignature = f.SignatureScheme
+			if f.Alert != nil && f.Encrypted { // decrypted: its level is known
+				r.Alert = &ProbeAlert{Level: f.Alert.Level, Code: f.Alert.Description, Name: f.Alert.String(), Encrypted: true}
+			}
+		}
+		resp = &r
+	}
+	rs.t.log.add(clientRaw, tag, start, rc, status, err, resp)
+	rs.setCertificateWithout(cert, status, err)
+}
+
+func (rs *rawScan) setCertificateWithout(cert *PresentedCert, status Status, err error) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	sel := rs.sel
+	if sel == nil {
+		return
+	}
+	sel.WithoutMLDSA, sel.WithoutStatus, sel.WithoutError, sel.WithoutErrorCode = cert, status, errText(err), errorCode(err)
+}
+
+func uint16s(ids []tls.CurveID) []uint16 {
+	out := make([]uint16, len(ids))
+	for i, id := range ids {
+		out[i] = uint16(id)
+	}
+	return out
 }

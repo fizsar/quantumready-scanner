@@ -78,8 +78,11 @@ type ProbeRecord struct {
 	Purpose string `json:"purpose"`
 	Subject string `json:"subject,omitempty"`
 	// Offer indexes ProbeLog.Offers; absent when nothing was sent.
-	Offer    *int          `json:"offer,omitempty"`
-	Response ProbeResponse `json:"response"`
+	Offer *int `json:"offer,omitempty"`
+	// RetryOffer indexes the second ClientHello, sent after a
+	// HelloRetryRequest (with the key share the server asked for).
+	RetryOffer *int          `json:"retry_offer,omitempty"`
+	Response   ProbeResponse `json:"response"`
 	// Status is the probe's verdict for its purpose, as in the rest of the
 	// result; Error is the library's text (evidence only) and ErrorCode its
 	// stable code.
@@ -124,6 +127,12 @@ type ProbeResponse struct {
 	// SSLv2Ciphers is how many cipher kinds an SSLv2 SERVER-HELLO listed.
 	SSLv2Ciphers int         `json:"sslv2_ciphers,omitempty"`
 	Alert        *ProbeAlert `json:"alert,omitempty"`
+	// Certificate is the leaf the server presented (milestone 2.8.5: the
+	// browser-like probe and the certificate probe), and HandshakeSignature
+	// the SignatureScheme of its CertificateVerify, when the probe read it
+	// (the certificate probe decrypts it; crypto/tls does not report it).
+	Certificate        *PresentedCert `json:"certificate,omitempty"`
+	HandshakeSignature uint16         `json:"handshake_signature,omitempty"`
 }
 
 // ProbeAlert is an alert from the server.
@@ -147,6 +156,7 @@ const (
 	PurposeTLS13Suites = "tls13_suites" // raw
 	PurposeTLS13Groups = "tls13_groups" // raw, through HelloRetryRequest
 	PurposeTLS12Curves = "tls12_curves" // raw, through ServerKeyExchange (Subject: version)
+	PurposeCertificate = "certificate"  // raw TLS 1.3, decrypted: the certificate without ML-DSA (Subject)
 )
 
 const (
@@ -208,7 +218,7 @@ func (l *probeLog) add(client string, tag probeTag, start time.Time, rc *recordi
 		Status: status, Error: errText(err), ErrorCode: errorCode(err),
 		DurationMS: end.Sub(start).Milliseconds(), at: start,
 	}
-	var offer *Offer
+	var offers []*Offer
 	switch {
 	case resp != nil:
 		rec.Response = *resp
@@ -220,23 +230,33 @@ func (l *probeLog) add(client string, tag probeTag, start time.Time, rc *recordi
 		rec.Response = responseOf(rc.out, rc.in, err)
 	}
 	if rc != nil && len(rc.out) > 0 {
-		if ch, perr := rawtls.ParseClientHello(rc.out); perr == nil {
-			offer = offerOf(ch)
+		if chs, perr := rawtls.ParseClientHellos(rc.out); perr == nil {
+			for _, ch := range chs[:min(len(chs), 2)] {
+				offers = append(offers, offerOf(ch))
+			}
 		}
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if offer != nil {
-		key, _ := json.Marshal(offer)
-		i, ok := l.index[string(key)]
-		if !ok {
-			i = len(l.offers)
-			l.offers = append(l.offers, *offer)
-			l.index[string(key)] = i
-		}
-		rec.Offer = &i
+	if len(offers) > 0 {
+		rec.Offer = l.intern(offers[0])
+	}
+	if len(offers) > 1 {
+		rec.RetryOffer = l.intern(offers[1])
 	}
 	l.probes = append(l.probes, rec)
+}
+
+// intern returns the index of o in l.offers, adding it if new. l.mu is held.
+func (l *probeLog) intern(o *Offer) *int {
+	key, _ := json.Marshal(o)
+	i, ok := l.index[string(key)]
+	if !ok {
+		i = len(l.offers)
+		l.offers = append(l.offers, *o)
+		l.index[string(key)] = i
+	}
+	return &i
 }
 
 // result is the log in start order, offers numbered in order of first use.
@@ -273,6 +293,16 @@ func (l *probeLog) result() *ProbeLog {
 		}
 		p.Offer = &n
 		previous[enum] = old
+		if p.RetryOffer != nil { // in full: it differs from the first in its key share
+			old := *p.RetryOffer
+			r, seen := renumbered[old]
+			if !seen {
+				r = len(offers)
+				offers = append(offers, l.offers[old])
+				renumbered[old] = r
+			}
+			p.RetryOffer = &r
+		}
 	}
 	if probes == nil {
 		probes = []ProbeRecord{}

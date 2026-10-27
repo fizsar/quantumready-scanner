@@ -55,7 +55,10 @@ func tlsServer(t testing.TB, cfg *tls.Config) (net.Conn, <-chan clientHelloInfo)
 	cfg = cfg.Clone()
 	cfg.Certificates = []tls.Certificate{testCert(t)}
 	cfg.GetConfigForClient = func(h *tls.ClientHelloInfo) (*tls.Config, error) {
-		seen <- clientHelloInfo{h.ServerName, h.SupportedVersions, h.CipherSuites, h.SupportedCurves, h.SignatureSchemes, h.Extensions}
+		select { // the first ClientHello (a HelloRetryRequest brings a second)
+		case seen <- clientHelloInfo{h.ServerName, h.SupportedVersions, h.CipherSuites, h.SupportedCurves, h.SignatureSchemes, h.Extensions}:
+		default:
+		}
 		return nil, nil
 	}
 	go func() {

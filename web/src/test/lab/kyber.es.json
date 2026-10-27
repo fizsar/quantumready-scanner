@@ -113,7 +113,7 @@
         "severity_label": "Bajo",
         "category": "certificate",
         "title": "Firma clásica (ECDSA P-256): riesgo cuántico futuro",
-        "detail": "La identidad del servidor se demuestra con ECDSA P-256, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. Hoy no hay certificados post-cuánticos (ML-DSA) en la web pública. No afecta a la nota.",
+        "detail": "La identidad del servidor se demuestra con ECDSA P-256, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. No afecta a la nota.",
         "remediation": "Nada que hacer todavía en la firma. Automatiza la renovación (ACME) para poder cambiar a certificados post-cuánticos (ML-DSA o híbridos) en cuanto las autoridades los emitan: hoy este certificado no da señales de renovarse solo."
       },
       {

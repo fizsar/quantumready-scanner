@@ -34,6 +34,9 @@ import (
 //	other_group            a group probe negotiated another group
 //	other_version          a version probe got another version
 //	no_hello_retry         a HelloRetryRequest was expected and did not come
+//	hello_retry            a HelloRetryRequest came where the probe cannot answer it
+//	no_key_share           the certificate probe has no key share for any accepted group
+//	no_certificate         the server sent no certificate
 //	malformed              the answer does not parse
 //	not_tls                the answer is not TLS
 //	read_limit             the server sent more than the read limit
@@ -84,6 +87,8 @@ func errorCode(err error) string {
 		return "malformed"
 	case errors.Is(err, rawtls.ErrLimit):
 		return "read_limit"
+	case errors.Is(err, rawtls.ErrRetry):
+		return "hello_retry"
 	}
 	msg := err.Error()
 	for _, m := range []struct{ text, code string }{

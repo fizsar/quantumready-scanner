@@ -20,6 +20,7 @@ import {
   versionsTried,
   type LogOffer,
   type LogProbe,
+  type PresentedCert,
   type Offer,
   type ProbeLog,
   type Reply,
@@ -89,6 +90,7 @@ export function UnderTheHood({ scan, anchor = 'under-the-hood', level = 1 }: { s
         />
         <Versions r={r} t={t} />
         <Groups r={r} t={t} />
+        {r.certificate_selection && <Certificates sel={r.certificate_selection} t={t} />}
         <Suites r={r} t={t} />
         {r.probe_log ? <LogProbes log={r.probe_log} t={t} /> : <Probes r={r} t={t} />}
       </div>
@@ -281,6 +283,7 @@ function LogProbes({ log, t }: { log: ProbeLog; t: T }) {
       <ol className="uth-probes uth-log">
         {log.probes.map((p, i) => {
           const offer = p.offer !== undefined ? expandOffer(log, p.offer) : undefined
+          const retry = p.retry_offer !== undefined ? expandOffer(log, p.retry_offer) : undefined
           return (
             <li key={i} className={`uth-probe reply-${logReplyKind(p)}`}>
               <span className="uth-src">{t(p.client === 'raw' ? 'uth.source.raw' : 'uth.source.cryptotls')}</span>
@@ -295,8 +298,15 @@ function LogProbes({ log, t }: { log: ProbeLog; t: T }) {
               <span className="uth-reply">
                 <span className="sr-only">{t('uth.col.reply')}: </span>
                 <LogReply p={p} t={t} />
+                {retry && (
+                  <span className="mono small">
+                    {' · '}
+                    {t('uth.log.retry', { list: (retry.key_shares ?? []).map(groupName).join(', ') || t('uth.none') })}
+                  </span>
+                )}
               </span>
-              {offer && <OfferDetails offer={offer} t={t} />}
+              {offer && <OfferDetails offer={offer} title={t('uth.offer.d.title')} t={t} />}
+              {retry && <OfferDetails offer={retry} title={t('uth.offer.d.retryTitle')} t={t} />}
             </li>
           )
         })}
@@ -322,7 +332,7 @@ function logReplyKind(p: LogProbe) {
   return 'other'
 }
 
-const PURPOSES = ['default', 'group', 'version', 'suites', 'sslv2', 'sslv3', 'tls13_suites', 'tls13_groups', 'tls12_curves'] as const
+const PURPOSES = ['default', 'group', 'version', 'suites', 'sslv2', 'sslv3', 'tls13_suites', 'tls13_groups', 'tls12_curves', 'certificate'] as const
 
 function purposeText(p: LogProbe, t: T) {
   const known = PURPOSES.find((k) => k === p.purpose)
@@ -353,6 +363,8 @@ function LogReply({ p, t }: { p: LogProbe; t: T }) {
     r.group_name,
     r.dh_bits && t('uth.resp.dh', { bits: r.dh_bits }),
     r.sslv2_ciphers && t('uth.reply.ciphers', { n: r.sslv2_ciphers }),
+    r.certificate && t('uth.resp.certificate', { key: certName(r.certificate) }),
+    r.handshake_signature && t('uth.resp.signature', { scheme: signatureName(r.handshake_signature) }),
   ].filter(Boolean)
   const ok = type === 'server_hello' || type === 'hello_retry_request' || type === 'sslv2_server_hello'
   return (
@@ -363,7 +375,10 @@ function LogReply({ p, t }: { p: LogProbe; t: T }) {
         <span className="bad">
           {' · '}
           {t('uth.reply.alert', { code: r.alert.code, name: r.alert.name })}{' '}
-          <span className="muted">({t(r.alert.encrypted ? 'uth.resp.encrypted' : r.alert.level === 1 ? 'uth.resp.warning' : 'uth.resp.fatal')})</span>
+          <span className="muted">
+            ({t(!r.alert.level ? 'uth.resp.levelUnknown' : r.alert.level === 1 ? 'uth.resp.warning' : 'uth.resp.fatal')}
+            {r.alert.level && r.alert.encrypted ? ', ' + t('uth.resp.decrypted') : ''})
+          </span>
         </span>
       )}
       <span className="muted small">
@@ -375,7 +390,27 @@ function LogReply({ p, t }: { p: LogProbe; t: T }) {
   )
 }
 
-function OfferDetails({ offer: o, t }: { offer: LogOffer; t: T }) {
+const certName = (c: PresentedCert) => c.key_algorithm || c.key_oid
+
+// Milestone 2.8.5: which certificate the server presents with and without ML-DSA in the offer.
+function Certificates({ sel, t }: { sel: NonNullable<ScanResult['certificate_selection']>; t: T }) {
+  const { Sub } = useContext(Levels)
+  const cert = (c: PresentedCert) => t('uth.certs.cert', { key: certName(c), oid: c.key_oid, pq: c.post_quantum ? t('uth.certs.pq') : t('uth.certs.classical') })
+  let without: string
+  if (sel.without_mldsa) without = cert(sel.without_mldsa)
+  else if (sel.without_status === 'not_supported') without = t('uth.certs.refused')
+  else if (sel.without_status === 'error') without = t('uth.certs.unknown')
+  else without = t('uth.certs.notProbed')
+  return (
+    <section className="uth-section" aria-label={t('uth.certs.title')}>
+      <Sub className="uth-h">{t('uth.certs.title')}</Sub>
+      <p>{t('uth.certs.with', { cert: sel.with_mldsa ? cert(sel.with_mldsa) : t('uth.certs.none') })}</p>
+      <p>{t('uth.certs.without', { cert: without })}</p>
+    </section>
+  )
+}
+
+function OfferDetails({ offer: o, title, t }: { offer: LogOffer; title: string; t: T }) {
   const rows: [string, string][] = [
     [t('uth.offer.d.versions'), offeredVersions(o).map(versionName).join(', ')],
     [o.sslv2 ? t('uth.offer.d.ciphers') : t('uth.offer.d.suites'), o.sslv2 ? (o.sslv2_ciphers ?? []).map((c) => '0x' + c.toString(16).padStart(6, '0')).join(' ') : (o.suites ?? []).map((s) => (isGrease(s) ? 'GREASE' : hex(s))).join(' ')],
@@ -388,7 +423,7 @@ function OfferDetails({ offer: o, t }: { offer: LogOffer; t: T }) {
   ]
   return (
     <details className="uth-offer-details">
-      <summary>{t('uth.offer.d.title')}</summary>
+      <summary>{title}</summary>
       <dl className="uth-facts">
         {rows
           .filter(([, v]) => v)
