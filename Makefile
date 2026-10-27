@@ -35,7 +35,7 @@ test: web/node_modules ## Run Go tests (integration tests too if the dev databas
 	npm --prefix web test
 
 FUZZTIME ?= 1m
-FUZZ_TARGETS := FuzzReadResponse FuzzParseServerHello FuzzParseServerKeyExchange FuzzReadSSLv2Response FuzzParseClientHello FuzzParseServerFlight FuzzParseTLS13Certificate
+FUZZ_TARGETS := FuzzReadResponse FuzzParseServerHello FuzzParseServerKeyExchange FuzzReadSSLv2Response FuzzParseClientHello FuzzParseServerFlight FuzzParseTLS13Certificate FuzzReadCertificateFlight FuzzDecryptedFlight
 fuzz: ## Fuzz the raw TLS parsers (FUZZTIME per target, default 1m)
 	@for t in $(FUZZ_TARGETS); do \
 		echo "== $$t"; go test -run='^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) ./internal/scanner/rawtls || exit 1; \

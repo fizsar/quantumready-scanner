@@ -54,13 +54,19 @@ func ecdhExchange(group uint16, curve ecdh.Curve) (*keyExchange, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ecdhExchangeWith(group, k), nil
+}
+
+// ecdhExchangeWith is ecdhExchange with a given private key (tests: RFC 8448).
+func ecdhExchangeWith(group uint16, k *ecdh.PrivateKey) *keyExchange {
+	curve := k.Curve()
 	return &keyExchange{KeyShare{group, k.PublicKey().Bytes()}, func(server []byte) ([]byte, error) {
 		pub, err := curve.NewPublicKey(server)
 		if err != nil {
 			return nil, malformed("server key share: %v", err)
 		}
 		return k.ECDH(pub)
-	}}, nil
+	}}
 }
 
 type kem interface {
@@ -196,7 +202,13 @@ func ExchangeCertificate(conn io.ReadWriter, p CertificateProbe) (*CertificateFl
 	if _, err := conn.Write(records); err != nil {
 		return nil, err
 	}
-	rr := newRecordReader(conn, MaxResponseBytes)
+	return readCertificateFlight(conn, h, records, kx)
+}
+
+// readCertificateFlight reads the server's answer to h, sent as records (the
+// transcript starts with them), and decrypts it with the secret kx agrees on.
+func readCertificateFlight(r io.Reader, h *Hello, records []byte, kx *keyExchange) (*CertificateFlight, error) {
+	rr := newRecordReader(r, MaxResponseBytes)
 	typ, body, alert, err := rr.next()
 	switch {
 	case err != nil:
@@ -280,9 +292,10 @@ func expandLabel(h func() hash.Hash, secret []byte, label string, context []byte
 	return hkdf.Expand(h, secret, string(info), length)
 }
 
-// serverHandshakeDecrypter derives server_handshake_traffic_secret and its
-// key and IV from the (EC)DHE secret and the ClientHello…ServerHello transcript.
-func serverHandshakeDecrypter(suite uint16, shared, transcript []byte) (*decrypter, error) {
+// handshakeKeys derives, from the (EC)DHE secret and the ClientHello…
+// ServerHello transcript, the handshake secret, the
+// server_handshake_traffic_secret and its key and IV (RFC 8446, 7.1 and 7.3).
+func handshakeKeys(suite uint16, shared, transcript []byte) (hs, secret, key, iv []byte, err error) {
 	h, keyLen := sha256.New, 16
 	switch suite {
 	case 0x1302:
@@ -293,31 +306,39 @@ func serverHandshakeDecrypter(suite uint16, shared, transcript []byte) (*decrypt
 	size := h().Size()
 	early, err := hkdf.Extract(h, make([]byte, size), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, nil, err
 	}
 	empty := h()
 	derived, err := expandLabel(h, early, "derived", empty.Sum(nil), size)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, nil, err
 	}
-	hs, err := hkdf.Extract(h, shared, derived)
-	if err != nil {
-		return nil, err
+	if hs, err = hkdf.Extract(h, shared, derived); err != nil {
+		return nil, nil, nil, nil, err
 	}
 	th := h()
 	th.Write(transcript)
-	secret, err := expandLabel(h, hs, "s hs traffic", th.Sum(nil), size)
+	if secret, err = expandLabel(h, hs, "s hs traffic", th.Sum(nil), size); err != nil {
+		return nil, nil, nil, nil, err
+	}
+	if key, err = expandLabel(h, secret, "key", nil, keyLen); err != nil {
+		return nil, nil, nil, nil, err
+	}
+	iv, err = expandLabel(h, secret, "iv", nil, 12)
+	return hs, secret, key, iv, err
+}
+
+// serverHandshakeDecrypter opens the server's handshake records.
+func serverHandshakeDecrypter(suite uint16, shared, transcript []byte) (*decrypter, error) {
+	_, _, key, iv, err := handshakeKeys(suite, shared, transcript)
 	if err != nil {
 		return nil, err
 	}
-	key, err := expandLabel(h, secret, "key", nil, keyLen)
-	if err != nil {
-		return nil, err
-	}
-	iv, err := expandLabel(h, secret, "iv", nil, 12)
-	if err != nil {
-		return nil, err
-	}
+	return newDecrypter(suite, key, iv)
+}
+
+func newDecrypter(suite uint16, key, iv []byte) (*decrypter, error) {
+	var err error
 	var aead cipher.AEAD
 	if suite == 0x1303 {
 		aead, err = chacha20poly1305.New(key)
