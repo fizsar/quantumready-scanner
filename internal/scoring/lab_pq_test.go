@@ -54,23 +54,28 @@ func TestLabPostQuantumCertificates(t *testing.T) {
 	for name, w := range map[string]struct {
 		score, validScore int
 		grade, validGrade string
+		ready, validReady int      // quantum readiness, as scanned and made valid
 		pq                []string // post-quantum certificate findings
 	}{
 		// As scanned, the self-signed certificate caps at F (as in every lab
-		// server). Made valid: mldsa-dual has OpenSSL's TLS 1.2 CBC suites
-		// (SUITE_CBC, cap B); mldsa-only is TLS 1.3 only.
-		"mldsa-dual": {85, 95, "F", "B", []string{"CERT_PQ_SIGNATURE"}},
-		"mldsa-only": {85, 95, "F", "A", []string{"CERT_PQ_SIGNATURE", "CERT_PQ_NO_CLASSICAL_FALLBACK"}},
+		// server) and shows no automated renewal. Made valid: mldsa-dual has
+		// OpenSSL's TLS 1.2 CBC suites (SUITE_CBC, cap B); mldsa-only is TLS
+		// 1.3 only, and its missing fallback takes no points (2026.3).
+		"mldsa-dual": {75, 100, "F", "B", 75, 90, []string{"CERT_PQ_SIGNATURE"}},
+		"mldsa-only": {75, 100, "F", "A", 75, 90, []string{"CERT_PQ_SIGNATURE", "CERT_PQ_NO_CLASSICAL_FALLBACK"}},
 	} {
 		r := labPQ(t, name)
 		raw, v, cl := Evaluate(r), Evaluate(valid(r)), Evaluate(valid(classical(r)))
 		t.Logf("%s: as scanned %d %s; certificate made valid %d %s (with ECDSA instead: %d %s); %v", name, raw.Score, raw.Grade, v.Score, v.Grade, cl.Score, cl.Grade, codes(v))
-		if raw.Score != w.score || raw.Grade != w.grade || v.Score != w.validScore || v.Grade != w.validGrade {
-			t.Errorf("%s: %d %s / %d %s; want %d %s / %d %s", name, raw.Score, raw.Grade, v.Score, v.Grade, w.score, w.grade, w.validScore, w.validGrade)
+		if raw.Score != w.score || raw.Grade != w.grade || v.Score != w.validScore || v.Grade != w.validGrade ||
+			raw.Readiness.Score != w.ready || v.Readiness.Score != w.validReady {
+			t.Errorf("%s: %d %s %d / %d %s %d; want %d %s %d / %d %s %d", name, raw.Score, raw.Grade, raw.Readiness.Score, v.Score, v.Grade, v.Readiness.Score,
+				w.score, w.grade, w.ready, w.validScore, w.validGrade, w.validReady)
 		}
-		// 2026.2: the post-quantum certificate does not add (or take) a point.
-		if v.Score != cl.Score || v.Grade != cl.Grade || !slices.Equal(blockPoints(v), blockPoints(cl)) {
-			t.Errorf("%s: %d %s with ML-DSA, %d %s with ECDSA", name, v.Score, v.Grade, cl.Score, cl.Grade)
+		// 2026.3: the post-quantum certificate adds 15 to readiness and
+		// nothing to security today, where it counts as an ECDSA key would.
+		if v.Score != cl.Score || v.Grade != cl.Grade || !slices.Equal(blockPoints(v), blockPoints(cl)) || v.Readiness.Score != cl.Readiness.Score+ReadyPQCert {
+			t.Errorf("%s: %d %s %d with ML-DSA, %d %s %d with ECDSA", name, v.Score, v.Grade, v.Readiness.Score, cl.Score, cl.Grade, cl.Readiness.Score)
 		}
 		for _, code := range []string{"CERT_PQ_SIGNATURE", "CERT_PQ_NO_CLASSICAL_FALLBACK"} {
 			if slices.Contains(codes(v), code) != slices.Contains(w.pq, code) {

@@ -292,20 +292,29 @@ func (q *Queries) LockTarget(ctx context.Context, target string) error {
 const recentScanForTarget = `-- name: RecentScanForTarget :one
 SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before FROM scans
 WHERE host = $1 AND port = $2 AND status <> 'failed'
-  AND created_at > now() - make_interval(secs => $3::float8)
+  AND (scoring_version IS NULL OR scoring_version = $3::text)
+  AND created_at > now() - make_interval(secs => $4::float8)
 ORDER BY created_at DESC
 LIMIT 1
 `
 
 type RecentScanForTargetParams struct {
-	Host          string
-	Port          int32
-	WithinSeconds float64
+	Host           string
+	Port           int32
+	ScoringVersion string
+	WithinSeconds  float64
 }
 
-// The latest scan of a target created within the cooldown that has not failed.
+// The latest scan of a target created within the cooldown that has not
+// failed and is judged (or will be) with the current scoring model: a scan
+// judged with an earlier one is not handed out again.
 func (q *Queries) RecentScanForTarget(ctx context.Context, arg RecentScanForTargetParams) (Scan, error) {
-	row := q.db.QueryRow(ctx, recentScanForTarget, arg.Host, arg.Port, arg.WithinSeconds)
+	row := q.db.QueryRow(ctx, recentScanForTarget,
+		arg.Host,
+		arg.Port,
+		arg.ScoringVersion,
+		arg.WithinSeconds,
+	)
 	var i Scan
 	err := row.Scan(
 		&i.ID,

@@ -81,8 +81,8 @@ func main() {
 }
 
 var ui = map[string]map[string]string{
-	"es": {"score": "Nota", "model": "modelo", "yes": "sí", "no": "no", "cap": "Tope por riesgo actual", "breakdown": "Desglose", "findings": "Hallazgos", "fix": "Qué hacer", "noteval": "No evaluado (no suma ni resta)"},
-	"en": {"score": "Score", "model": "model", "yes": "yes", "no": "no", "cap": "Cap from current risk", "breakdown": "Breakdown", "findings": "Findings", "fix": "What to do", "noteval": "Not evaluated (never scored)"},
+	"es": {"score": "Seguridad hoy", "readiness": "Preparación cuántica", "model": "modelo", "yes": "sí", "no": "no", "cap": "Tope por riesgo actual", "breakdown": "Desglose", "findings": "Hallazgos", "fix": "Qué hacer", "noteval": "No evaluado (no suma ni resta)"},
+	"en": {"score": "Security today", "readiness": "Quantum readiness", "model": "model", "yes": "yes", "no": "no", "cap": "Cap from current risk", "breakdown": "Breakdown", "findings": "Findings", "fix": "What to do", "noteval": "Not evaluated (never scored)"},
 }
 
 func printReport(r *scanner.Result, s scoring.Result, lang string) {
@@ -111,6 +111,12 @@ func printReport(r *scanner.Result, s scoring.Result, lang string) {
 	}
 	if s.FloorPoints > 0 {
 		fmt.Printf("  %-40s +%d\n", catalog.Label("adjust.floor", lang), s.FloorPoints)
+	}
+	if rd := s.Readiness; rd != nil {
+		fmt.Printf("\n%s: %d/100 · %s\n", t["readiness"], rd.Score, catalog.Label("level."+rd.Level, lang))
+		for _, b := range rd.Blocks {
+			fmt.Printf("  %-40s %3d/%d\n", catalog.Label("block."+b.ID, lang), b.Points, b.Max)
+		}
 	}
 
 	fmt.Printf("\n%s\n", t["findings"])

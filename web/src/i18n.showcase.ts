@@ -165,13 +165,14 @@ const es = {
     'Detecta las versiones de SSLv2 a TLS 1.3, las suites aceptadas en cada versión, los grupos clásicos y los híbridos post-cuánticos como X25519MLKEM768, el tamaño de los parámetros Diffie-Hellman y el certificado.',
   'arch.engine.p4':
     'Solo hace handshakes: no pide ninguna página, en las sondas en crudo no envía nada después del ClientHello (lee la primera respuesta y cierra) y no intenta explotar nada.',
-  'arch.scoring.title': 'Modelo de puntuación (2026.2)',
+  'arch.scoring.title':
+    'Modelo de puntuación (2026.3)',
   'arch.scoring.p1':
-    'Una nota de 0 a 100 y una letra de A a F. La mitad de los puntos depende de que el servidor elija un intercambio de claves híbrido con ML-KEM cuando se conecta un navegador actual: es lo que protege hoy el tráfico frente a «cosechar ahora, descifrar después».',
+    'Dos ejes. «Seguridad hoy», de 0 a 100 y con letra de A a F, valora lo que protege la conexión frente a un atacante actual: TLS 1.3 (30 puntos), secreto hacia adelante en todas las versiones (25) y el certificado (45: válido, clave, firma y renovación automatizada).',
   'arch.scoring.p2':
-    'El resto premia TLS 1.3 (los grupos híbridos solo existen ahí), el secreto hacia adelante, tener más de un grupo híbrido y un certificado válido con renovación automatizada, porque pasar a certificados post-cuánticos exigirá reemitirlos todos.',
+    '«Preparación cuántica», de 0 a 100 en tres niveles (Preparado desde 70, En camino desde 35, No preparado), valora la protección frente a un ordenador cuántico: 50 puntos si el servidor elige un intercambio híbrido con ML-KEM cuando se conecta un navegador actual (lo que protege hoy el tráfico frente a «cosechar ahora, descifrar después»), TLS 1.3, más de un grupo híbrido, la renovación automatizada y un certificado post-cuántico. Mientras no haya certificados post-cuánticos en la web pública, lo habitual es como mucho 85. Aceptar el borrador obsoleto de Kyber resta 15.',
   'arch.scoring.p3':
-    'Lo que está roto hoy limita la letra aunque sume puntos: SSLv2, suites sin cifrado o EXPORT, o un certificado no válido dejan una F. Un TLS clásico bien configurado y sin nada roto nunca baja de D.',
+    'Lo que está roto hoy limita la letra de seguridad aunque sume puntos: SSLv2, suites sin cifrado o EXPORT, o un certificado no válido dejan una F. Grover (AES-128) solo se informa: no suma ni resta. Los escaneos analizados con un modelo anterior conservan su nota y se pueden repetir.',
   'arch.scoring.p4':
     'Es determinista, y cada regla cita su fuente: un RFC, un CVE, un borrador del IETF, una publicación del NIST o una votación del CA/Browser Forum. Un test comprueba que ninguna se queda sin ella.',
   'arch.security.title': 'Seguridad del propio servicio',
@@ -229,7 +230,7 @@ const es = {
   'how.ssrf':
     'Anti-SSRF: rechaza el dominio si alguna de sus direcciones es privada, reservada o local, y se conecta a la IP ya validada, nunca al nombre.',
   'how.scoring':
-    'Puntuación con fuentes: la mitad de la nota depende del intercambio de claves híbrido con ML-KEM, y cada regla cita su RFC, CVE, borrador del IETF o publicación del NIST.',
+    'Puntuación con fuentes, en dos ejes: la seguridad de hoy y la preparación cuántica, que depende sobre todo del intercambio de claves híbrido con ML-KEM. Cada regla cita su RFC, CVE, borrador del IETF o publicación del NIST.',
   'how.lab':
     'Contrastado: un laboratorio de servidores TLS aislados, casi todos vulnerables a propósito, cuyos resultados se comparan con los de testssl.sh.',
   'how.more': 'Todos los detalles en Arquitectura',
@@ -318,9 +319,10 @@ const es = {
   'examples.lead':
     'Informes reales, con el mismo formato que verás al escanear tu web: uno de fizsar.com y tres de servidores de laboratorio, uno bien configurado según los estándares de hoy y dos configurados mal a propósito.',
   'examples.labNote':
-    'Los servidores de laboratorio viven en una red Docker interna, sin salida a Internet. Su certificado real es autofirmado, así que el informe lleva uno simulado y válido, con el mismo tipo de clave que el real y un emisor de laboratorio. Así la nota valora su configuración de TLS y un certificado válido sin renovación automatizada (5 puntos menos), no el hecho de que el real sea autofirmado.',
+    'Los servidores de laboratorio viven en una red Docker interna, sin salida a Internet. Su certificado real es autofirmado, así que el informe lleva uno simulado y válido, con el mismo tipo de clave que el real y un emisor de laboratorio. Así la nota valora su configuración de TLS y un certificado válido sin renovación automatizada (10 puntos menos de seguridad y 15 menos de preparación), no el hecho de que el real sea autofirmado.',
   'examples.nav': 'Ejemplos en esta página',
-  'examples.heading': '{host} · {grade} · {score}',
+  'examples.heading':
+    '{host} · {grade} · {score} · preparación: {level}',
   'examples.lab': 'Servidor de laboratorio aislado; no es un sitio real',
   'examples.real': 'Escaneo real del {date}',
   'examples.labDate': 'Escaneado en el laboratorio el {date}',
@@ -331,23 +333,25 @@ const es = {
   'examples.fizsar.config':
     'TLS 1.2 y 1.3. Ante la oferta de un navegador actual elige el intercambio híbrido X25519MLKEM768. Certificado ECDSA de Let’s Encrypt que se renueva solo.',
   'examples.fizsar.why':
-    'El tráfico ya va protegido frente a «cosechar ahora, descifrar después», y el resto está bien hecho. Pierde 5 puntos porque acepta un solo grupo híbrido.',
+    'Seguridad hoy: A con 100 puntos, con TLS 1.3, secreto hacia adelante y un certificado válido que se renueva solo. Preparación cuántica: 75, Preparado. El tráfico ya va protegido frente a «cosechar ahora, descifrar después» (50 puntos), con TLS 1.3 (10) y renovación automatizada (15). Le faltan 10 puntos por aceptar un solo grupo híbrido y 15 por no tener un certificado post-cuántico, que las autoridades de la web pública todavía no emiten.',
   'examples.fizsar.fix':
-    'Para llegar a 100, aceptar también SecP256r1MLKEM768. El servidor web que usa todavía no permite activarlo.',
+    'Para subir en preparación, aceptar también SecP256r1MLKEM768 (+10): el servidor web que usa todavía no permite activarlo. Los 15 del certificado post-cuántico llegarán cuando las autoridades públicas los emitan.',
   'examples.modern.config':
     'TLS 1.2 y 1.3, solo intercambio ECDHE con cifrado autenticado (AES-GCM y ChaCha20-Poly1305) y los grupos x25519 y secp256r1. Ningún grupo post-cuántico. Es la configuración que recomiendan hoy las guías habituales.',
   'examples.modern.why':
-    'Hoy es seguro: no hay nada roto ni débil, y tiene TLS 1.3 y secreto hacia adelante. Pero sin intercambio híbrido, el tráfico que se capture ahora podría descifrarse cuando exista un ordenador cuántico, y ese bloque, la mitad de la nota, se queda en 0. Además, su certificado de laboratorio no se renueva de forma automatizada (5 puntos menos).',
-  'examples.modern.fix': 'Actualizar el software TLS a uno con ML-KEM y activar X25519MLKEM768: con eso pasaría a una A. Automatizar la renovación del certificado (por ejemplo, con ACME) sumaría otros 5 puntos.',
+    'Seguridad hoy: A con 90 puntos. No hay nada roto ni débil, y tiene TLS 1.3 y secreto hacia adelante; pierde 10 porque su certificado de laboratorio no se renueva de forma automatizada. Preparación cuántica: 10, No preparado. Sin intercambio híbrido, el tráfico que se capture ahora podría descifrarse cuando exista un ordenador cuántico: ese criterio, 50 de los 100 puntos, se queda en 0. Solo suma los 10 de TLS 1.3.',
+  'examples.modern.fix':
+    'Actualizar el software TLS a uno con ML-KEM y activar X25519MLKEM768 (+50 de preparación), y automatizar la renovación del certificado, por ejemplo con ACME (+10 de seguridad y +15 de preparación): llegaría a A con 100 y a 75 de preparación, Preparado.',
   'examples.kyber.config':
     'Solo TLS 1.3, con X25519Kyber768Draft00 (un borrador de intercambio post-cuántico anterior al estándar ML-KEM) y x25519 clásico.',
   'examples.kyber.why':
-    'Los navegadores ya no ofrecen ese borrador, así que la conexión acaba en x25519: no hay protección post-cuántica real y el intercambio de claves, la mitad de la nota, se queda en 0. TLS 1.3 y el secreto hacia adelante están bien; el certificado de laboratorio pierde 5 puntos por no renovarse de forma automatizada.',
-  'examples.kyber.fix': 'Actualizar el software TLS a uno con ML-KEM estándar y activar X25519MLKEM768.',
+    'Seguridad hoy: A con 90 puntos, como el anterior: TLS 1.3 y secreto hacia adelante, y 10 menos por el certificado sin renovación automatizada. Preparación cuántica: 0, No preparado, por debajo del anterior. Los navegadores ya no ofrecen ese borrador, así que la conexión acaba en x25519, sin protección post-cuántica real; y aceptar el codepoint obsoleto de Kyber resta 15 puntos, porque es una migración que empezó y se quedó a medias.',
+  'examples.kyber.fix':
+    'Actualizar el software TLS a uno con ML-KEM estándar, activar X25519MLKEM768 y retirar el borrador de Kyber.',
   'examples.export.config':
     'TLS 1.0 a 1.2 con suites EXPORT de 40 bits, DES simple, suites sin cifrado y anónimas, y un grupo Diffie-Hellman de 512 bits. Sin TLS 1.3.',
   'examples.export.why':
-    'Cualquiera puede degradar esas conexiones o leerlas, así que la letra se queda en F. Solo puntúa el certificado, sin los 5 puntos de renovación automatizada; y sin TLS 1.3 no hay intercambio post-cuántico posible.',
+    'Cualquiera puede degradar esas conexiones o leerlas, así que la seguridad de hoy se queda en F, con 35 puntos: solo puntúa el certificado, sin los 10 de renovación automatizada. Preparación cuántica: 0, No preparado: sin TLS 1.3 no hay intercambio post-cuántico posible.',
   'examples.export.fix': 'Retirar todas esas suites, dejar TLS 1.2 y 1.3 con suites AEAD y activar X25519MLKEM768.',
 }
 
@@ -515,13 +519,14 @@ const en: Record<ShowcaseKey, string> = {
     'It detects the versions from SSLv2 to TLS 1.3, the suites accepted in each version, classical groups and hybrid post-quantum ones such as X25519MLKEM768, the size of the Diffie-Hellman parameters and the certificate.',
   'arch.engine.p4':
     'It only performs handshakes: it never requests a page, its raw probes send nothing after the ClientHello (they read the first answer and close), and it never tries to exploit anything.',
-  'arch.scoring.title': 'Scoring model (2026.2)',
+  'arch.scoring.title':
+    'Scoring model (2026.3)',
   'arch.scoring.p1':
-    "A score from 0 to 100 and a grade from A to F. Half of the points depend on the server choosing a hybrid key exchange with ML-KEM when a current browser connects: that is what protects today's traffic against “harvest now, decrypt later”.",
+    'Two axes. “Security today”, from 0 to 100 with a grade from A to F, rates what protects the connection against a present-day attacker: TLS 1.3 (30 points), forward secrecy in every version (25) and the certificate (45: valid, key, signature and automated renewal).',
   'arch.scoring.p2':
-    'The rest rewards TLS 1.3 (hybrid groups only exist there), forward secrecy, having more than one hybrid group, and a valid certificate with automated renewal, because moving to post-quantum certificates will mean reissuing all of them.',
+    "“Quantum readiness”, from 0 to 100 in three levels (Ready from 70, On track from 35, Not ready), rates protection against a quantum computer: 50 points if the server chooses a hybrid key exchange with ML-KEM when a current browser connects (what protects today's traffic against “harvest now, decrypt later”), TLS 1.3, more than one hybrid group, automated renewal and a post-quantum certificate. While there are no post-quantum certificates on the public web, 85 is usually the most a server can get. Accepting the obsolete Kyber draft takes 15 away.",
   'arch.scoring.p3':
-    'What is broken today caps the grade whatever the points: SSLv2, suites without encryption or EXPORT suites, or an invalid certificate mean an F. A well-configured classical TLS setup with nothing broken never goes below D.',
+    'What is broken today caps the security grade whatever the points: SSLv2, suites without encryption or EXPORT suites, or an invalid certificate mean an F. Grover (AES-128) is only reported: it neither adds nor takes away. Scans analyzed with an earlier model keep their grade and can be run again.',
   'arch.scoring.p4':
     'It is deterministic, and every rule cites its source: an RFC, a CVE, an IETF draft, a NIST publication or a CA/Browser Forum ballot. A test checks none is missing one.',
   'arch.security.title': 'Security of the service itself',
@@ -578,7 +583,7 @@ const en: Record<ShowcaseKey, string> = {
   'how.ssrf':
     'Anti-SSRF: it refuses the domain if any of its addresses is private, reserved or local, and connects to the validated IP, never to the name.',
   'how.scoring':
-    'Scoring with sources: half of the score depends on a hybrid key exchange with ML-KEM, and every rule cites its RFC, CVE, IETF draft or NIST publication.',
+    "Scoring with sources, on two axes: today's security and quantum readiness, which depends above all on a hybrid key exchange with ML-KEM. Every rule cites its RFC, CVE, IETF draft or NIST publication.",
   'how.lab':
     "Cross-checked: a lab of isolated TLS servers, nearly all deliberately vulnerable, whose results are compared with testssl.sh's.",
   'how.more': 'All the details in Architecture',
@@ -667,9 +672,10 @@ const en: Record<ShowcaseKey, string> = {
   'examples.lead':
     'Real reports, in the same format you get when you scan your website: one of fizsar.com and three of lab servers, one well configured by today’s standards and two misconfigured on purpose.',
   'examples.labNote':
-    'The lab servers live on an internal Docker network with no way out to the Internet. Their real certificate is self-signed, so the report carries a simulated valid one, with the same key type as the real one and a lab issuer. So the grade reflects its TLS setup and a valid certificate without automated renewal (5 points less), not the fact that the real one is self-signed.',
+    'Lab servers live on an internal Docker network with no Internet access. Their real certificate is self-signed, so the report carries a simulated, valid one, with the same key type as the real one and a lab issuer. That way the grade rates their TLS configuration and a valid certificate without automated renewal (10 points less of security and 15 less of readiness), not the fact that the real one is self-signed.',
   'examples.nav': 'Examples on this page',
-  'examples.heading': '{host} · {grade} · {score}',
+  'examples.heading':
+    '{host} · {grade} · {score} · readiness: {level}',
   'examples.lab': 'Isolated lab server; not a real website',
   'examples.real': 'Real scan of {date}',
   'examples.labDate': 'Scanned in the lab on {date}',
@@ -680,22 +686,25 @@ const en: Record<ShowcaseKey, string> = {
   'examples.fizsar.config':
     'TLS 1.2 and 1.3. Given a current browser’s offer it chooses the hybrid X25519MLKEM768 key exchange. ECDSA certificate from Let’s Encrypt, renewed automatically.',
   'examples.fizsar.why':
-    'Its traffic is already protected against “harvest now, decrypt later”, and the rest is done right. It loses 5 points for accepting a single hybrid group.',
-  'examples.fizsar.fix': 'To reach 100, also accept SecP256r1MLKEM768. The web server it uses cannot enable it yet.',
+    'Security today: A with 100 points, with TLS 1.3, forward secrecy and a valid certificate that renews itself. Quantum readiness: 75, Ready. Its traffic is already protected against “harvest now, decrypt later” (50 points), with TLS 1.3 (10) and automated renewal (15). It misses 10 points for accepting a single hybrid group and 15 for not having a post-quantum certificate, which public web authorities do not issue yet.',
+  'examples.fizsar.fix':
+    'To gain readiness, also accept SecP256r1MLKEM768 (+10): the web server it uses cannot enable it yet. The 15 points of a post-quantum certificate will come when public authorities issue them.',
   'examples.modern.config':
     'TLS 1.2 and 1.3, ECDHE key exchange with authenticated encryption only (AES-GCM and ChaCha20-Poly1305) and the x25519 and secp256r1 groups. No post-quantum group. It is what the usual guides recommend today.',
   'examples.modern.why':
-    'It is secure today: nothing is broken or weak, and it has TLS 1.3 and forward secrecy. But without a hybrid key exchange, traffic captured now could be decrypted once a quantum computer exists, and that block, half of the score, stays at 0. Its lab certificate is also not renewed in an automated way (5 points less).',
-  'examples.modern.fix': 'Update the TLS software to one with ML-KEM and enable X25519MLKEM768: that alone would make it an A. Automating certificate renewal (with ACME, for instance) would add another 5 points.',
+    'Security today: A with 90 points. Nothing is broken or weak, and it has TLS 1.3 and forward secrecy; it loses 10 because its lab certificate is not renewed in an automated way. Quantum readiness: 10, Not ready. Without a hybrid key exchange, traffic captured now could be decrypted once a quantum computer exists: that criterion, 50 of the 100 points, stays at 0. It only gets the 10 of TLS 1.3.',
+  'examples.modern.fix':
+    'Update the TLS software to one with ML-KEM and enable X25519MLKEM768 (+50 readiness), and automate certificate renewal, with ACME for instance (+10 security and +15 readiness): it would reach an A with 100 and 75 readiness, Ready.',
   'examples.kyber.config':
     'TLS 1.3 only, with X25519Kyber768Draft00 (a post-quantum key exchange draft that predates the ML-KEM standard) and classical x25519.',
   'examples.kyber.why':
-    'Browsers no longer offer that draft, so connections end up on x25519: there is no real post-quantum protection and the key exchange, half of the score, stays at 0. TLS 1.3 and forward secrecy are fine; the lab certificate loses 5 points for not being renewed in an automated way.',
-  'examples.kyber.fix': 'Update the TLS software to one with standard ML-KEM and enable X25519MLKEM768.',
+    'Security today: A with 90 points, like the previous one: TLS 1.3 and forward secrecy, and 10 less for the certificate without automated renewal. Quantum readiness: 0, Not ready, below the previous one. Browsers no longer offer that draft, so connections end up on x25519, with no real post-quantum protection; and accepting the obsolete Kyber codepoint takes 15 points away, because it is a migration that started and got stuck halfway.',
+  'examples.kyber.fix':
+    'Update the TLS software to one with standard ML-KEM, enable X25519MLKEM768 and remove the Kyber draft.',
   'examples.export.config':
     'TLS 1.0 to 1.2 with 40-bit EXPORT suites, single DES, suites without encryption and anonymous ones, and a 512-bit Diffie-Hellman group. No TLS 1.3.',
   'examples.export.why':
-    'Anyone can downgrade those connections or read them, so the grade stays at F. Only the certificate scores, without the 5 points for automated renewal; and without TLS 1.3 no post-quantum key exchange is possible.',
+    "Anyone can downgrade those connections or read them, so today's security stays at F, with 35 points: only the certificate scores, without the 10 for automated renewal. Quantum readiness: 0, Not ready: without TLS 1.3 no post-quantum key exchange is possible.",
   'examples.export.fix': 'Remove all those suites, keep TLS 1.2 and 1.3 with AEAD suites and enable X25519MLKEM768.',
 }
 

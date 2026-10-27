@@ -38,13 +38,13 @@ func (s *Store) Enqueue(ctx context.Context, host string, port int32) (Scan, err
 // cooldown and has not failed, in which case it returns that one with
 // reused=true. Concurrent calls for the same target are serialized, so they
 // cannot both enqueue.
-func (s *Store) EnqueueOrReuse(ctx context.Context, host string, port int32, cooldown time.Duration) (sc Scan, reused bool, err error) {
+func (s *Store) EnqueueOrReuse(ctx context.Context, host string, port int32, cooldown time.Duration, scoringVersion string) (sc Scan, reused bool, err error) {
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.WithTx(tx)
 		if err := q.LockTarget(ctx, fmt.Sprintf("%s:%d", host, port)); err != nil {
 			return err
 		}
-		recent, err := q.RecentScanForTarget(ctx, RecentScanForTargetParams{Host: host, Port: port, WithinSeconds: cooldown.Seconds()})
+		recent, err := q.RecentScanForTarget(ctx, RecentScanForTargetParams{Host: host, Port: port, ScoringVersion: scoringVersion, WithinSeconds: cooldown.Seconds()})
 		if err == nil {
 			sc, reused = recent, true
 			return nil

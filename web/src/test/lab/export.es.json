@@ -9,8 +9,8 @@
   "finished_at": "2026-10-14T22:04:00Z",
   "lang": "es",
   "report": {
-    "scoring_version": "2026.2",
-    "score": 15,
+    "scoring_version": "2026.3",
+    "score": 35,
     "grade": "F",
     "score_grade": "F",
     "cap": {
@@ -39,6 +39,45 @@
       ]
     },
     "pqc": false,
+    "readiness": {
+      "score": 0,
+      "level": {
+        "code": "not_ready",
+        "label": "No preparado"
+      },
+      "blocks": [
+        {
+          "id": "key_exchange",
+          "label": "Intercambio de claves post-cuántico",
+          "points": 0,
+          "max": 50
+        },
+        {
+          "id": "tls13",
+          "label": "TLS 1.3",
+          "points": 0,
+          "max": 10
+        },
+        {
+          "id": "hybrid_variety",
+          "label": "Variedad de grupos híbridos",
+          "points": 0,
+          "max": 10
+        },
+        {
+          "id": "cert_automation",
+          "label": "Renovación automatizada del certificado",
+          "points": 0,
+          "max": 15
+        },
+        {
+          "id": "pq_certificate",
+          "label": "Certificado post-cuántico (ML-DSA, SLH-DSA)",
+          "points": 0,
+          "max": 15
+        }
+      ]
+    },
     "quantum_risk": {
       "code": "critical",
       "label": "Crítico"
@@ -49,58 +88,46 @@
     },
     "blocks": [
       {
-        "id": "key_exchange",
-        "label": "Intercambio de claves post-cuántico",
-        "points": 0,
-        "max": 50
-      },
-      {
         "id": "tls13",
         "label": "TLS 1.3",
         "points": 0,
-        "max": 15
+        "max": 30
       },
       {
         "id": "forward_secrecy",
         "label": "Secreto hacia adelante (forward secrecy)",
         "points": 0,
-        "max": 10
-      },
-      {
-        "id": "hybrid_variety",
-        "label": "Variedad de grupos híbridos",
-        "points": 0,
-        "max": 5
+        "max": 25
       },
       {
         "id": "certificate",
         "label": "Certificado y agilidad",
-        "points": 15,
-        "max": 20,
+        "points": 35,
+        "max": 45,
         "items": [
           {
             "id": "valid",
             "label": "Válido (cadena, nombre, fechas)",
-            "points": 5,
-            "max": 5
+            "points": 15,
+            "max": 15
           },
           {
             "id": "key",
             "label": "Clave",
-            "points": 5,
-            "max": 5
+            "points": 10,
+            "max": 10
           },
           {
             "id": "signature",
             "label": "Firma",
-            "points": 5,
-            "max": 5
+            "points": 10,
+            "max": 10
           },
           {
             "id": "automation",
             "label": "Renovación automatizada",
             "points": 0,
-            "max": 5
+            "max": 10
           }
         ]
       }
@@ -110,6 +137,7 @@
         "code": "KEX_NO_HYBRID",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "critical",
         "severity_label": "Crítico",
         "category": "key_exchange",
@@ -176,6 +204,7 @@
         "code": "TLS13_MISSING",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "high",
         "severity_label": "Alto",
         "category": "protocol",
@@ -209,17 +238,19 @@
         "code": "CERT_CLASSICAL_SIGNATURE",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "low",
         "severity_label": "Bajo",
         "category": "certificate",
         "title": "Firma clásica (RSA-2048): riesgo cuántico futuro",
-        "detail": "La identidad del servidor se demuestra con RSA-2048, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. No afecta a la nota.",
+        "detail": "La identidad del servidor se demuestra con RSA-2048, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. No limita la nota de seguridad de hoy; en la preparación cuántica (modelo 2026.3), un certificado post-cuántico sumaría 15 puntos.",
         "remediation": "Nada que hacer todavía en la firma. Automatiza la renovación (ACME) para poder cambiar a certificados post-cuánticos (ML-DSA o híbridos) en cuanto las autoridades los emitan: hoy este certificado no da señales de renovarse solo."
       },
       {
         "code": "CERT_NOT_AUTOMATED",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "low",
         "severity_label": "Bajo",
         "category": "certificate",

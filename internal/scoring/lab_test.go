@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -68,19 +69,21 @@ func TestLabServers(t *testing.T) {
 		cap     string   // cap grade, "" for none
 		capBy   []string // codes imposing it
 		include []string // findings that must be there
+		ready   string   // quantum readiness: "<score> <level>"
 	}
 	cases := map[string]want{
-		"ssl2":    {20, "F", "F", []string{"PROTO_SSL2"}, []string{"PROTO_SSL2", "KEX_NO_HYBRID", "TLS13_MISSING"}},
-		"ssl3":    {20, "F", "F", []string{"SUITE_EXPORT", "SUITE_DES"}, []string{"PROTO_SSL3", "SUITE_EXPORT", "SUITE_DES", "SUITE_RC4", "SUITE_3DES", "DH_SMALL", "SCAN_PARTIAL"}},
-		"export":  {20, "F", "F", []string{"SUITE_NULL", "SUITE_EXPORT", "SUITE_ANON", "SUITE_DES", "DH_WEAK"}, []string{"SUITE_NULL", "SUITE_EXPORT", "SUITE_ANON", "SUITE_DES", "DH_WEAK", "PROTO_LEGACY_TLS", "FS_PARTIAL"}},
-		"dhe1024": {40, "D", "C", []string{"SUITE_3DES", "DH_SMALL"}, []string{"DH_SMALL", "SUITE_3DES", "SUITE_CBC", "FS_ALL"}},
-		"tls10":   {40, "D", "C", []string{"FS_NONE", "SUITE_RC4", "SUITE_3DES"}, []string{"FS_NONE", "SUITE_RC4", "SUITE_3DES", "PROTO_LEGACY_TLS", "SUITE_CBC"}},
-		"secp224": {40, "D", "C", []string{"SUITE_RC4", "SUITE_3DES"}, []string{"GROUP_WEAK_CURVES", "SUITE_RC4", "SUITE_3DES"}},
-		"tls12":   {40, "D", "B", []string{"SUITE_CBC"}, []string{"DH_OK", "SUITE_CCM8", "SUITE_CBC", "GROUPS_EXTRA", "FS_PARTIAL"}},
-		"tls13":   {100, "A", "", nil, []string{"KEX_HYBRID_PREFERRED", "KEX_MULTIPLE_PQC", "KEX_PURE_MLKEM", "SUITE_CCM8", "GROUPS_EXTRA"}},
-		"kyber":   {45, "D", "", nil, []string{"KEX_NO_HYBRID", "KEX_EXPERIMENTAL_PQC_ONLY", "TLS13_SUITES_AEAD", "FS_ALL"}},
-		// Well configured today, not quantum-ready: nothing to cap, no PQC.
-		"modern": {45, "D", "", nil, []string{"KEX_NO_HYBRID", "TLS13_SUPPORTED", "TLS13_SUITES_AEAD", "FS_ALL", "CERT_VALID"}},
+		"ssl2":    {45, "F", "F", []string{"PROTO_SSL2"}, []string{"PROTO_SSL2", "KEX_NO_HYBRID", "TLS13_MISSING"}, "15 not_ready"},
+		"ssl3":    {45, "F", "F", []string{"SUITE_EXPORT", "SUITE_DES"}, []string{"PROTO_SSL3", "SUITE_EXPORT", "SUITE_DES", "SUITE_RC4", "SUITE_3DES", "DH_SMALL", "SCAN_PARTIAL"}, "15 not_ready"},
+		"export":  {45, "F", "F", []string{"SUITE_NULL", "SUITE_EXPORT", "SUITE_ANON", "SUITE_DES", "DH_WEAK"}, []string{"SUITE_NULL", "SUITE_EXPORT", "SUITE_ANON", "SUITE_DES", "DH_WEAK", "PROTO_LEGACY_TLS", "FS_PARTIAL"}, "15 not_ready"},
+		"dhe1024": {70, "C", "C", []string{"SUITE_3DES", "DH_SMALL"}, []string{"DH_SMALL", "SUITE_3DES", "SUITE_CBC", "FS_ALL"}, "15 not_ready"},
+		"tls10":   {45, "D", "C", []string{"FS_NONE", "SUITE_RC4", "SUITE_3DES"}, []string{"FS_NONE", "SUITE_RC4", "SUITE_3DES", "PROTO_LEGACY_TLS", "SUITE_CBC"}, "15 not_ready"},
+		"secp224": {70, "C", "C", []string{"SUITE_RC4", "SUITE_3DES"}, []string{"GROUP_WEAK_CURVES", "SUITE_RC4", "SUITE_3DES"}, "15 not_ready"},
+		"tls12":   {45, "D", "B", []string{"SUITE_CBC"}, []string{"DH_OK", "SUITE_CCM8", "SUITE_CBC", "GROUPS_EXTRA", "FS_PARTIAL"}, "15 not_ready"},
+		"tls13":   {100, "A", "", nil, []string{"KEX_HYBRID_PREFERRED", "KEX_MULTIPLE_PQC", "KEX_PURE_MLKEM", "SUITE_CCM8", "GROUPS_EXTRA"}, "85 ready"},
+		"kyber":   {100, "A", "", nil, []string{"KEX_NO_HYBRID", "KEX_EXPERIMENTAL_PQC_ONLY", "TLS13_SUITES_AEAD", "FS_ALL"}, "10 not_ready"},
+		// Well configured today, not quantum-ready: A today, not ready. Kyber
+		// stays below it in readiness (the obsolete codepoint costs 15).
+		"modern": {100, "A", "", nil, []string{"KEX_NO_HYBRID", "TLS13_SUPPORTED", "TLS13_SUITES_AEAD", "FS_ALL", "CERT_VALID"}, "25 not_ready"},
 	}
 	for name, r := range labResults(t) {
 		res := Evaluate(r)
@@ -93,6 +96,9 @@ func TestLabServers(t *testing.T) {
 		if !ok {
 			t.Errorf("no expectation for %s", name)
 			continue
+		}
+		if got := fmt.Sprintf("%d %s", res.Readiness.Score, res.Readiness.Level); got != w.ready {
+			t.Errorf("%s: readiness %s, want %s", name, got, w.ready)
 		}
 		slices.Sort(capBy)
 		slices.Sort(w.capBy)

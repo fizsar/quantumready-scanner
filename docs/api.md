@@ -35,18 +35,22 @@ Pide un escaneo. Cuerpo (máx. 1 KiB, `Content-Type: application/json`, campos d
   "error": {"code": "connection_refused", "message": "…"},   // si failed (o esperando reintento)
   "lang": "es",
   "report": {                  // solo si done
-    "scoring_version": "2026.1", "score": 95, "grade": "A", "score_grade": "A",
-    "floor_points": 0, "cap": null, "pqc": true,
+    "scoring_version": "2026.3", "score": 100, "grade": "A", "score_grade": "A",   // seguridad hoy
+    "cap": null, "pqc": true,
     "selected_group": "X25519MLKEM768", "tls_version": "TLS 1.3",
+    "readiness": {"score": 75, "level": {"code": "ready", "label": "Preparado"},   // preparación cuántica (2026.3)
+                  "blocks": [{"id": "key_exchange", "label": "…", "points": 50, "max": 50}, …]},
     "quantum_risk": {"code": "low", "label": "Bajo"}, "current_risk": {"code": "none", "label": "Ninguno"},
-    "blocks": [{"id": "key_exchange", "label": "…", "points": 50, "max": 50, "items": […]}],
-    "findings": [{"code": "…", "axis": "quantum", "axis_label": "…", "severity": "low", "severity_label": "…",
+    "blocks": [{"id": "tls13", "label": "TLS 1.3", "points": 30, "max": 30, "items": […]}, …],
+    "findings": [{"code": "…", "axis": "quantum", "axis_label": "…", "threat": "shor", "severity": "low", "severity_label": "…",
                   "category": "…", "title": "…", "detail": "…", "remediation": "…"}],
     "not_evaluated": [{"code": "ssl2_ssl3", "label": "…"}],
     "result": { … }            // hechos del escáner (docs/scanner.md)
   }
 }
 ```
+
+Desde el modelo **2026.3** el informe tiene dos ejes: `score`, `grade`, `cap` y `blocks` son «Seguridad hoy», y `readiness` es «Preparación cuántica» (nivel `ready`, `on_track` o `not_ready`; un bloque puede tener puntos negativos: `kyber_draft`, −15). `threat` marca, en los hallazgos del eje cuántico, si son de Shor o de Grover. Un escaneo analizado con un modelo anterior conserva su juicio: sin `readiness`, con `floor_points` si lo tuvo (2026.2) y con `"outdated_model": true`; la web ofrece repetir el análisis. `POST /api/scans` solo reutiliza un escaneo reciente del modelo actual (o aún sin analizar).
 
 ## `POST /api/e` (métricas de uso, M1)
 

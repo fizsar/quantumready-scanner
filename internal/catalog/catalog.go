@@ -321,9 +321,9 @@ var findingTexts = map[string]langTexts{
 	},
 	"SYM_AES128": {
 		"es": {Title: "AES-128 y el algoritmo de Grover",
-			Detail: "La conexión usa {suite}. En teoría, el algoritmo de Grover reduce la seguridad de AES-128 a unos 64 bits, pero no es paralelizable de forma práctica y NIST sigue considerando AES-128 adecuado. Informativo: no afecta a la nota."},
+			Detail: "La conexión usa {suite}. En teoría, el algoritmo de Grover reduce la seguridad de AES-128 a unos 64 bits, pero no es paralelizable de forma práctica y NIST sigue considerando AES-128 adecuado. Informativo: no suma ni resta en ningún eje."},
 		"en": {Title: "AES-128 and Grover's algorithm",
-			Detail: "The connection uses {suite}. In theory Grover's algorithm reduces AES-128 to about 64-bit security, but it does not parallelize in practice and NIST still considers AES-128 adequate. Informational: it does not affect the grade."},
+			Detail: "The connection uses {suite}. In theory Grover's algorithm reduces AES-128 to about 64-bit security, but it does not parallelize in practice and NIST still considers AES-128 adequate. Informational: it neither adds nor takes away on either axis."},
 	},
 
 	// --- Certificate ---
@@ -365,17 +365,17 @@ var findingTexts = map[string]langTexts{
 	},
 	"CERT_CLASSICAL_SIGNATURE": {
 		"es": {Title: "Firma clásica ({key}): riesgo cuántico futuro",
-			Detail:      "La identidad del servidor se demuestra con {key}, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes.{pq_selection} No afecta a la nota.",
+			Detail:      "La identidad del servidor se demuestra con {key}, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes.{pq_selection} No limita la nota de seguridad de hoy; en la preparación cuántica (modelo 2026.3), un certificado post-cuántico sumaría 15 puntos.",
 			Remediation: "Nada que hacer todavía en la firma. {renewal_advice}"},
 		"en": {Title: "Classical signature ({key}): future quantum risk",
-			Detail:      "The server proves its identity with {key}, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before.{pq_selection} It does not affect the grade.",
+			Detail:      "The server proves its identity with {key}, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before.{pq_selection} It does not limit today's security grade; in quantum readiness (model 2026.3), a post-quantum certificate would add 15 points.",
 			Remediation: "Nothing to do on the signature yet. {renewal_advice}"},
 	},
 	"CERT_PQ_SIGNATURE": {
 		"es": {Title: "Certificado post-cuántico ({algorithm})",
-			Detail: "Al ofrecerle firmas ML-DSA, como hace Chrome, el servidor presentó un certificado {algorithm}: demuestra su identidad con un algoritmo de firma post-cuántico, diseñado para resistir a un ordenador cuántico. Es informativo: en el modelo 2026.2 no cambia la nota."},
+			Detail: "Al ofrecerle firmas ML-DSA, como hace Chrome, el servidor presentó un certificado {algorithm}: demuestra su identidad con un algoritmo de firma post-cuántico, diseñado para resistir a un ordenador cuántico. Suma 15 puntos de preparación cuántica (modelo 2026.3; en el 2026.2 era informativo)."},
 		"en": {Title: "Post-quantum certificate ({algorithm})",
-			Detail: "Offered ML-DSA signatures, as Chrome does, the server presented a {algorithm} certificate: it proves its identity with a post-quantum signature algorithm, designed to resist a quantum computer. Informational: in model 2026.2 it does not change the grade."},
+			Detail: "Offered ML-DSA signatures, as Chrome does, the server presented a {algorithm} certificate: it proves its identity with a post-quantum signature algorithm, designed to resist a quantum computer. It adds 15 points of quantum readiness (model 2026.3; informational in 2026.2)."},
 	},
 	"CERT_PQ_NO_CLASSICAL_FALLBACK": {
 		"es": {Title: "Solo certificado post-cuántico: sin respaldo clásico",
@@ -427,6 +427,14 @@ var labels = map[string]map[string]string{
 	"block.forward_secrecy": {"es": "Secreto hacia adelante (forward secrecy)", "en": "Forward secrecy"},
 	"block.hybrid_variety":  {"es": "Variedad de grupos híbridos", "en": "Hybrid group variety"},
 	"block.certificate":     {"es": "Certificado y agilidad", "en": "Certificate and agility"},
+	// Quantum readiness blocks (2026.3); key_exchange, tls13 and
+	// hybrid_variety keep their labels.
+	"block.cert_automation": {"es": "Renovación automatizada del certificado", "en": "Automated certificate renewal"},
+	"block.pq_certificate":  {"es": "Certificado post-cuántico (ML-DSA, SLH-DSA)", "en": "Post-quantum certificate (ML-DSA, SLH-DSA)"},
+	"block.kyber_draft":     {"es": "Kyber obsoleto aceptado (penalización)", "en": "Obsolete Kyber accepted (penalty)"},
+	"level.ready":           {"es": "Preparado", "en": "Ready"},
+	"level.on_track":        {"es": "En camino", "en": "On track"},
+	"level.not_ready":       {"es": "No preparado", "en": "Not ready"},
 	"item.valid":            {"es": "Válido (cadena, nombre, fechas)", "en": "Valid (chain, name, dates)"},
 	"item.key":              {"es": "Clave", "en": "Key"},
 	"item.signature":        {"es": "Firma", "en": "Signature"},

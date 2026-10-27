@@ -101,6 +101,28 @@ Protocolos, suites y grupos también coinciden con testssl.sh en los dos. El cer
 
 Nota con el modelo 2026.2 (`internal/scoring`, `TestLabPostQuantumCertificates`): tal como se escanean, 85 · F los dos (el certificado autofirmado limita a F, como en todo el laboratorio); con el certificado hecho válido, `mldsa-dual` 95 · B (las suites CBC de TLS 1.2 de OpenSSL) y `mldsa-only` 95 · A, exactamente la misma nota que con un certificado ECDSA: el certificado post-cuántico no suma (`CERT_PQ_SIGNATURE`, informativo). `mldsa-only` tiene además `CERT_PQ_NO_CLASSICAL_FALLBACK` (gravedad media, sin tope).
 
+### Hito 2.8.6: notas con el modelo 2026.3
+
+Las mismas sondas, el modelo nuevo: dos ejes (`docs/scoring.md`). Laboratorio con el certificado hecho válido, como en los tests (`internal/scoring`: `TestLabServers`, `TestLabPostQuantumCertificates`); fizsar.com, su escaneo real.
+
+| Servidor | 2026.2 | 2026.3: seguridad hoy | 2026.3: preparación cuántica |
+|---|---|---|---|
+| `fizsar.com` | A · 95 | A · 100 | 75 · Preparado |
+| `tls13` | A · 100 | A · 100 | 85 · Preparado |
+| `modern` | D · 45 | A · 100 | 25 · No preparado |
+| `kyber` | D · 45 | A · 100 | 10 · No preparado |
+| `tls12` | D · 40 | D · 45 (tope B) | 15 · No preparado |
+| `dhe1024` | D · 40 | C · 70 (tope C) | 15 · No preparado |
+| `secp224` | D · 40 | C · 70 (tope C) | 15 · No preparado |
+| `tls10` | D · 40 | D · 45 (tope C) | 15 · No preparado |
+| `ssl2` | F · 20 | F · 45 (tope F) | 15 · No preparado |
+| `ssl3` | F · 20 | F · 45 (tope F) | 15 · No preparado |
+| `export` | F · 20 | F · 45 (tope F) | 15 · No preparado |
+| `mldsa-dual` | B · 95 | B · 100 (tope B) | 90 · Preparado |
+| `mldsa-only` | A · 95 | A · 100 | 90 · Preparado |
+
+`kyber` queda por debajo de `modern` en preparación (10 frente a 25): aceptar el borrador obsoleto de Kyber resta 15. `mldsa-only` no pierde puntos por no tener certificado clásico de respaldo: es un hallazgo medio visible (`CERT_PQ_NO_CLASSICAL_FALLBACK`). En /examples, con el certificado simulado sin renovación automatizada: fizsar.com A · 100 / 75 Preparado, `modern` A · 90 / 10, `kyber` A · 90 / 0 y `export` F · 35 / 0 (`TestLabFixtures`).
+
 ### Mediciones y tiempo máximo por escaneo
 
 Cada servidor, con intensidad `full` y `basic`, en local y con una latencia simulada de 100 ms de RTT (el dialer espera 2 RTT por conexión: TCP y el primer intercambio; solo en tests).

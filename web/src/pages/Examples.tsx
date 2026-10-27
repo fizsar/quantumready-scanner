@@ -40,7 +40,7 @@ export default function Examples() {
               const s = scans[lang]
               return (
                 <li key={key}>
-                  <a href={`#${key}`}>{t('examples.heading', { host: s.host, grade: s.report!.grade, score: s.report!.score })}</a>
+                  <a href={`#${key}`}>{t('examples.heading', { host: s.host, grade: s.report!.grade, score: s.report!.score, level: s.report!.readiness?.level.label ?? '' })}</a>
                 </li>
               )
             })}
@@ -56,7 +56,7 @@ export default function Examples() {
           <section key={key} id={key} className="example" aria-labelledby={`${key}-title`}>
             <div className="panel example-intro">
               <h2 id={`${key}-title`} className="h-section">
-                {t('examples.heading', { host: scan.host, grade: report.grade, score: report.score })}
+                {t('examples.heading', { host: scan.host, grade: report.grade, score: report.score, level: report.readiness?.level.label ?? '' })}
               </h2>
               {lab ? <p className="example-lab">{t('examples.lab')}</p> : null}
               <p className="muted small">{lab ? t('examples.labDate', { date: when }) : t('examples.real', { date: when })}</p>

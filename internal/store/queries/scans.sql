@@ -67,9 +67,12 @@ VALUES (@scan_id, @position, @code, @axis, @severity, @category, @params);
 SELECT pg_advisory_xact_lock(hashtextextended(@target::text, 0));
 
 -- name: RecentScanForTarget :one
--- The latest scan of a target created within the cooldown that has not failed.
+-- The latest scan of a target created within the cooldown that has not
+-- failed and is judged (or will be) with the current scoring model: a scan
+-- judged with an earlier one is not handed out again.
 SELECT * FROM scans
 WHERE host = @host AND port = @port AND status <> 'failed'
+  AND (scoring_version IS NULL OR scoring_version = @scoring_version::text)
   AND created_at > now() - make_interval(secs => @within_seconds::float8)
 ORDER BY created_at DESC
 LIMIT 1;

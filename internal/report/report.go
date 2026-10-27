@@ -38,21 +38,27 @@ type Input struct {
 // Document is a scan's report, every text in one language. The JSON tags are
 // the API's (docs/api.md): the API serializes it unchanged.
 type Document struct {
-	ScoringVersion string          `json:"scoring_version"`
-	Score          int             `json:"score"`
-	Grade          string          `json:"grade"`
-	ScoreGrade     string          `json:"score_grade"`
-	FloorPoints    int             `json:"floor_points,omitempty"`
-	Cap            *Cap            `json:"cap,omitempty"`
-	PQC            bool            `json:"pqc"`
-	SelectedGroup  string          `json:"selected_group,omitempty"`
-	TLSVersion     string          `json:"tls_version,omitempty"`
-	QuantumRisk    Labeled         `json:"quantum_risk"`
-	CurrentRisk    Labeled         `json:"current_risk"`
-	Blocks         []Block         `json:"blocks"`
-	Findings       []FindingText   `json:"findings"`
-	NotEvaluated   []Labeled       `json:"not_evaluated"`
-	Result         json.RawMessage `json:"result"` // raw scanner facts
+	ScoringVersion string `json:"scoring_version"`
+	Score          int    `json:"score"`
+	Grade          string `json:"grade"`
+	ScoreGrade     string `json:"score_grade"`
+	FloorPoints    int    `json:"floor_points,omitempty"`
+	Cap            *Cap   `json:"cap,omitempty"`
+	PQC            bool   `json:"pqc"`
+	SelectedGroup  string `json:"selected_group,omitempty"`
+	TLSVersion     string `json:"tls_version,omitempty"`
+	// Readiness is the quantum readiness axis (model 2026.3 on); nil for a
+	// scan judged with an earlier model, which has one grade only.
+	Readiness *Readiness `json:"readiness,omitempty"`
+	// OutdatedModel: the scan was judged with an earlier model than the
+	// current one. It keeps that judgement; the web offers to scan again.
+	OutdatedModel bool            `json:"outdated_model,omitempty"`
+	QuantumRisk   Labeled         `json:"quantum_risk"`
+	CurrentRisk   Labeled         `json:"current_risk"`
+	Blocks        []Block         `json:"blocks"`
+	Findings      []FindingText   `json:"findings"`
+	NotEvaluated  []Labeled       `json:"not_evaluated"`
+	Result        json.RawMessage `json:"result"` // raw scanner facts
 }
 
 // Labeled is a code with its display name.
@@ -84,11 +90,21 @@ type Item struct {
 	Max    int    `json:"max"`
 }
 
+// Readiness is the quantum readiness axis: score, level and its blocks.
+type Readiness struct {
+	Score  int     `json:"score"`
+	Level  Labeled `json:"level"`
+	Blocks []Block `json:"blocks"`
+}
+
 // FindingText is a finding with its labels and texts.
 type FindingText struct {
-	Code          string `json:"code"`
-	Axis          string `json:"axis"`
-	AxisLabel     string `json:"axis_label"`
+	Code      string `json:"code"`
+	Axis      string `json:"axis"`
+	AxisLabel string `json:"axis_label"`
+	// Threat is the quantum threat a finding of the quantum axis concerns:
+	// shor (key exchange, signatures) or grover (symmetric ciphers).
+	Threat        string `json:"threat,omitempty"`
 	Severity      string `json:"severity"`
 	SeverityLabel string `json:"severity_label"`
 	Category      string `json:"category"`
@@ -131,17 +147,15 @@ func Build(in Input) (*Document, error) {
 			doc.Cap.Codes = append(doc.Cap.Codes, Labeled{c, catalog.DescribeIn(c, params[c], lang, tctx).Title})
 		}
 	}
-	for _, b := range s.Blocks {
-		bv := Block{ID: b.ID, Label: catalog.Label("block."+b.ID, lang), Points: b.Points, Max: b.Max}
-		for _, it := range b.Items {
-			bv.Items = append(bv.Items, Item{it.ID, catalog.Label("item."+it.ID, lang), it.Points, it.Max})
-		}
-		doc.Blocks = append(doc.Blocks, bv)
+	doc.Blocks = blocks(s.Blocks, lang)
+	if r := s.Readiness; r != nil {
+		doc.Readiness = &Readiness{Score: r.Score, Level: Labeled{r.Level, catalog.Label("level."+r.Level, lang)}, Blocks: blocks(r.Blocks, lang)}
 	}
+	doc.OutdatedModel = s.ScoringVersion != scoring.Version
 	doc.Findings = make([]FindingText, 0, len(in.Findings))
 	for _, f := range in.Findings {
 		doc.Findings = append(doc.Findings, FindingText{
-			Code: f.Code, Axis: f.Axis, AxisLabel: catalog.Label("axis."+f.Axis, lang),
+			Code: f.Code, Axis: f.Axis, AxisLabel: catalog.Label("axis."+f.Axis, lang), Threat: scoring.ThreatOf(f.Code, scoring.Axis(f.Axis)),
 			Severity: f.Severity, SeverityLabel: catalog.Label("severity."+f.Severity, lang),
 			Category: f.Category, Text: catalog.DescribeIn(f.Code, f.Params, lang, tctx),
 		})
@@ -151,4 +165,16 @@ func Build(in Input) (*Document, error) {
 		doc.NotEvaluated = append(doc.NotEvaluated, Labeled{c, catalog.Label("noteval."+c, lang)})
 	}
 	return doc, nil
+}
+
+func blocks(in []scoring.Block, lang string) []Block {
+	out := make([]Block, 0, len(in))
+	for _, b := range in {
+		bv := Block{ID: b.ID, Label: catalog.Label("block."+b.ID, lang), Points: b.Points, Max: b.Max}
+		for _, it := range b.Items {
+			bv.Items = append(bv.Items, Item{it.ID, catalog.Label("item."+it.ID, lang), it.Points, it.Max})
+		}
+		out = append(out, bv)
+	}
+	return out
 }

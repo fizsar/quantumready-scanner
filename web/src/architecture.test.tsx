@@ -21,8 +21,8 @@ function renderAt(path: string, lang: Lang) {
 
 const heading = { es: 'Arquitectura', en: 'Architecture' }
 const sections = {
-  es: ['El flujo de un escaneo', 'Motor de escaneo', 'Modelo de puntuación (2026.2)', 'Seguridad del propio servicio', 'Calidad', 'Operación', 'En desarrollo', 'Verlo en marcha', 'Código'],
-  en: ['The path of a scan', 'Scanning engine', 'Scoring model (2026.2)', 'Security of the service itself', 'Quality', 'Operations', 'In development', 'See it working', 'Code'],
+  es: ['El flujo de un escaneo', 'Motor de escaneo', 'Modelo de puntuación (2026.3)', 'Seguridad del propio servicio', 'Calidad', 'Operación', 'En desarrollo', 'Verlo en marcha', 'Código'],
+  en: ['The path of a scan', 'Scanning engine', 'Scoring model (2026.3)', 'Security of the service itself', 'Quality', 'Operations', 'In development', 'See it working', 'Code'],
 }
 
 const forbidden = forbiddenProse

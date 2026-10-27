@@ -2,6 +2,8 @@ package report
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -78,5 +80,40 @@ func TestBuildResolvesTexts(t *testing.T) {
 func TestBadResult(t *testing.T) {
 	if _, err := Build(Input{Result: json.RawMessage(`{`)}); err == nil {
 		t.Error("a broken stored result was accepted")
+	}
+}
+
+// A scan judged with 2026.2 (testdata: fizsar.com's stored judgement, as the
+// worker wrote it before 2026.3) keeps that judgement: one grade, no
+// readiness, and the mark that the model is outdated.
+func TestOutdatedModel(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("testdata", "fizsar.com.scoring-2026.2.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var old scoring.Result
+	if err := json.Unmarshal(b, &old); err != nil {
+		t.Fatal(err)
+	}
+	d := build(t, Input{Scoring: old, Lang: "es"})
+	if d.ScoringVersion != "2026.2" || !d.OutdatedModel || d.Readiness != nil || d.Grade != "A" || d.Score != 95 || len(d.Blocks) != 5 {
+		t.Errorf("%+v", d)
+	}
+}
+
+func TestReadinessAxis(t *testing.T) {
+	in := Input{Scoring: scoring.Result{ScoringVersion: scoring.Version, Score: 100, Grade: "A",
+		Readiness: &scoring.Readiness{Score: 75, Level: scoring.LevelReady, Blocks: []scoring.Block{{ID: "pq_certificate", Points: 0, Max: 15}}}},
+		Findings: []Finding{{Code: "SYM_AES128", Axis: "quantum", Severity: "info"}, {Code: "KEX_SINGLE_HYBRID", Axis: "quantum", Severity: "low"}, {Code: "FS_ALL", Axis: "current", Severity: "pass"}}}
+	for lang, label := range map[string]string{"es": "Preparado", "en": "Ready"} {
+		in.Lang = lang
+		d := build(t, in)
+		r := d.Readiness
+		if d.OutdatedModel || r == nil || r.Score != 75 || r.Level.Code != "ready" || r.Level.Label != label || r.Blocks[0].Label == "" || r.Blocks[0].Label == "block.pq_certificate" {
+			t.Errorf("%s: %+v", lang, r)
+		}
+		if threats := [3]string{d.Findings[0].Threat, d.Findings[1].Threat, d.Findings[2].Threat}; threats != [3]string{"grover", "shor", ""} {
+			t.Errorf("threats %v", threats)
+		}
 	}
 }

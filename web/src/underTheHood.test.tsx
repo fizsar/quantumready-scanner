@@ -139,7 +139,7 @@ describe('Under the hood panel', () => {
   it('kyber: the experimental group and its replies', async () => {
     const scan = scans.kyber.en
     const panel = await openPanel(scan, 'en')
-    expect(scan.report!.grade).toBe('D')
+    expect(scan.report!.grade).toBe('A') // model 2026.3: A today, not ready
     const r = resultOf(scan.report!) as ScanResult
     const groups = within(panel).getByRole('region', { name: 'Key exchange groups' })
     for (const g of r.key_exchange.groups ?? []) expect(within(groups).getByText(g.name)).toBeTruthy()

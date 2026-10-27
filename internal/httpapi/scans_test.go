@@ -277,8 +277,10 @@ func TestGetScanReport(t *testing.T) {
 		if got.Status != "done" || r == nil {
 			t.Fatalf("view = %+v", got)
 		}
-		if r.Grade != "A" || r.Score != 95 || !r.PQC || r.SelectedGroup != "X25519MLKEM768" || r.TLSVersion != "TLS 1.3" ||
-			r.ScoringVersion != scoring.Version || len(r.Blocks) != 5 || len(r.Findings) == 0 || len(r.NotEvaluated) == 0 || len(r.Result) == 0 {
+		// Model 2026.3: security today (3 blocks) and quantum readiness.
+		if r.Grade != "A" || r.Score != 100 || !r.PQC || r.SelectedGroup != "X25519MLKEM768" || r.TLSVersion != "TLS 1.3" ||
+			r.ScoringVersion != scoring.Version || len(r.Blocks) != 3 || r.Readiness == nil || r.Readiness.Score != 75 || r.OutdatedModel ||
+			len(r.Findings) == 0 || len(r.NotEvaluated) == 0 || len(r.Result) == 0 {
 			t.Fatalf("report = %+v", r)
 		}
 		for _, f := range r.Findings {
@@ -290,8 +292,9 @@ func TestGetScanReport(t *testing.T) {
 	if es.Lang != "es" || en.Lang != "en" {
 		t.Errorf("langs = %s %s", es.Lang, en.Lang)
 	}
-	if es.Report.Blocks[0].Label != "Intercambio de claves post-cuántico" || en.Report.Blocks[0].Label != "Post-quantum key exchange" {
-		t.Errorf("block labels = %q / %q", es.Report.Blocks[0].Label, en.Report.Blocks[0].Label)
+	if es.Report.Readiness.Blocks[0].Label != "Intercambio de claves post-cuántico" || en.Report.Readiness.Blocks[0].Label != "Post-quantum key exchange" ||
+		es.Report.Blocks[1].Label == en.Report.Blocks[1].Label || es.Report.Readiness.Level.Label != "Preparado" || en.Report.Readiness.Level.Label != "Ready" {
+		t.Errorf("labels = %q / %q, %q / %q", es.Report.Readiness.Blocks[0].Label, en.Report.Readiness.Blocks[0].Label, es.Report.Blocks[1].Label, en.Report.Blocks[1].Label)
 	}
 	if es.Report.Findings[0].Title == en.Report.Findings[0].Title {
 		t.Errorf("finding not translated: %q", es.Report.Findings[0].Title)

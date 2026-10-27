@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/fizsar/quantumready-saas/internal/report"
+	"github.com/fizsar/quantumready-saas/internal/scoring"
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
 
@@ -24,7 +25,9 @@ const maxBodyBytes = 1 << 10
 
 // ScanStore is what the scan endpoints need from internal/store.
 type ScanStore interface {
-	EnqueueOrReuse(ctx context.Context, host string, port int32, cooldown time.Duration) (store.Scan, bool, error)
+	// EnqueueOrReuse reuses a recent scan only if judged (or to be judged)
+	// with scoringVersion.
+	EnqueueOrReuse(ctx context.Context, host string, port int32, cooldown time.Duration, scoringVersion string) (store.Scan, bool, error)
 	GetScan(ctx context.Context, id uuid.UUID) (store.Scan, error)
 	ListFindings(ctx context.Context, scanID uuid.UUID) ([]store.Finding, error)
 }
@@ -83,7 +86,7 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusTooManyRequests, "rate_limited")
 		return
 	}
-	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), host, ScanPort, a.cfg.TargetCooldown)
+	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), host, ScanPort, a.cfg.TargetCooldown, scoring.Version)
 	if err != nil {
 		a.cfg.Limiter.Cancel(key)
 		a.internal(w, r, "enqueue scan", err)

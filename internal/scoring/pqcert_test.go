@@ -58,7 +58,11 @@ func TestPostQuantumCertificate(t *testing.T) {
 		if findingOf(res, "CERT_CLASSICAL_SIGNATURE") != nil {
 			t.Errorf("%s: an ML-DSA leaf is not a classical signature", name)
 		}
-		// 2026.2: the post-quantum certificate neither adds nor takes away.
+		// 2026.3: security today as with the ECDSA one; readiness +15, and
+		// the missing fallback takes nothing away on either axis.
+		if res.Readiness.Score != classical.Readiness.Score+ReadyPQCert {
+			t.Errorf("%s: readiness %d, the ECDSA one %d", name, res.Readiness.Score, classical.Readiness.Score)
+		}
 		if res.Score != classical.Score || res.Grade != classical.Grade || !slices.Equal(blockPoints(res), blockPoints(classical)) {
 			t.Errorf("%s: %d %s %v, the ECDSA one %d %s %v", name, res.Score, res.Grade, blockPoints(res), classical.Score, classical.Grade, blockPoints(classical))
 		}

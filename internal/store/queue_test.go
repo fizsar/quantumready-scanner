@@ -251,15 +251,15 @@ func TestEnqueueOrReuse(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	first, reused, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+	first, reused, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute, "2026.3")
 	if err != nil || reused {
 		t.Fatalf("first = %v reused=%v", err, reused)
 	}
-	again, reused, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+	again, reused, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute, "2026.3")
 	if err != nil || !reused || again.ID != first.ID {
 		t.Fatalf("within cooldown: %v reused=%v id=%s, want the first scan", err, reused, again.ID)
 	}
-	if _, reused, _ := s.EnqueueOrReuse(ctx, "other.example", 443, time.Minute); reused {
+	if _, reused, _ := s.EnqueueOrReuse(ctx, "other.example", 443, time.Minute, "2026.3"); reused {
 		t.Error("another target was reused")
 	}
 
@@ -268,13 +268,36 @@ func TestEnqueueOrReuse(t *testing.T) {
 	if err := s.Fail(ctx, c.ID, *c.LeaseToken, "unreachable"); err != nil {
 		t.Fatal(err)
 	}
-	if fresh, reused, _ := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute); reused || fresh.ID == first.ID {
+	if fresh, reused, _ := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute, "2026.3"); reused || fresh.ID == first.ID {
 		t.Errorf("a failed scan was reused")
+	}
+
+	// A scan judged with another scoring model is not handed out again; one
+	// with the same model is.
+	if _, err := s.Enqueue(ctx, "old.example", 443); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		c, err := s.Claim(ctx, time.Minute)
+		if err != nil {
+			break
+		}
+		p := completeParams(c)
+		p.ScoringVersion = ptr("2026.2")
+		if err := s.Complete(ctx, p, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, reused, _ := s.EnqueueOrReuse(ctx, "old.example", 443, time.Minute, "2026.3"); reused {
+		t.Error("a scan judged with 2026.2 was reused under 2026.3")
+	}
+	if _, reused, _ := s.EnqueueOrReuse(ctx, "old.example", 443, time.Minute, "2026.2"); !reused {
+		t.Error("a scan judged with the current model was not reused")
 	}
 
 	// Outside the cooldown a new scan is created.
 	time.Sleep(300 * time.Millisecond)
-	if _, reused, _ := s.EnqueueOrReuse(ctx, "other.example", 443, 200*time.Millisecond); reused {
+	if _, reused, _ := s.EnqueueOrReuse(ctx, "other.example", 443, 200*time.Millisecond, "2026.3"); reused {
 		t.Error("reused after the cooldown")
 	}
 }
@@ -290,7 +313,7 @@ func TestEnqueueOrReuseConcurrent(t *testing.T) {
 	)
 	for range 10 {
 		wg.Go(func() {
-			sc, _, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute)
+			sc, _, err := s.EnqueueOrReuse(ctx, "example.com", 443, time.Minute, "2026.3")
 			if err != nil {
 				t.Error(err)
 				return

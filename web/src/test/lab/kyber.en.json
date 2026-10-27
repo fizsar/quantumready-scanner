@@ -9,13 +9,58 @@
   "finished_at": "2026-10-14T22:04:37Z",
   "lang": "en",
   "report": {
-    "scoring_version": "2026.2",
-    "score": 40,
-    "grade": "D",
-    "score_grade": "D",
+    "scoring_version": "2026.3",
+    "score": 90,
+    "grade": "A",
+    "score_grade": "A",
     "pqc": false,
     "selected_group": "x25519",
     "tls_version": "TLS 1.3",
+    "readiness": {
+      "score": 0,
+      "level": {
+        "code": "not_ready",
+        "label": "Not ready"
+      },
+      "blocks": [
+        {
+          "id": "key_exchange",
+          "label": "Post-quantum key exchange",
+          "points": 0,
+          "max": 50
+        },
+        {
+          "id": "tls13",
+          "label": "TLS 1.3",
+          "points": 10,
+          "max": 10
+        },
+        {
+          "id": "hybrid_variety",
+          "label": "Hybrid group variety",
+          "points": 0,
+          "max": 10
+        },
+        {
+          "id": "cert_automation",
+          "label": "Automated certificate renewal",
+          "points": 0,
+          "max": 15
+        },
+        {
+          "id": "pq_certificate",
+          "label": "Post-quantum certificate (ML-DSA, SLH-DSA)",
+          "points": 0,
+          "max": 15
+        },
+        {
+          "id": "kyber_draft",
+          "label": "Obsolete Kyber accepted (penalty)",
+          "points": -15,
+          "max": 0
+        }
+      ]
+    },
     "quantum_risk": {
       "code": "critical",
       "label": "Critical"
@@ -26,58 +71,46 @@
     },
     "blocks": [
       {
-        "id": "key_exchange",
-        "label": "Post-quantum key exchange",
-        "points": 0,
-        "max": 50
-      },
-      {
         "id": "tls13",
         "label": "TLS 1.3",
-        "points": 15,
-        "max": 15
+        "points": 30,
+        "max": 30
       },
       {
         "id": "forward_secrecy",
         "label": "Forward secrecy",
-        "points": 10,
-        "max": 10
-      },
-      {
-        "id": "hybrid_variety",
-        "label": "Hybrid group variety",
-        "points": 0,
-        "max": 5
+        "points": 25,
+        "max": 25
       },
       {
         "id": "certificate",
         "label": "Certificate and agility",
-        "points": 15,
-        "max": 20,
+        "points": 35,
+        "max": 45,
         "items": [
           {
             "id": "valid",
             "label": "Valid (chain, name, dates)",
-            "points": 5,
-            "max": 5
+            "points": 15,
+            "max": 15
           },
           {
             "id": "key",
             "label": "Key",
-            "points": 5,
-            "max": 5
+            "points": 10,
+            "max": 10
           },
           {
             "id": "signature",
             "label": "Signature",
-            "points": 5,
-            "max": 5
+            "points": 10,
+            "max": 10
           },
           {
             "id": "automation",
             "label": "Automated renewal",
             "points": 0,
-            "max": 5
+            "max": 10
           }
         ]
       }
@@ -87,6 +120,7 @@
         "code": "KEX_NO_HYBRID",
         "axis": "quantum",
         "axis_label": "Quantum risk",
+        "threat": "shor",
         "severity": "critical",
         "severity_label": "Critical",
         "category": "key_exchange",
@@ -98,6 +132,7 @@
         "code": "KEX_EXPERIMENTAL_PQC_ONLY",
         "axis": "quantum",
         "axis_label": "Quantum risk",
+        "threat": "shor",
         "severity": "medium",
         "severity_label": "Medium",
         "category": "key_exchange",
@@ -109,17 +144,19 @@
         "code": "CERT_CLASSICAL_SIGNATURE",
         "axis": "quantum",
         "axis_label": "Quantum risk",
+        "threat": "shor",
         "severity": "low",
         "severity_label": "Low",
         "category": "certificate",
         "title": "Classical signature (ECDSA P-256): future quantum risk",
-        "detail": "The server proves its identity with ECDSA P-256, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before. It does not affect the grade.",
+        "detail": "The server proves its identity with ECDSA P-256, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before. It does not limit today's security grade; in quantum readiness (model 2026.3), a post-quantum certificate would add 15 points.",
         "remediation": "Nothing to do on the signature yet. Automate renewal (ACME) so you can switch to post-quantum (ML-DSA or hybrid) certificates as soon as authorities issue them: today this certificate shows no sign of renewing itself."
       },
       {
         "code": "CERT_NOT_AUTOMATED",
         "axis": "quantum",
         "axis_label": "Quantum risk",
+        "threat": "shor",
         "severity": "low",
         "severity_label": "Low",
         "category": "certificate",
@@ -131,11 +168,12 @@
         "code": "SYM_AES128",
         "axis": "quantum",
         "axis_label": "Quantum risk",
+        "threat": "grover",
         "severity": "info",
         "severity_label": "Info",
         "category": "cipher_suites",
         "title": "AES-128 and Grover's algorithm",
-        "detail": "The connection uses TLS_AES_128_GCM_SHA256. In theory Grover's algorithm reduces AES-128 to about 64-bit security, but it does not parallelize in practice and NIST still considers AES-128 adequate. Informational: it does not affect the grade."
+        "detail": "The connection uses TLS_AES_128_GCM_SHA256. In theory Grover's algorithm reduces AES-128 to about 64-bit security, but it does not parallelize in practice and NIST still considers AES-128 adequate. Informational: it neither adds nor takes away on either axis."
       },
       {
         "code": "CERT_CT_MISSING",
@@ -151,6 +189,7 @@
         "code": "TLS13_SUPPORTED",
         "axis": "quantum",
         "axis_label": "Quantum risk",
+        "threat": "shor",
         "severity": "pass",
         "severity_label": "Pass",
         "category": "protocol",

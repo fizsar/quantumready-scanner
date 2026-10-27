@@ -1,6 +1,7 @@
 package scoring
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -128,8 +129,10 @@ type golden struct {
 	notCodes []string // must be absent
 	quantum  string
 	current  string
-	blockPts map[string]int
-	floor    int // expected FloorPoints
+	blockPts map[string]int // security today
+	readyPts map[string]int // quantum readiness
+	// readiness is "<score> <level>" of the quantum readiness axis ("": not checked).
+	readiness string
 }
 
 func tls12Only(r *scanner.Result) {
@@ -137,78 +140,122 @@ func tls12Only(r *scanner.Result) {
 	r.Default.CipherSuite = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
 }
 
+// kyber adds the obsolete Kyber draft codepoint, as the raw probes see it.
+func kyber(r *scanner.Result) {
+	r.Intensity = scanner.IntensityFull
+	r.Raw = &scanner.RawResult{SuitesComplete: true, TLS13SuitesComplete: true, TLS13GroupsComplete: true, TLS12CurvesComplete: true,
+		SSLv2: scanner.RawProtocol{Status: scanner.NotSupported}, SSLv3: scanner.RawProtocol{Status: scanner.NotSupported},
+		TLS13Groups: []scanner.RawGroup{{Name: "X25519Kyber768Draft00", ID: 0x6399, Kind: "kyber_draft"}}}
+}
+
+// pqCert gives the leaf an ML-DSA-65 key, presented when ML-DSA is offered
+// (with a classical certificate for clients without it).
+func pqCert(r *scanner.Result) {
+	c := r.Certificate
+	c.KeyAlgorithm, c.KeySize, c.Curve = "ML-DSA-65", 0, ""
+	c.Chain = []scanner.ChainCert{{KeyAlgorithm: "ML-DSA-65", PublicKeyOID: "2.16.840.1.101.3.4.3.18", SignatureOID: "1.2.840.10045.4.3.2"}}
+	ec := scanner.PresentedCert{KeyAlgorithm: "ECDSA", KeyOID: "1.2.840.10045.2.1"}
+	r.CertificateSelection = &scanner.CertificateSelection{WithMLDSA: &scanner.PresentedCert{KeyAlgorithm: "ML-DSA-65", KeyOID: "2.16.840.1.101.3.4.3.18", PostQuantum: true},
+		WithoutMLDSA: &ec, WithoutStatus: scanner.Supported}
+}
+
+// Model 2026.3. Security today: TLS 1.3 30, forward secrecy 25, certificate
+// 45 (valid 15, key 10, signature 10, automated renewal 10). Quantum
+// readiness: hybrid ML-KEM preferred 50 (accepted alone 30), TLS 1.3 10, more
+// than one standard group 10, automated renewal 15, post-quantum certificate
+// 15, obsolete Kyber -15 (not below 0).
 func goldenCases() []golden {
 	return []golden{
 		{
 			name: "ideal: PQC preferred, three hybrids", in: ideal(),
-			score: 100, grade: "A", quantum: "low", current: "none",
+			score: 100, grade: "A", readiness: "85 ready", quantum: "low", current: "none",
 			codes:    []string{"KEX_HYBRID_PREFERRED", "KEX_MULTIPLE_HYBRIDS", "TLS13_SUPPORTED", "FS_ALL", "CERT_VALID", "CERT_AUTOMATED_ACME", "CERT_CLASSICAL_SIGNATURE", "CERT_CT", "SYM_AES128"},
 			notCodes: []string{"SCAN_PARTIAL"},
-			blockPts: map[string]int{"key_exchange": 50, "tls13": 15, "forward_secrecy": 10, "hybrid_variety": 5, "certificate": 20},
+			blockPts: map[string]int{"tls13": 30, "forward_secrecy": 25, "certificate": 45},
+			readyPts: map[string]int{"key_exchange": 50, "tls13": 10, "hybrid_variety": 10, "cert_automation": 15, "pq_certificate": 0},
+		},
+		{
+			name: "ideal with a post-quantum certificate: readiness 100", in: apply(pqCert),
+			score: 100, grade: "A", readiness: "100 ready", codes: []string{"CERT_PQ_SIGNATURE"}, notCodes: []string{"CERT_CLASSICAL_SIGNATURE"},
+			readyPts: map[string]int{"pq_certificate": 15},
 		},
 		{
 			name: "like fizsar.com today: PQC preferred, one hybrid", in: apply(singleHybrid),
-			score: 95, grade: "A", quantum: "low", current: "none",
+			score: 100, grade: "A", readiness: "75 ready", quantum: "low", current: "none",
 			codes: []string{"KEX_HYBRID_PREFERRED", "KEX_SINGLE_HYBRID"},
 		},
 		{
-			name: "impeccable classical TLS without PQC -> D", in: apply(noPQC),
-			score: 45, grade: "D", quantum: "critical", current: "none",
+			name: "impeccable classical TLS without PQC: A today, not ready", in: apply(noPQC),
+			score: 100, grade: "A", readiness: "25 not_ready", quantum: "critical", current: "none",
 			codes:    []string{"KEX_NO_HYBRID", "TLS13_SUPPORTED", "FS_ALL", "CERT_VALID"},
-			blockPts: map[string]int{"key_exchange": 0, "tls13": 15, "forward_secrecy": 10, "hybrid_variety": 0, "certificate": 20},
+			readyPts: map[string]int{"key_exchange": 0, "tls13": 10, "hybrid_variety": 0, "cert_automation": 15},
 		},
 		{
-			name: "classical TLS with a commercial RSA-2048 certificate -> D", in: apply(noPQC, commercialRSA),
-			score: 40, grade: "D", quantum: "critical", current: "none",
+			name: "classical TLS with a commercial RSA-2048 certificate", in: apply(noPQC, commercialRSA),
+			score: 90, grade: "A", readiness: "10 not_ready", quantum: "critical", current: "none",
 			codes: []string{"KEX_NO_HYBRID", "CERT_NOT_AUTOMATED"},
 		},
 		{
-			name: "ML-KEM supported but not preferred -> B", in: apply(noPQC, singleHybrid),
-			score: 75, grade: "B", quantum: "high",
+			name: "ML-KEM supported but not preferred: on track", in: apply(noPQC, singleHybrid),
+			score: 100, grade: "A", readiness: "55 on_track", quantum: "high",
 			codes: []string{"KEX_HYBRID_NOT_PREFERRED"}, notCodes: []string{"KEX_NO_HYBRID", "KEX_HYBRID_PREFERRED"},
 		},
 		{
-			name:  "TLS 1.2 only, well configured -> bottom of D through the floor",
+			name: "obsolete Kyber alone: below no PQC at all", in: apply(noPQC, kyber),
+			score: 100, grade: "A", readiness: "10 not_ready", codes: []string{"KEX_EXPERIMENTAL_PQC_ONLY"},
+			readyPts: map[string]int{"kyber_draft": -15},
+		},
+		{
+			name: "obsolete Kyber besides ML-KEM still costs 15", in: apply(kyber),
+			score: 100, grade: "A", readiness: "70 ready", codes: []string{"KEX_EXPERIMENTAL_PQC_EXTRA"},
+		},
+		{
+			name: "the Kyber penalty stops at 0", in: apply(noPQC, commercialRSA, kyber),
+			score: 90, grade: "A", readiness: "0 not_ready",
+		},
+		{
+			name:  "TLS 1.2 only, well configured -> C (no floor since 2026.3)",
 			in:    apply(noPQC, tls12Only),
-			score: 40, grade: "D", floor: 10, quantum: "critical", current: "none",
+			score: 70, grade: "C", readiness: "15 not_ready", quantum: "critical", current: "none",
 			codes:    []string{"TLS13_MISSING", "KEX_NO_HYBRID", "FS_ALL"},
-			blockPts: map[string]int{"key_exchange": 0, "tls13": 0, "forward_secrecy": 10, "hybrid_variety": 0, "certificate": 20},
+			blockPts: map[string]int{"tls13": 0, "forward_secrecy": 25, "certificate": 45},
+			readyPts: map[string]int{"key_exchange": 0, "tls13": 0, "hybrid_variety": 0, "cert_automation": 15},
 		},
 		{
-			name:  "TLS 1.2 only with a commercial certificate -> D, never F",
+			name:  "TLS 1.2 only with a commercial certificate",
 			in:    apply(noPQC, tls12Only, commercialRSA),
-			score: 40, grade: "D", floor: 15, codes: []string{"TLS13_MISSING", "CERT_NOT_AUTOMATED"},
+			score: 60, grade: "C", readiness: "0 not_ready", codes: []string{"TLS13_MISSING", "CERT_NOT_AUTOMATED"},
 		},
 		{
-			name: "TLS 1.2 only with CBC suites -> D (a B cap does not remove the floor)",
+			name: "TLS 1.2 only with CBC suites: the B cap does not lower a C",
 			in: apply(noPQC, tls12Only, func(r *scanner.Result) {
 				r.TLS12Suites = append(r.TLS12Suites, suite("TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"))
 			}),
-			score: 40, grade: "D", floor: 10, cap: "B", codes: []string{"SUITE_CBC"},
+			score: 70, grade: "C", cap: "B", codes: []string{"SUITE_CBC"},
 		},
 		{
-			name: "TLS 1.2 only with RC4 -> floor kept (weak, not broken), D",
+			name: "TLS 1.2 only with RC4: C",
 			in: apply(noPQC, tls12Only, func(r *scanner.Result) {
 				r.TLS12Suites = append(r.TLS12Suites, suite("TLS_ECDHE_ECDSA_WITH_RC4_128_SHA"))
 			}),
-			score: 40, grade: "D", floor: 10, cap: "C", codes: []string{"SUITE_RC4"},
+			score: 70, grade: "C", cap: "C", codes: []string{"SUITE_RC4"},
 		},
 		{
 			name: "expired certificate caps at F", in: apply(func(r *scanner.Result) {
 				r.Certificate.Expired, r.Certificate.Trusted, r.Certificate.DaysToExpiry = true, false, -3
 			}),
-			score: 95, grade: "F", cap: "F", current: "critical",
+			score: 85, grade: "F", cap: "F", current: "critical",
 			codes: []string{"CERT_EXPIRED"}, notCodes: []string{"CERT_VALID", "CERT_UNTRUSTED"},
 		},
 		{
 			name: "self-signed caps at F", in: apply(func(r *scanner.Result) {
 				r.Certificate.Trusted, r.Certificate.SelfSigned, r.Certificate.TrustError = false, true, "x509: certificate signed by unknown authority"
 			}),
-			score: 95, grade: "F", cap: "F", codes: []string{"CERT_SELF_SIGNED"},
+			score: 85, grade: "F", cap: "F", codes: []string{"CERT_SELF_SIGNED"},
 		},
 		{
 			name: "hostname mismatch caps at F", in: apply(func(r *scanner.Result) { r.Certificate.HostnameMatch = false }),
-			score: 95, grade: "F", cap: "F", codes: []string{"CERT_HOSTNAME_MISMATCH"},
+			score: 85, grade: "F", cap: "F", codes: []string{"CERT_HOSTNAME_MISMATCH"},
 		},
 		{
 			name: "TLS 1.0/1.1 and CBC cap at B", in: apply(func(r *scanner.Result) {
@@ -229,27 +276,28 @@ func goldenCases() []golden {
 				r.Versions = versions("TLS 1.0", "TLS 1.1", "TLS 1.2", "TLS 1.3")
 				r.TLS10Suites = []scanner.CipherSuite{suite("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"), suite("TLS_RSA_WITH_3DES_EDE_CBC_SHA")}
 			}),
-			// The TLS 1.0 RSA suite also costs the forward secrecy block (2026.2).
-			score: 90, grade: "C", cap: "C", current: "high", codes: []string{"SUITE_3DES", "PROTO_LEGACY_TLS", "FS_PARTIAL"},
+			// The TLS 1.0 RSA suite also costs the forward secrecy block.
+			score: 75, grade: "C", cap: "C", current: "high", codes: []string{"SUITE_3DES", "PROTO_LEGACY_TLS", "FS_PARTIAL"},
 		},
 		{
 			name: "RSA-1024 caps at C and loses the key points", in: apply(func(r *scanner.Result) {
 				r.Certificate.KeyAlgorithm, r.Certificate.KeySize, r.Certificate.Curve, r.Certificate.SignatureAlgorithm = "RSA", 1024, "", "SHA256-RSA"
 			}),
-			score: 95, grade: "C", cap: "C", codes: []string{"CERT_WEAK_KEY"},
+			score: 90, grade: "C", cap: "C", codes: []string{"CERT_WEAK_KEY"},
 		},
 		{
 			name: "SHA-1 signature caps at C", in: apply(func(r *scanner.Result) { r.Certificate.SignatureAlgorithm = "SHA1-RSA" }),
-			score: 95, grade: "C", cap: "C", codes: []string{"CERT_WEAK_SIGNATURE"},
+			score: 90, grade: "C", cap: "C", codes: []string{"CERT_WEAK_SIGNATURE"},
 		},
 		{
-			name: "partial forward secrecy costs the block", in: apply(func(r *scanner.Result) {
+			name: "partial forward secrecy earns nothing of the block", in: apply(func(r *scanner.Result) {
 				r.TLS12Suites = append(r.TLS12Suites, suite("TLS_RSA_WITH_AES_128_GCM_SHA256"))
 			}),
-			score: 90, grade: "A", current: "medium", codes: []string{"FS_PARTIAL"}, notCodes: []string{"FS_ALL", "FS_NONE"},
+			score: 75, grade: "B", current: "medium", codes: []string{"FS_PARTIAL"}, notCodes: []string{"FS_ALL", "FS_NONE"},
+			blockPts: map[string]int{"forward_secrecy": 0},
 		},
 		{
-			name: "RSA key exchange only, no TLS 1.3 -> floor kept (weak, not broken), D",
+			name: "RSA key exchange only, no TLS 1.3, commercial certificate -> F by its score (no floor)",
 			in: apply(noPQC, commercialRSA, func(r *scanner.Result) {
 				r.Default = scanner.Handshake{Status: scanner.NotSupported}
 				r.KeyExchange.Selected = ""
@@ -257,7 +305,7 @@ func goldenCases() []golden {
 				r.Versions, r.TLS13Suite = versions("TLS 1.2"), ""
 				r.TLS12Suites = []scanner.CipherSuite{suite("TLS_RSA_WITH_AES_128_GCM_SHA256")}
 			}),
-			score: 40, grade: "D", floor: 25, cap: "C", codes: []string{"FS_NONE", "TLS13_MISSING", "KEX_NO_HYBRID"},
+			score: 35, grade: "F", cap: "C", readiness: "0 not_ready", codes: []string{"FS_NONE", "TLS13_MISSING", "KEX_NO_HYBRID"},
 		},
 		{
 			name: "TLS 1.0 only with RSA key exchange: no forward secrecy in any version",
@@ -268,7 +316,7 @@ func goldenCases() []golden {
 				r.Versions, r.TLS13Suite, r.TLS12Suites = versions("TLS 1.0"), "", nil
 				r.TLS10Suites = []scanner.CipherSuite{suite("TLS_RSA_WITH_AES_128_CBC_SHA")}
 			}),
-			score: 40, grade: "D", floor: 20, cap: "C", codes: []string{"FS_NONE", "PROTO_LEGACY_TLS", "SUITE_CBC"}, notCodes: []string{"FS_ALL"},
+			score: 45, grade: "D", cap: "C", codes: []string{"FS_NONE", "PROTO_LEGACY_TLS", "SUITE_CBC"}, notCodes: []string{"FS_ALL"},
 		},
 		{
 			name: "TLS 1.3 only has forward secrecy by design", in: apply(func(r *scanner.Result) {
@@ -280,7 +328,7 @@ func goldenCases() []golden {
 			name: "commercial certificate valid for 47 days counts as automated", in: apply(commercialRSA, func(r *scanner.Result) {
 				r.Certificate.ValidityDays = 47
 			}),
-			score: 100, grade: "A", codes: []string{"CERT_AUTOMATED_SHORT"}, notCodes: []string{"CERT_NOT_AUTOMATED"},
+			score: 100, grade: "A", readiness: "85 ready", codes: []string{"CERT_AUTOMATED_SHORT"}, notCodes: []string{"CERT_NOT_AUTOMATED"},
 		},
 		{
 			name: "expiring soon is a warning, not a cap", in: apply(func(r *scanner.Result) { r.Certificate.DaysToExpiry = 5 }),
@@ -302,15 +350,26 @@ func TestEvaluateGolden(t *testing.T) {
 			if got.ScoreGrade != GradeFor(tc.score) {
 				t.Errorf("score_grade = %s, want %s", got.ScoreGrade, GradeFor(tc.score))
 			}
-			if got.FloorPoints != tc.floor {
-				t.Errorf("floor_points = %d, want %d", got.FloorPoints, tc.floor)
+			if got.FloorPoints != 0 {
+				t.Errorf("floor_points = %d: no floor since 2026.3", got.FloorPoints)
 			}
-			sum := got.FloorPoints
+			sum := 0
 			for _, b := range got.Blocks {
 				sum += b.Points
 			}
 			if sum != got.Score {
-				t.Errorf("blocks + floor = %d, but score = %d", sum, got.Score)
+				t.Errorf("blocks = %d, but score = %d", sum, got.Score)
+			}
+			r := got.Readiness
+			ready := 0
+			for _, b := range r.Blocks {
+				ready += b.Points
+			}
+			if r.Score != max(ready, 0) || r.Level != LevelFor(r.Score) {
+				t.Errorf("readiness %d %s, blocks add up to %d", r.Score, r.Level, ready)
+			}
+			if tc.readiness != "" && fmt.Sprintf("%d %s", r.Score, r.Level) != tc.readiness {
+				t.Errorf("readiness = %d %s, want %s (%+v)", r.Score, r.Level, tc.readiness, r.Blocks)
 			}
 			gotCap := ""
 			if got.Cap != nil {
@@ -339,10 +398,15 @@ func TestEvaluateGolden(t *testing.T) {
 			if tc.current != "" && got.CurrentRisk != tc.current {
 				t.Errorf("current risk = %s, want %s", got.CurrentRisk, tc.current)
 			}
-			for id, want := range tc.blockPts {
-				for _, b := range got.Blocks {
-					if b.ID == id && b.Points != want {
-						t.Errorf("block %s = %d, want %d", id, b.Points, want)
+			for _, axis := range []struct {
+				name   string
+				want   map[string]int
+				blocks []Block
+			}{{"security", tc.blockPts, got.Blocks}, {"readiness", tc.readyPts, got.Readiness.Blocks}} {
+				for id, want := range axis.want {
+					i := slices.IndexFunc(axis.blocks, func(b Block) bool { return b.ID == id })
+					if i < 0 || axis.blocks[i].Points != want {
+						t.Errorf("%s block %s: %+v, want %d", axis.name, id, axis.blocks, want)
 					}
 				}
 			}
@@ -487,6 +551,24 @@ func TestModelAddsUpTo100(t *testing.T) {
 	if total != 100 {
 		t.Errorf("blocks add up to %d, want 100", total)
 	}
+	// Quantum readiness: 100 at most, reached only with a post-quantum
+	// certificate (85 without one, as the web says).
+	ready := 0
+	for _, b := range Evaluate(ideal()).Readiness.Blocks {
+		ready += b.Max
+	}
+	if ready != 100 || ReadyPQCert != 15 || Evaluate(ideal()).Readiness.Score != 85 {
+		t.Errorf("readiness adds up to %d (post-quantum certificate %d, ideal without one %d), want 100, 15, 85", ready, ReadyPQCert, Evaluate(ideal()).Readiness.Score)
+	}
+}
+
+// The level thresholds: Ready from 70, On track from 35.
+func TestLevelFor(t *testing.T) {
+	for score, want := range map[int]string{100: LevelReady, 70: LevelReady, 69: LevelOnTrack, 35: LevelOnTrack, 34: LevelNotReady, 0: LevelNotReady} {
+		if got := LevelFor(score); got != want {
+			t.Errorf("LevelFor(%d) = %s, want %s", score, got, want)
+		}
+	}
 }
 
 func TestFindingsSortedBySeverity(t *testing.T) {
@@ -582,5 +664,24 @@ func TestCatalog(t *testing.T) {
 	}
 	if catalog.Describe("KEX_NO_HYBRID", nil, "fr").Title != catalog.Describe("KEX_NO_HYBRID", nil, "es").Title {
 		t.Error("unknown language should fall back to Spanish")
+	}
+}
+
+// Shor breaks key exchange and signatures; Grover only weakens symmetric
+// ciphers (informational). Findings off the quantum axis have no threat.
+func TestThreatOf(t *testing.T) {
+	for _, c := range []struct {
+		code string
+		axis Axis
+		want string
+	}{
+		{"SYM_AES128", AxisQuantum, ThreatGrover},
+		{"KEX_NO_HYBRID", AxisQuantum, ThreatShor},
+		{"CERT_CLASSICAL_SIGNATURE", AxisQuantum, ThreatShor},
+		{"FS_ALL", AxisCurrent, ""},
+	} {
+		if got := ThreatOf(c.code, c.axis); got != c.want {
+			t.Errorf("ThreatOf(%s, %s) = %q, want %q", c.code, c.axis, got, c.want)
+		}
 	}
 }

@@ -1,6 +1,6 @@
-import { useId } from 'react'
-import { Link } from 'react-router'
-import type { Finding, Report as ReportData, ScanView } from '../api'
+import { useId, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { createScan, type Block, type Finding, type Report as ReportData, type ScanView } from '../api'
 import { useLang } from '../i18n'
 import { headline } from '../verdict'
 import { UnderTheHood } from './UnderTheHood'
@@ -30,16 +30,26 @@ export function Report({ scan, report, level = 1, uthAnchor }: { scan: ScanView;
         {t(verdict.key)}
       </H>
 
+      {report.outdated_model && <OutdatedModel scan={scan} version={report.scoring_version} />}
+
       <section className="summary" aria-label={t('grade.label')}>
         <div className={`grade grade-${report.grade}`}>
+          {report.readiness && <span className="grade-axis">{t('axis2.security')}</span>}
           <span className="grade-letter" aria-hidden="true">
             {report.grade}
           </span>
           <span className="sr-only">
-            {t('grade.label')}: {report.grade}
+            {t(report.readiness ? 'axis2.security' : 'grade.label')}: {report.grade}
           </span>
           <span className="grade-score">{t('grade.score', { score: report.score })}</span>
         </div>
+        {report.readiness && (
+          <div className={`readiness readiness-${report.readiness.level.code}`}>
+            <span className="grade-axis">{t('axis2.readiness')}</span>
+            <span className="readiness-level">{report.readiness.level.label}</span>
+            <span className="grade-score">{t('grade.score', { score: report.readiness.score })}</span>
+          </div>
+        )}
         <div className="summary-facts">
           <p className="host">{scan.host}</p>
           <p className={`badge ${report.pqc ? 'badge-yes' : 'badge-no'}`}>{report.pqc ? t('pqc.yes') : t('pqc.no')}</p>
@@ -60,25 +70,10 @@ export function Report({ scan, report, level = 1, uthAnchor }: { scan: ScanView;
         <H2 id={`${uid}-breakdown`} className="h-section">
           {t('breakdown.title')}
         </H2>
+        {report.readiness && <h3 className="h-axis2">{t('axis2.security')}</h3>}
         <ul className="blocks">
           {report.blocks.map((b) => (
-            <li key={b.id} className="block">
-              <div className="block-head">
-                <span>{b.label}</span>
-                <span className="pts">{t('breakdown.points', { points: b.points, max: b.max })}</span>
-              </div>
-              <meter className="bar" min={0} max={b.max} value={b.points} aria-label={b.label} />
-              {b.items && (
-                <ul className="items">
-                  {b.items.map((it) => (
-                    <li key={it.id}>
-                      <span>{it.label}</span>
-                      <span className="pts">{t('breakdown.points', { points: it.points, max: it.max })}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
+            <BlockRow key={b.id} b={b} />
           ))}
           {!!report.floor_points && (
             <li className="block block-floor">
@@ -90,6 +85,17 @@ export function Report({ scan, report, level = 1, uthAnchor }: { scan: ScanView;
             </li>
           )}
         </ul>
+        {report.readiness && (
+          <>
+            <h3 className="h-axis2">{t('axis2.readiness')}</h3>
+            <ul className="blocks">
+              {report.readiness.blocks.map((b) => (
+                <BlockRow key={b.id} b={b} />
+              ))}
+            </ul>
+            <p className="muted small">{t('axis2.readinessHelp')}</p>
+          </>
+        )}
       </section>
 
       <section className="panel" aria-labelledby={`${uid}-noteval`}>
@@ -115,6 +121,61 @@ export function Report({ scan, report, level = 1, uthAnchor }: { scan: ScanView;
   )
 }
 
+function BlockRow({ b }: { b: Block }) {
+  const { t } = useLang()
+  const penalty = b.points < 0
+  return (
+    <li className={`block${penalty ? ' block-penalty' : ''}`}>
+      <div className="block-head">
+        <span>{b.label}</span>
+        <span className="pts">{penalty ? t('breakdown.penalty', { points: b.points }) : t('breakdown.points', { points: b.points, max: b.max })}</span>
+      </div>
+      {!penalty && <meter className="bar" min={0} max={b.max} value={b.points} aria-label={b.label} />}
+      {b.items && (
+        <ul className="items">
+          {b.items.map((it) => (
+            <li key={it.id}>
+              <span>{it.label}</span>
+              <span className="pts">{t('breakdown.points', { points: it.points, max: it.max })}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  )
+}
+
+/** A scan judged with an earlier model: say so, and offer to scan again. */
+function OutdatedModel({ scan, version }: { scan: ScanView; version: string }) {
+  const { lang, t } = useLang()
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const rescan = async () => {
+    setBusy(true)
+    setFailed(false)
+    try {
+      const s = await createScan(scan.host, lang)
+      navigate(`/scans/${s.id}`)
+    } catch {
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="panel outdated" aria-label={t('outdated.title', { version })}>
+      <p>
+        <strong>{t('outdated.title', { version })}</strong> {t('outdated.lead')}
+      </p>
+      <button type="button" className="btn" onClick={rescan} disabled={busy}>
+        {t('outdated.rescan')}
+      </button>
+      {failed && <p className="bad small">{t('outdated.failed')}</p>}
+    </section>
+  )
+}
+
 function Axis({ uid, h, axis, level, findings }: { uid: string; h: Level; axis: 'quantum' | 'current'; level: string; findings: Finding[] }) {
   const { t } = useLang()
   const mine = findings.filter((f) => f.axis === axis) // already sorted by severity
@@ -130,7 +191,22 @@ function Axis({ uid, h, axis, level, findings }: { uid: string; h: Level; axis: 
         {t(`axis.${axis}.title`)} <span className="level">{t('axis.level', { level })}</span>
       </H2>
       <p className="muted small">{t(`axis.${axis}.help`)}</p>
-      {risks.length > 0 ? <FindingList findings={risks} /> : <p className="no-risks">{t('axis.noRisks')}</p>}
+      {axis === 'quantum' && risks.some((f) => f.threat === 'grover') ? (
+        <>
+          <H3 className="h-threat">{t('threat.shor')}</H3>
+          {risks.some((f) => f.threat !== 'grover') ? (
+            <FindingList findings={risks.filter((f) => f.threat !== 'grover')} />
+          ) : (
+            <p className="no-risks">{t('axis.noRisks')}</p>
+          )}
+          <H3 className="h-threat">{t('threat.grover')}</H3>
+          <FindingList findings={risks.filter((f) => f.threat === 'grover')} />
+        </>
+      ) : risks.length > 0 ? (
+        <FindingList findings={risks} />
+      ) : (
+        <p className="no-risks">{t('axis.noRisks')}</p>
+      )}
       {good.length > 0 && (
         <div className="good" role="group" aria-labelledby={`${id}-good`}>
           <H3 id={`${id}-good`} className="h-good">

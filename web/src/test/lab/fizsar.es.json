@@ -9,13 +9,52 @@
   "finished_at": "2026-10-17T11:47:58Z",
   "lang": "es",
   "report": {
-    "scoring_version": "2026.2",
-    "score": 95,
+    "scoring_version": "2026.3",
+    "score": 100,
     "grade": "A",
     "score_grade": "A",
     "pqc": true,
     "selected_group": "X25519MLKEM768",
     "tls_version": "TLS 1.3",
+    "readiness": {
+      "score": 75,
+      "level": {
+        "code": "ready",
+        "label": "Preparado"
+      },
+      "blocks": [
+        {
+          "id": "key_exchange",
+          "label": "Intercambio de claves post-cuántico",
+          "points": 50,
+          "max": 50
+        },
+        {
+          "id": "tls13",
+          "label": "TLS 1.3",
+          "points": 10,
+          "max": 10
+        },
+        {
+          "id": "hybrid_variety",
+          "label": "Variedad de grupos híbridos",
+          "points": 0,
+          "max": 10
+        },
+        {
+          "id": "cert_automation",
+          "label": "Renovación automatizada del certificado",
+          "points": 15,
+          "max": 15
+        },
+        {
+          "id": "pq_certificate",
+          "label": "Certificado post-cuántico (ML-DSA, SLH-DSA)",
+          "points": 0,
+          "max": 15
+        }
+      ]
+    },
     "quantum_risk": {
       "code": "low",
       "label": "Bajo"
@@ -26,58 +65,46 @@
     },
     "blocks": [
       {
-        "id": "key_exchange",
-        "label": "Intercambio de claves post-cuántico",
-        "points": 50,
-        "max": 50
-      },
-      {
         "id": "tls13",
         "label": "TLS 1.3",
-        "points": 15,
-        "max": 15
+        "points": 30,
+        "max": 30
       },
       {
         "id": "forward_secrecy",
         "label": "Secreto hacia adelante (forward secrecy)",
-        "points": 10,
-        "max": 10
-      },
-      {
-        "id": "hybrid_variety",
-        "label": "Variedad de grupos híbridos",
-        "points": 0,
-        "max": 5
+        "points": 25,
+        "max": 25
       },
       {
         "id": "certificate",
         "label": "Certificado y agilidad",
-        "points": 20,
-        "max": 20,
+        "points": 45,
+        "max": 45,
         "items": [
           {
             "id": "valid",
             "label": "Válido (cadena, nombre, fechas)",
-            "points": 5,
-            "max": 5
+            "points": 15,
+            "max": 15
           },
           {
             "id": "key",
             "label": "Clave",
-            "points": 5,
-            "max": 5
+            "points": 10,
+            "max": 10
           },
           {
             "id": "signature",
             "label": "Firma",
-            "points": 5,
-            "max": 5
+            "points": 10,
+            "max": 10
           },
           {
             "id": "automation",
             "label": "Renovación automatizada",
-            "points": 5,
-            "max": 5
+            "points": 10,
+            "max": 10
           }
         ]
       }
@@ -87,17 +114,19 @@
         "code": "CERT_CLASSICAL_SIGNATURE",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "low",
         "severity_label": "Bajo",
         "category": "certificate",
         "title": "Firma clásica (ECDSA P-256): riesgo cuántico futuro",
-        "detail": "La identidad del servidor se demuestra con ECDSA P-256, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. No afecta a la nota.",
+        "detail": "La identidad del servidor se demuestra con ECDSA P-256, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. No limita la nota de seguridad de hoy; en la preparación cuántica (modelo 2026.3), un certificado post-cuántico sumaría 15 puntos.",
         "remediation": "Nada que hacer todavía en la firma. Mantén la renovación automatizada para poder cambiar a certificados ML-DSA o híbridos en cuanto las autoridades los emitan."
       },
       {
         "code": "KEX_SINGLE_HYBRID",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "low",
         "severity_label": "Bajo",
         "category": "key_exchange",
@@ -109,11 +138,12 @@
         "code": "SYM_AES128",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "grover",
         "severity": "info",
         "severity_label": "Informativo",
         "category": "cipher_suites",
         "title": "AES-128 y el algoritmo de Grover",
-        "detail": "La conexión usa TLS_AES_128_GCM_SHA256. En teoría, el algoritmo de Grover reduce la seguridad de AES-128 a unos 64 bits, pero no es paralelizable de forma práctica y NIST sigue considerando AES-128 adecuado. Informativo: no afecta a la nota."
+        "detail": "La conexión usa TLS_AES_128_GCM_SHA256. En teoría, el algoritmo de Grover reduce la seguridad de AES-128 a unos 64 bits, pero no es paralelizable de forma práctica y NIST sigue considerando AES-128 adecuado. Informativo: no suma ni resta en ningún eje."
       },
       {
         "code": "CERT_CT",
@@ -129,6 +159,7 @@
         "code": "CERT_AUTOMATED_ACME",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "pass",
         "severity_label": "Correcto",
         "category": "certificate",
@@ -139,6 +170,7 @@
         "code": "KEX_HYBRID_PREFERRED",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "pass",
         "severity_label": "Correcto",
         "category": "key_exchange",
@@ -149,6 +181,7 @@
         "code": "TLS13_SUPPORTED",
         "axis": "quantum",
         "axis_label": "Riesgo cuántico",
+        "threat": "shor",
         "severity": "pass",
         "severity_label": "Correcto",
         "category": "protocol",
