@@ -59,7 +59,51 @@ func rawExtras() map[string]*scanner.Result {
 		r.Raw.TLS13Groups = []scanner.RawGroup{{Name: "X25519Kyber768Draft00", ID: 0x6399, Kind: "kyber_draft"}}
 		r.Raw.DH = []scanner.DHParams{{Version: "TLS 1.2", Suite: "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256", PrimeBits: 3072}}
 	})
-	return map[string]*scanner.Result{"integrity_only": integrity, "modern_aead": modern, "kyber_and_mlkem": extra}
+	chacha := scanner.RawSuite{Version: "TLS 1.3", Name: "TLS_CHACHA20_POLY1305_SHA256", ID: 0x1303, AEAD: true, Mode: "aead", Bits: 256, ForwardSecrecy: true}
+	order := func(o, a, b string) *scanner.Result { // milestone 2.8.7
+		return apply(func(r *scanner.Result) {
+			tls13(r, aes, chacha)
+			r.Raw.TLS13SuiteOrder = &scanner.SuiteOrder{Order: o, Offer: []string{aes.Name, chacha.Name}, Picks: []string{a, b}}
+		})
+	}
+	return map[string]*scanner.Result{"integrity_only": integrity, "modern_aead": modern, "kyber_and_mlkem": extra,
+		"order_server":  order(scanner.SuiteOrderServer, aes.Name, aes.Name),
+		"order_client":  order(scanner.SuiteOrderClient, aes.Name, chacha.Name),
+		"order_unknown": order("", aes.Name, "")}
+}
+
+// The TLS 1.3 suite order (2.8.7) is evaluated and informational: either
+// answer leaves score, grade and readiness as they were; an undecided one or
+// a scan without it (stored before) adds nothing.
+func TestTLS13SuiteOrder(t *testing.T) {
+	x := rawExtras()
+	base := Evaluate(apply(func(r *scanner.Result) {
+		r.Intensity = scanner.IntensityFull
+		r.Raw = &scanner.RawResult{SuitesComplete: true, TLS13SuitesComplete: true, TLS13GroupsComplete: true, TLS12CurvesComplete: true,
+			SSLv2: scanner.RawProtocol{Status: scanner.NotSupported}, SSLv3: scanner.RawProtocol{Status: scanner.NotSupported},
+			TLS13Suites: x["order_server"].Raw.TLS13Suites}
+	}))
+	for name, want := range map[string]string{"order_server": "TLS13_SUITE_ORDER_SERVER", "order_client": "TLS13_SUITE_ORDER_CLIENT", "order_unknown": ""} {
+		res := Evaluate(x[name])
+		var got []Finding
+		for _, f := range res.Findings {
+			if strings.HasPrefix(f.Code, "TLS13_SUITE_ORDER") {
+				got = append(got, f)
+			}
+		}
+		switch {
+		case want == "" && len(got) != 0, want != "" && (len(got) != 1 || got[0].Code != want || got[0].Severity != Info || got[0].Axis != AxisCurrent):
+			t.Errorf("%s: %+v, want %q (informational)", name, got, want)
+		}
+		if res.Score != base.Score || res.Grade != base.Grade || res.Readiness.Score != base.Readiness.Score || len(res.Findings) != len(base.Findings)+len(got) {
+			t.Errorf("%s changed the judgement: %d %s %d", name, res.Score, res.Grade, res.Readiness.Score)
+		}
+	}
+	if got := Evaluate(x["order_client"]).Findings; !slices.ContainsFunc(got, func(f Finding) bool {
+		return f.Code == "TLS13_SUITE_ORDER_CLIENT" && f.Params["first"] == "TLS_AES_128_GCM_SHA256" && f.Params["second"] == "TLS_CHACHA20_POLY1305_SHA256"
+	}) {
+		t.Errorf("client order params: %+v", got)
+	}
 }
 
 func TestLabServers(t *testing.T) {

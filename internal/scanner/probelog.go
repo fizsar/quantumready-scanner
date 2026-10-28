@@ -158,6 +158,11 @@ const (
 	PurposeTLS12Curves = "tls12_curves" // raw, through ServerKeyExchange (Subject: version)
 	PurposeCertificate = "certificate"  // raw TLS 1.3, decrypted: the certificate without ML-DSA (Subject)
 	PurposeChrome      = "chrome"       // raw: Chrome 156's ClientHello, byte for byte
+	// PurposeTLS13SuiteOrder: raw, the accepted TLS 1.3 suites in one order
+	// and reversed (Subject: SubjectFirstOrder, SubjectReversedOrder).
+	PurposeTLS13SuiteOrder = "tls13_suite_order"
+	SubjectFirstOrder      = "first"
+	SubjectReversedOrder   = "reversed"
 )
 
 const (

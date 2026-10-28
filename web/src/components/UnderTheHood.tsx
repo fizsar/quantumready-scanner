@@ -332,11 +332,13 @@ function logReplyKind(p: LogProbe) {
   return 'other'
 }
 
-const PURPOSES = ['default', 'group', 'version', 'suites', 'sslv2', 'sslv3', 'tls13_suites', 'tls13_groups', 'tls12_curves', 'certificate', 'chrome'] as const
+const PURPOSES = ['default', 'group', 'version', 'suites', 'sslv2', 'sslv3', 'tls13_suites', 'tls13_groups', 'tls12_curves', 'certificate', 'chrome', 'tls13_suite_order'] as const
 
 function purposeText(p: LogProbe, t: T) {
   const known = PURPOSES.find((k) => k === p.purpose)
-  return known ? t(`uth.purpose.${known}`, { subject: p.subject ?? '' }) : [p.purpose, p.subject].filter(Boolean).join(' ')
+  // The suite order probes (2.8.7) name their offer: first or reversed.
+  const subject = known === 'tls13_suite_order' ? t(p.subject === 'reversed' ? 'uth.order.reversed' : 'uth.order.first') : (p.subject ?? '')
+  return known ? t(`uth.purpose.${known}`, { subject }) : [p.purpose, p.subject].filter(Boolean).join(' ')
 }
 
 const shortList = (names: string[], max = 4) => (names.length > max ? [...names.slice(0, max), '…'] : names).join(', ')

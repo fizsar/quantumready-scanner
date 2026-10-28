@@ -5,6 +5,8 @@ import (
 	"errors"
 	"slices"
 	"testing"
+
+	"github.com/fizsar/quantumready-saas/internal/scanner/rawtls"
 )
 
 func TestFullIntensityAgainstGo(t *testing.T) {
@@ -138,6 +140,91 @@ func TestChromeOffer(t *testing.T) {
 	if basic.ChromeOffer != nil {
 		t.Errorf("basic: chrome offer %+v (raw probes are intensity full only)", basic.ChromeOffer)
 	}
+}
+
+func TestSuiteOrderOf(t *testing.T) {
+	offer := []uint16{0x1301, 0x1302, 0x1303}
+	for _, tc := range []struct {
+		a, b uint16
+		want string
+	}{
+		{0x1301, 0x1301, SuiteOrderServer}, // the same both times
+		{0x1302, 0x1302, SuiteOrderServer},
+		{0x1301, 0x1303, SuiteOrderClient}, // the first of each offer
+		{0x1301, 0x1302, ""},               // neither
+		{0x1302, 0x1303, ""},
+		{0, 0x1303, ""}, // a probe failed
+		{0x1301, 0, ""},
+		{0, 0, ""}, // both: not "the same choice"
+	} {
+		if got := suiteOrderOf(offer, tc.a, tc.b); got != tc.want {
+			t.Errorf("picks %04x, %04x: %q, want %q", tc.a, tc.b, got, tc.want)
+		}
+	}
+	if got := suiteOrderOf([]uint16{0x1301}, 0x1301, 0x1301); got != "" {
+		t.Errorf("one suite: %q, nothing to tell", got)
+	}
+}
+
+// A crypto/tls server (three TLS 1.3 suites): two probes, the offer and its
+// reverse, logged; a TLS 1.2-only server gets none.
+func TestTLS13SuiteOrder(t *testing.T) {
+	pki := newTestPKI(t)
+	cert := pki.leaf(t, leafOpts{})
+	r := scan(t, newTestScanner(pki, Options{Intensity: IntensityFull}), startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}}))
+	o := r.Raw.TLS13SuiteOrder
+	if o == nil || len(o.Offer) != 3 || len(o.Picks) != 2 || o.Picks[0] == "" || o.Picks[1] == "" {
+		t.Fatalf("suite order %+v", o)
+	}
+	// Go follows the client when it puts ChaCha20 first and otherwise its
+	// own order (AES first with AES hardware): either way, a clear answer.
+	if want := suiteOrderOf(suiteIDs(t, o.Offer), suiteID(t, o.Picks[0]), suiteID(t, o.Picks[1])); o.Order == "" || o.Order != want {
+		t.Errorf("order %q for %+v", o.Order, o)
+	}
+	if slices.Contains(r.NotEvaluated, NotEvalTLS13SuiteOrder) {
+		t.Errorf("not evaluated %v", r.NotEvaluated)
+	}
+	offered := map[string][]uint16{} // subject → TLS 1.3 suites offered, as sent
+	for _, p := range r.ProbeLog.Probes {
+		if p.Purpose == PurposeTLS13SuiteOrder && p.Offer != nil {
+			offered[p.Subject] = slices.DeleteFunc(slices.Clone(r.ProbeLog.Offers[*p.Offer].Suites), func(id uint16) bool {
+				return id == rawtls.SCSVRenegotiation // Hello.Marshal adds it to every offer
+			})
+		}
+	}
+	first, second := offered[SubjectFirstOrder], slices.Clone(offered[SubjectReversedOrder])
+	slices.Reverse(second)
+	if len(offered) != 2 || !slices.Equal(first, suiteIDs(t, o.Offer)) || !slices.Equal(second, first) {
+		t.Errorf("offers logged %v: want the suites found, then the same reversed", offered)
+	}
+
+	r12 := scan(t, newTestScanner(pki, Options{Intensity: IntensityFull}), startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}, MaxVersion: tls.VersionTLS12}))
+	if r12.Raw.TLS13SuiteOrder != nil || slices.Contains(r12.NotEvaluated, NotEvalTLS13SuiteOrder) {
+		t.Errorf("TLS 1.2 only: %+v, %v", r12.Raw.TLS13SuiteOrder, r12.NotEvaluated)
+	}
+	// An undecided outcome is reported as not evaluated.
+	if !slices.Contains(notEvaluatedFull(&RawResult{TLS13SuiteOrder: &SuiteOrder{}}), NotEvalTLS13SuiteOrder) {
+		t.Error("an undecided order must be not evaluated")
+	}
+}
+
+func suiteID(t *testing.T, name string) uint16 {
+	t.Helper()
+	for _, s := range rawtls.Suites() {
+		if s.Name == name {
+			return s.ID
+		}
+	}
+	t.Fatalf("unknown suite %s", name)
+	return 0
+}
+
+func suiteIDs(t *testing.T, names []string) []uint16 {
+	var out []uint16
+	for _, n := range names {
+		out = append(out, suiteID(t, n))
+	}
+	return out
 }
 
 func TestNoteChainKeepsTheHighestVersion(t *testing.T) {

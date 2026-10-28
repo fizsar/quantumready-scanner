@@ -88,6 +88,9 @@ type view struct {
 	// CertDetails describe the server's certificate (key and size,
 	// signature, expiry date, chain): only when testssl.sh saw one alone.
 	CertDetails []string `json:"cert_details"`
+	// TLS13Order is whose TLS 1.3 suite order the server follows:
+	// "servidor" or "cliente" (2.8.7).
+	TLS13Order []string `json:"tls13_order"`
 }
 
 func sortedSet(m map[string]bool) []string {
@@ -157,6 +160,9 @@ func ourView(r *Result) view {
 			}
 		}
 	}
+	if raw := r.Raw; raw != nil && raw.TLS13SuiteOrder != nil {
+		v.TLS13Order = []string{map[string]string{SuiteOrderServer: "servidor", SuiteOrderClient: "cliente"}[raw.TLS13SuiteOrder.Order]}
+	}
 	if c := r.Certificate; c != nil {
 		chain := "no de confianza"
 		switch {
@@ -224,8 +230,17 @@ func testsslView(t *testing.T, server string) view {
 		}
 	}
 	protos, suites, ssl3, ssl2, tls13, dh, groups := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
-	certs, details := map[string]bool{}, map[string]bool{}
+	certs, details, order := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, e := range entries {
+		// "NOT a cipher order configured" (cipher_order-tls1_3), or "not a
+		// server cipher order for TLS 1.3 configured" (cipher_order, TLS 1.3 only).
+		if e.ID == "cipher_order-tls1_3" || e.ID == "cipher_order" && strings.Contains(e.Finding, "TLS 1.3") {
+			if strings.Contains(strings.ToLower(e.Finding), "not a") {
+				order["cliente"] = true
+			} else {
+				order["servidor"] = true
+			}
+		}
 		if strings.HasPrefix(e.ID, "cert_keySize") {
 			certs[testsslKey(e.Finding)] = true
 		}
@@ -290,7 +305,7 @@ func testsslView(t *testing.T, server string) view {
 		}
 	}
 	return view{Protocols: sortedSet(protos), Suites: sortedSet(suites), SSLv3Suites: sortedSet(ssl3), SSLv2: sortedSet(ssl2),
-		TLS13Suites: sortedSet(tls13), DHBits: sortedSet(dh), Groups: sortedSet(groups), CertKeys: sortedSet(certs), CertDetails: sortedSet(details)}
+		TLS13Suites: sortedSet(tls13), DHBits: sortedSet(dh), Groups: sortedSet(groups), CertKeys: sortedSet(certs), CertDetails: sortedSet(details), TLS13Order: sortedSet(order)}
 }
 
 func groupID(name string) uint16 {
@@ -376,6 +391,7 @@ func TestLab(t *testing.T) {
 				{"grupos", ref.Groups, ours.Groups},
 				{"certificados (clave)", ref.CertKeys, ours.CertKeys},
 				{"certificado (detalle)", ref.CertDetails, ours.CertDetails},
+				{"orden de suites TLS 1.3", ref.TLS13Order, ours.TLS13Order},
 			} {
 				onlyRef, onlyOurs := diff(a.ref, a.our)
 				verdict := "="

@@ -172,8 +172,12 @@ describe('Under the hood: certificates by offer and the details 2.8.5 adds', () 
   it('names the Chrome 156 probe (2.8.7)', async () => {
     const r = structuredClone(fizsarV2) as unknown as ScanResult
     r.probe_log!.probes[1].purpose = 'chrome'
+    Object.assign(r.probe_log!.probes[2], { purpose: 'tls13_suite_order', subject: 'first' })
+    Object.assign(r.probe_log!.probes[3], { purpose: 'tls13_suite_order', subject: 'reversed' })
     const { items } = await panel(withResult(fizsarEs, r))
     expect(items[1].textContent).toContain('Oferta de Chrome 156 (byte a byte)')
+    expect(items[2].textContent).toContain('Orden de suites de TLS 1.3: en el orden encontrado')
+    expect(items[3].textContent).toContain('Orden de suites de TLS 1.3: en orden inverso')
   })
 
   it('scans from before show no certificate section', async () => {

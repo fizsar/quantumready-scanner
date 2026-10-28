@@ -210,6 +210,9 @@ func (s *Scanner) runRaw(ctx context.Context, t target, res *Result) [][]byte {
 		}
 		return nil
 	})
+	if len(rs.res.TLS13Suites) >= 2 {
+		g2.Go(func() error { rs.tls13SuiteOrder(ctx); return nil })
+	}
 	_ = g2.Wait()
 	// ECDHE only in SSLv3: its curves are not probed (SSLv3 clients send no
 	// supported_groups), so the curve list is not evaluated.
@@ -464,6 +467,66 @@ func (rs *rawScan) tls13Suites(ctx context.Context) {
 		remaining = slices.DeleteFunc(remaining, func(x uint16) bool { return x == id })
 	}
 	rs.setTLS13Suites(true)
+}
+
+// tls13SuiteOrder offers the accepted TLS 1.3 suites in the order they were
+// found and then reversed (two connections, same groups and key share as
+// tls13Suites). The same choice both times: the server imposes its order;
+// the first suite of each offer: it follows the client's.
+func (rs *rawScan) tls13SuiteOrder(ctx context.Context) {
+	rs.mu.Lock()
+	var offer []uint16
+	for _, s := range rs.res.TLS13Suites {
+		offer = append(offer, s.ID)
+	}
+	rs.mu.Unlock()
+	if len(offer) < 2 { // one suite: no order to tell
+		return
+	}
+	reversed := slices.Clone(offer)
+	slices.Reverse(reversed)
+	ks, err := rawtls.X25519KeyShare()
+	if err != nil {
+		return
+	}
+	pick := func(suites []uint16, subject string) uint16 {
+		h := &rawtls.Hello{Version: rawtls.VersionTLS12, SupportedVersions: []uint16{rawtls.VersionTLS13}, Suites: suites,
+			ServerName: rs.t.sni, Groups: tls13GroupIDs(), KeyShares: []rawtls.KeyShare{ks}}
+		o := rs.hello(ctx, probeTag{PurposeTLS13SuiteOrder, subject}, h, false, nil)
+		if o.status != Supported {
+			return 0
+		}
+		return o.resp.ServerHello.CipherSuite
+	}
+	a, b := pick(offer, SubjectFirstOrder), pick(reversed, SubjectReversedOrder)
+	order := suiteOrderOf(offer, a, b)
+	name := func(id uint16) string {
+		if id == 0 {
+			return ""
+		}
+		return rawtls.SuiteName(id)
+	}
+	var names []string
+	for _, id := range offer {
+		names = append(names, rawtls.SuiteName(id))
+	}
+	rs.mu.Lock()
+	rs.res.TLS13SuiteOrder = &SuiteOrder{Order: order, Offer: names, Picks: []string{name(a), name(b)}}
+	rs.mu.Unlock()
+}
+
+// suiteOrderOf judges the suites a and b chosen for offer and for it
+// reversed (0: the probe failed).
+func suiteOrderOf(offer []uint16, a, b uint16) string {
+	switch {
+	case a == 0 || b == 0 || len(offer) < 2:
+		return ""
+	case a == b:
+		return SuiteOrderServer
+	case a == offer[0] && b == offer[len(offer)-1]:
+		return SuiteOrderClient
+	}
+	return ""
 }
 
 func (rs *rawScan) setTLS13Suites(complete bool) {

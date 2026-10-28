@@ -155,6 +155,14 @@ Lo que elige cada servidor para la oferta tipo navegador de `crypto/tls` y para 
 
 Ningún servidor elige distinto: la sonda queda como contraste y la nota sigue saliendo de la oferta de `crypto/tls`. Una conexión más por escaneo (intensidad `full`).
 
+### Hito 2.8.7: orden de suites de TLS 1.3
+
+Los cinco servidores del laboratorio con varias suites de TLS 1.3 (`tls13`, `modern`, `kyber`, `mldsa-dual`, `mldsa-only`) y fizsar.com **siguen el orden del cliente**: con la oferta invertida eligen su primera suite (`tls13` llega a elegir `TLS_AES_128_CCM_8_SHA256` si va primera). testssl.sh dice lo mismo de los cinco («not a server cipher order for TLS 1.3 configured»); `make tlslab-test` lo compara. En el informe es un hallazgo informativo sin puntos (`TLS13_SUITE_ORDER_CLIENT` o `_SERVER`).
+
+Conexiones por escaneo (intensidad `full`), antes y después del 2.8.7: fizsar.com 30 → 33 (Chrome 156 y las dos de orden; 15 de ellas en crudo); `export` 53 → 54 (Chrome 156; sin TLS 1.3 no hay sondas de orden; 39 en crudo, presupuesto de 48). El certificado de las sondas en crudo no cuesta conexiones.
+
+Los escaneos del laboratorio y de fizsar.com hechos con el escáner del 2.8.7 están en `internal/scoring/testdata/lab_v3`; `TestLabV3AgainstBefore` comprueba que, frente a los anteriores y con el mismo modelo, la nota y los hallazgos cambian solo donde dicen las tablas de arriba.
+
 ### Mediciones y tiempo máximo por escaneo
 
 Cada servidor, con intensidad `full` y `basic`, en local y con una latencia simulada de 100 ms de RTT (el dialer espera 2 RTT por conexión: TCP y el primer intercambio; solo en tests).

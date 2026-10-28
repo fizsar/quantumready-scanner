@@ -779,6 +779,19 @@ func (e *evaluator) suites() {
 	if len(tls13) > 0 && len(integrity) == 0 && len(ccm8) == 0 {
 		e.add("TLS13_SUITES_AEAD", AxisCurrent, Pass, CatCipherSuites, map[string]string{"suites": strings.Join(tls13, ", ")})
 	}
+
+	// Whose order of TLS 1.3 suites the server follows (milestone 2.8.7):
+	// evaluated, informational, no points (every TLS 1.3 suite is sound).
+	// Only scans that carry it: earlier ones keep their judgement.
+	if raw := e.r.Raw; raw != nil && raw.TLS13SuiteOrder != nil && len(raw.TLS13SuiteOrder.Picks) == 2 {
+		o := raw.TLS13SuiteOrder
+		switch o.Order {
+		case scanner.SuiteOrderServer:
+			e.add("TLS13_SUITE_ORDER_SERVER", AxisCurrent, Info, CatCipherSuites, map[string]string{"suite": o.Picks[0]})
+		case scanner.SuiteOrderClient:
+			e.add("TLS13_SUITE_ORDER_CLIENT", AxisCurrent, Info, CatCipherSuites, map[string]string{"first": o.Picks[0], "second": o.Picks[1]})
+		}
+	}
 }
 
 // symmetric: AES-128 and Grover. Informational: NIST still deems AES-128

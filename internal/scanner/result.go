@@ -165,6 +165,10 @@ type RawResult struct {
 	// negotiated one).
 	TLS13Suites         []RawSuite `json:"tls13_suites"`
 	TLS13SuitesComplete bool       `json:"tls13_suites_complete"`
+	// TLS13SuiteOrder (milestone 2.8.7) says whether the server imposes its
+	// own order of TLS 1.3 suites or follows the client's; nil when it has
+	// fewer than two or was not probed (results from before).
+	TLS13SuiteOrder *SuiteOrder `json:"tls13_suite_order,omitempty"`
 
 	// DH lists the finite-field DH groups seen in ServerKeyExchange.
 	DH []DHParams `json:"dh,omitempty"`
@@ -385,6 +389,27 @@ const (
 // suites need credentials or algorithms a scanner does not have.
 const NotEvalCredentialSuites = "credential_suites" //nolint:gosec // a code name, not a credential
 
+// SuiteOrder is the outcome of two offers of the same suites in opposite
+// orders: the suite chosen for each.
+type SuiteOrder struct {
+	// Order is SuiteOrderServer (the same suite both times),
+	// SuiteOrderClient (the first one offered each time) or "" (neither, or
+	// a probe failed: not evaluated).
+	Order string   `json:"order"`
+	Offer []string `json:"offer"` // the first offer; the second is it reversed
+	Picks []string `json:"picks"` // chosen for the first and the second offer ("" if the probe failed)
+}
+
+// The values of SuiteOrder.Order.
+const (
+	SuiteOrderServer = "server" // the server imposes its order
+	SuiteOrderClient = "client" // the server follows the client's order
+)
+
+// NotEvalTLS13SuiteOrder (intensity full): the server has two or more TLS 1.3
+// suites and whose order it follows could not be told.
+const NotEvalTLS13SuiteOrder = "tls13_suite_order"
+
 // Post-quantum certificates (milestone 2.8.5): no certificate was seen with
 // an offer that includes ML-DSA; or a post-quantum one was, and whether the
 // server has a classical one for clients without ML-DSA could not be told.
@@ -417,6 +442,9 @@ func notEvaluatedFull(r *RawResult) []string {
 	}
 	if !r.TLS13SuitesComplete {
 		out = append(out, NotEvalTLS13Suites)
+	}
+	if o := r.TLS13SuiteOrder; o != nil && o.Order == "" {
+		out = append(out, NotEvalTLS13SuiteOrder)
 	}
 	out = append(out, NotEvalServerPreference)
 	if !r.TLS13GroupsComplete || !r.TLS12CurvesComplete {

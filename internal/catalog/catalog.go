@@ -255,6 +255,18 @@ var findingTexts = map[string]langTexts{
 		"en": {Title: "Sound TLS 1.3 suites",
 			Detail: "Every TLS 1.3 suite accepted uses authenticated encryption with a full-size tag: {suites}."},
 	},
+	"TLS13_SUITE_ORDER_SERVER": {
+		"es": {Title: "TLS 1.3: el servidor impone su orden de suites",
+			Detail: "Con las mismas suites ofrecidas en un orden y en el inverso, el servidor eligió las dos veces {suite}: decide él, no el cliente. Informativo: en TLS 1.3 todas las suites son seguras, así que no suma ni resta."},
+		"en": {Title: "TLS 1.3: the server imposes its suite order",
+			Detail: "Offered the same suites in one order and reversed, the server chose {suite} both times: it decides, not the client. Informational: every TLS 1.3 suite is sound, so it neither adds nor takes away."},
+	},
+	"TLS13_SUITE_ORDER_CLIENT": {
+		"es": {Title: "TLS 1.3: el servidor sigue el orden del cliente",
+			Detail: "Con las mismas suites ofrecidas en un orden y en el inverso, el servidor eligió cada vez la primera del cliente ({first} y {second}). Informativo: en TLS 1.3 todas las suites son seguras y el cliente sabe mejor cuál le conviene (AES con aceleración por hardware o ChaCha20), así que no suma ni resta."},
+		"en": {Title: "TLS 1.3: the server follows the client's order",
+			Detail: "Offered the same suites in one order and reversed, the server chose the client's first each time ({first} and {second}). Informational: every TLS 1.3 suite is sound and the client knows best which suits it (AES with hardware support or ChaCha20), so it neither adds nor takes away."},
+	},
 	"DH_WEAK": {
 		"es": {Title: "Diffie-Hellman demasiado débil ({bits} bits)",
 			Detail:      "Las suites DHE usan un grupo de menos de 1024 bits. Con el ataque Logjam (CVE-2015-4000) se puede romper en tiempo real y descifrar o manipular la conexión.",
@@ -457,6 +469,7 @@ var labels = map[string]map[string]string{
 	"noteval.tls12_ccm_camellia_aria_null_export_suites": {"es": "Suites CCM, Camellia, ARIA, NULL y EXPORT", "en": "CCM, Camellia, ARIA, NULL and EXPORT suites"},
 	"noteval.tls13_suite_list":                           {"es": "Lista completa de suites de TLS 1.3", "en": "Full TLS 1.3 suite list"},
 	"noteval.tls12_server_cipher_preference":             {"es": "Orden de preferencia de suites del servidor", "en": "Server cipher suite preference"},
+	"noteval.tls13_suite_order":                          {"es": "Orden de suites de TLS 1.3 (servidor o cliente)", "en": "TLS 1.3 suite order (server or client)"},
 	"noteval.legacy_groups":                              {"es": "Grupos antiguos (ffdhe, brainpool…)", "en": "Legacy groups (ffdhe, brainpool…)"},
 	"noteval.non_standard_pqc_groups":                    {"es": "Grupos post-cuánticos no estándar", "en": "Non-standard post-quantum groups"},
 	"noteval.credential_suites":                          {"es": "Suites PSK, SRP, Kerberos y GOST (requieren credenciales o algoritmos que un escáner no tiene)", "en": "PSK, SRP, Kerberos and GOST suites (they need credentials or algorithms a scanner does not have)"},
