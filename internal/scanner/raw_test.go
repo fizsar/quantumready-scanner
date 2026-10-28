@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"crypto/tls"
+	"errors"
 	"slices"
 	"testing"
 )
@@ -47,6 +48,70 @@ func TestFullIntensityAgainstGo(t *testing.T) {
 	}
 	if n := res.calls.Load(); n != 1 {
 		t.Errorf("%d DNS lookups, want 1 (raw probes must reuse the pinned address)", n)
+	}
+	if r.Certificate == nil || r.Certificate.Source != "" {
+		t.Errorf("certificate %+v: crypto/tls saw it, so it is not from the raw probes", r.Certificate)
+	}
+}
+
+// A TLS 1.2 server that refuses every ClientHello carrying
+// extended_master_secret, which crypto/tls always sends and the raw probes
+// never do: no crypto/tls handshake gets to the certificate (as with the
+// lab's EXPORT, DHE-only or secp224 servers), the raw probes read it in clear.
+func TestCertificateFromRawProbes(t *testing.T) {
+	pki := newTestPKI(t)
+	cert := pki.leaf(t, leafOpts{})
+	port := startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}, MaxVersion: tls.VersionTLS12,
+		GetConfigForClient: func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+			if slices.Contains(hi.Extensions, 23) {
+				return nil, errors.New("no crypto/tls clients here")
+			}
+			return nil, nil
+		}})
+
+	full := scan(t, newTestScanner(pki, Options{Intensity: IntensityFull}), port)
+	c := full.Certificate
+	if c == nil {
+		t.Fatal("no certificate: the raw probes saw it in clear")
+	}
+	if c.Source != CertSourceRaw || !c.Trusted || !c.HostnameMatch || c.KeyAlgorithm != "ECDSA" || c.OCSPStapled || c.SCTsHandshake != 0 || len(c.Chain) != 2 {
+		t.Errorf("certificate %+v: want the leaf and its CA, trusted, from the raw probes", c)
+	}
+	sel := full.CertificateSelection
+	if sel.WithMLDSA == nil || sel.WithMLDSA.PostQuantum || sel.WithMLDSA.SHA256 == "" {
+		t.Errorf("selection %+v: without TLS 1.3, the certificate seen is also what a client offering ML-DSA gets", sel.WithMLDSA)
+	}
+	if slices.Contains(full.NotEvaluated, NotEvalPQCertificate) {
+		t.Errorf("not evaluated %v: the certificate was seen", full.NotEvaluated)
+	}
+	for _, p := range full.ProbeLog.Probes {
+		if p.Client == clientCryptoTLS && p.Status == Supported {
+			t.Fatalf("a crypto/tls probe completed (%+v): the server must refuse them all", p)
+		}
+	}
+
+	// Intensity basic has no raw probes: not seen, as before.
+	basic := scan(t, newTestScanner(pki, Options{Intensity: IntensityBasic}), port)
+	if basic.Certificate != nil || !slices.Contains(basic.NotEvaluated, NotEvalPQCertificate) {
+		t.Errorf("basic: certificate %+v, not evaluated %v", basic.Certificate, basic.NotEvaluated)
+	}
+}
+
+func TestNoteChainKeepsTheHighestVersion(t *testing.T) {
+	a, b, c := [][]byte{{1}}, [][]byte{{2}}, [][]byte{{3}}
+	for _, order := range [][]int{{0, 1, 2}, {2, 1, 0}, {1, 2, 0}} {
+		rs := &rawScan{}
+		seen := []struct {
+			chain [][]byte
+			v     uint16
+		}{{a, 0x0002}, {b, 0x0303}, {c, 0x0300}}
+		for _, i := range order {
+			rs.noteChain(seen[i].chain, seen[i].v)
+		}
+		rs.noteChain(nil, 0x0304) // a probe without a certificate changes nothing
+		if !slices.Equal(rs.chain[0], b[0]) || rs.chainVersion != 0x0303 {
+			t.Errorf("order %v: kept %v (0x%04x), want the TLS 1.2 chain", order, rs.chain, rs.chainVersion)
+		}
 	}
 }
 

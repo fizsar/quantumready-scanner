@@ -38,7 +38,7 @@ func analyzeCertificate(chain []*x509.Certificate, st *tls.ConnectionState, host
 		SignatureAlgorithm: leaf.SignatureAlgorithm.String(),
 		Expired:            now.After(leaf.NotAfter),
 		NotYetValid:        now.Before(leaf.NotBefore),
-		SelfSigned:         bytes.Equal(leaf.RawSubject, leaf.RawIssuer) && leaf.CheckSignatureFrom(leaf) == nil,
+		SelfSigned:         selfSigned(leaf),
 		SANs:               append([]string{}, leaf.DNSNames...),
 	}
 	for _, ip := range leaf.IPAddresses {
@@ -104,6 +104,13 @@ func analyzeCertificate(chain []*x509.Certificate, st *tls.ConnectionState, host
 		})
 	}
 	return c
+}
+
+// selfSigned reports whether c is signed with its own key under its own name.
+// Not CheckSignatureFrom(c): that also wants c to be a CA, and a self-signed
+// leaf usually is not (until 2.8.7 those counted as merely untrusted).
+func selfSigned(c *x509.Certificate) bool {
+	return bytes.Equal(c.RawSubject, c.RawIssuer) && c.CheckSignature(c.SignatureAlgorithm, c.RawTBSCertificate, c.Signature) == nil
 }
 
 // algorithmOIDs reads, from the certificate as sent, the OID of its signature

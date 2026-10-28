@@ -356,6 +356,11 @@ type Response struct {
 	Alert       *Alert
 	ServerHello *ServerHello
 	KeyExchange *KeyExchange
+	// Certificates is the chain of the Certificate message (TLS 1.0–1.2 and
+	// SSLv3, where it travels in clear), leaf first, as sent (DER). Only read
+	// with ReadKeyExchange; nil if the server sent none or it did not parse
+	// (the probe's question is the suite or the key exchange, not this).
+	Certificates [][]byte
 }
 
 // Exchange writes the ClientHello h to conn and reads the answer. The caller
@@ -406,8 +411,13 @@ func readResponse(r io.Reader, h *Hello, opts Options) (*Response, error) {
 			return resp, nil
 		}
 		switch typ {
-		case typeCertificate, typeCertificateStatus:
-			continue // not needed here: crypto/tls probes capture the chain
+		case typeCertificate:
+			if chain, err := ParseCertificate(body); err == nil && len(chain) > 0 {
+				resp.Certificates = chain
+			}
+			continue
+		case typeCertificateStatus:
+			continue
 		case typeServerKeyExchange:
 			resp.KeyExchange, err = ParseServerKeyExchange(body, suite)
 			return resp, err
@@ -416,6 +426,25 @@ func readResponse(r io.Reader, h *Hello, opts Options) (*Response, error) {
 		}
 		return resp, malformed("unexpected handshake message %d", typ)
 	}
+}
+
+// ParseCertificate parses the body of a TLS 1.0–1.2 (or SSLv3) Certificate
+// message (RFC 5246, 7.4.2) and returns the certificates, leaf first.
+func ParseCertificate(body []byte) ([][]byte, error) {
+	s := cryptobyte.String(body)
+	var list cryptobyte.String
+	if !s.ReadUint24LengthPrefixed(&list) || !s.Empty() {
+		return nil, malformed("bad Certificate message")
+	}
+	var chain [][]byte
+	for !list.Empty() {
+		var cert cryptobyte.String
+		if !list.ReadUint24LengthPrefixed(&cert) || cert.Empty() {
+			return nil, malformed("bad certificate in the list")
+		}
+		chain = append(chain, slices.Clone([]byte(cert)))
+	}
+	return chain, nil
 }
 
 // checkServerHello rejects anything the hello did not offer.

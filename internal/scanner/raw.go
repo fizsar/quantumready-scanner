@@ -32,6 +32,23 @@ type rawScan struct {
 	mu  sync.Mutex
 	res RawResult
 	sel *CertificateSelection // the scan's, filled by certificateWithoutMLDSA
+	// chain is the certificate chain the raw probes saw in clear (TLS 1.0–1.2,
+	// SSLv3, SSLv2), from the highest version that sent one (chainVersion).
+	chain        [][]byte
+	chainVersion uint16
+}
+
+// noteChain keeps the chain a probe of version v saw, unless one was already
+// seen in a higher version: the same choice whatever order the probes end in.
+func (rs *rawScan) noteChain(chain [][]byte, v uint16) {
+	if len(chain) == 0 {
+		return
+	}
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.chain == nil || v > rs.chainVersion {
+		rs.chain, rs.chainVersion = chain, v
+	}
 }
 
 // rawOutcome is one raw probe, classified like the crypto/tls probes.
@@ -90,6 +107,9 @@ func (rs *rawScan) hello(ctx context.Context, tag probeTag, h *rawtls.Hello, rea
 		return err
 	})
 	o := classifyRaw(resp, err)
+	if o.resp != nil && o.resp.ServerHello != nil {
+		rs.noteChain(o.resp.Certificates, o.resp.ServerHello.Version)
+	}
 	if o.status == Supported && check != nil {
 		if st, cerr := check(o.resp.ServerHello); cerr != nil {
 			o.status, o.err = st, cerr
@@ -126,8 +146,9 @@ func classifyRaw(resp *rawtls.Response, err error) rawOutcome {
 }
 
 // runRaw runs every raw probe after the crypto/tls ones (it needs their
-// results) and fills res.Raw.
-func (s *Scanner) runRaw(ctx context.Context, t target, res *Result) {
+// results) and fills res.Raw. It returns the certificate chain the probes saw
+// in clear, if any (leaf first, DER).
+func (s *Scanner) runRaw(ctx context.Context, t target, res *Result) [][]byte {
 	rs := &rawScan{s: s, t: t, budget: int32(min(s.opts.RawProbeBudget, 1<<20)), sel: res.CertificateSelection} //nolint:gosec // bounded
 	found := goFound(res)
 
@@ -204,6 +225,7 @@ func (s *Scanner) runRaw(ctx context.Context, t target, res *Result) {
 	rs.res.Normalize()
 	res.Raw = &rs.res
 	res.NotEvaluated = notEvaluatedFull(&rs.res)
+	return rs.chain
 }
 
 // goFound is what crypto/tls already found, per version.
@@ -242,6 +264,9 @@ func (rs *rawScan) sslv2(ctx context.Context) {
 	switch {
 	case err == nil && resp.ServerHello != nil:
 		p.Status = Supported
+		if c := resp.ServerHello.Certificate; c != nil {
+			rs.noteChain([][]byte{c}, rawtls.VersionSSL20)
+		}
 		for _, id := range resp.ServerHello.Ciphers {
 			for _, c := range rawtls.SSLv2Ciphers {
 				if c.ID == id {

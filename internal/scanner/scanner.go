@@ -227,8 +227,22 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 	// Chrome): the certificate seen is the one such a client gets. The raw
 	// probes add the one a client without them gets.
 	res.CertificateSelection = &CertificateSelection{WithMLDSA: presented(rawCerts)}
+	var clearChain [][]byte
 	if s.opts.Intensity == IntensityFull {
-		s.runRaw(ctx, t, res)
+		clearChain = s.runRaw(ctx, t, res)
+	}
+	// No crypto/tls handshake got to the certificate (SSLv2/v3, EXPORT, only
+	// DHE, only secp224…): the raw probes read it in clear. Without TLS 1.3
+	// there are no ML-DSA certificates, so it is also what a client offering
+	// ML-DSA gets.
+	certSource := ""
+	if len(certs) == 0 {
+		if parsed := parseChain(clearChain); len(parsed) > 0 {
+			certs, state, certSource = parsed, nil, CertSourceRaw
+			if res.CertificateSelection.WithMLDSA == nil && !tls13Seen(res) {
+				res.CertificateSelection.WithMLDSA = presented(clearChain)
+			}
+		}
 	}
 	switch sel := res.CertificateSelection; {
 	case sel.WithMLDSA == nil:
@@ -239,11 +253,31 @@ func (s *Scanner) Scan(ctx context.Context, host string, port int) (*Result, err
 
 	if len(certs) > 0 {
 		res.Certificate = analyzeCertificate(certs, state, t.host, s.opts.Now(), s.opts.RootCAs)
+		res.Certificate.Source = certSource
 	}
 	res.Connections = int(t.conns.Load())
 	res.ProbeLog = t.log.result()
 	res.DurationMS = s.opts.Now().Sub(start).Milliseconds()
 	return res, nil
+}
+
+// parseChain parses a chain as sent (leaf first), up to the first
+// certificate crypto/x509 cannot parse, as the crypto/tls probes do.
+func parseChain(chain [][]byte) []*x509.Certificate {
+	var out []*x509.Certificate
+	for _, der := range chain {
+		c, err := x509.ParseCertificate(der)
+		if err != nil {
+			break
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// tls13Seen reports whether any probe, crypto/tls or raw, got TLS 1.3.
+func tls13Seen(res *Result) bool {
+	return versionStatusOf(res, tls.VersionTLS13) == Supported || res.Raw != nil && len(res.Raw.TLS13Suites) > 0
 }
 
 // probeGroup offers a single group. Hybrids need TLS 1.3; classical groups are

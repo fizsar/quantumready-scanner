@@ -71,6 +71,8 @@ Un servidor moderno usa unas 10–12 sondas en crudo; el peor caso del laborator
 - En el registro por sonda, la oferta tipo navegador y la sonda de certificado llevan el certificado recibido; la sonda también la firma del CertificateVerify (`handshake_signature`) y, si el servidor la rechaza con una alerta cifrada, su nivel (la descifra).
 - **No evaluado**: `pq_certificate` si no se vio ningún certificado; `pq_certificate_fallback` si el certificado es post-cuántico y no se pudo saber si hay uno clásico de respaldo.
 
+**Certificado desde las sondas en crudo** (2.8.7, intensidad `full`): si ningún handshake de `crypto/tls` llega al certificado (servidores solo SSLv2/v3, EXPORT, solo DHE o solo secp224), se lee del mensaje Certificate de las sondas en crudo de TLS 1.0–1.2 y SSLv3, o del SERVER-HELLO de SSLv2 (solo la hoja), donde va en claro; se usa la cadena de la versión más alta que la envió. Se analiza igual que la de `crypto/tls` y lleva `certificate.source: "raw"` (sin grapado OCSP ni SCT del handshake). Sin TLS 1.3 no hay certificados ML-DSA: es también `certificate_selection.with_mldsa`. Un mensaje Certificate mal formado se ignora (la sonda sigue con su pregunta).
+
 **Segundo ClientHello** (también 2.8.5): tras un HelloRetryRequest, el registro guarda el segundo ClientHello (`retry_offer`), leído igual de los bytes enviados.
 
 ## Política anti-SSRF

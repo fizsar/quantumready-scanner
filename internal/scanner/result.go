@@ -334,7 +334,15 @@ type Certificate struct {
 	SCTsHandshake int `json:"scts_handshake"`
 
 	Chain []ChainCert `json:"chain"` // as sent by the server, leaf first
+	// Source (milestone 2.8.7) is "raw" when no crypto/tls handshake got as
+	// far as the certificate and it was read in clear from the raw probes
+	// (TLS 1.0–1.2, SSLv3, SSLv2): no OCSP staple or handshake SCTs then.
+	// Empty: from crypto/tls, as always before.
+	Source string `json:"source,omitempty"`
 }
+
+// CertSourceRaw is Certificate.Source for a chain read from the raw probes.
+const CertSourceRaw = "raw"
 
 // ChainCert is one certificate of the chain sent by the server.
 type ChainCert struct {

@@ -85,7 +85,7 @@ Detalle por aspecto: `test/tlslab/results/COMPARISON.md` (se regenera con `make 
 - **Curvas ECDHE que solo existen en SSLv3** (`ssl3`: secp256r1). Un cliente SSLv3 no envía `supported_groups`, así que no las sondeamos; el resultado lo marca como **no evaluado** (`legacy_groups`), no como "no soportado". Sin efecto en la nota: SSLv3 ya limita a C.
 - **Suites por versión por debajo de TLS 1.2**: para ahorrar conexiones, en TLS 1.1, 1.0 y SSLv3 solo buscamos las suites que no aparecieron en una versión superior (sí detectamos qué versiones están activas). El conjunto total de suites coincide con el de testssl.sh en todos los servidores; lo que no listamos es la repetición de la misma suite en varias versiones.
 - **Orden de preferencia del servidor**: sigue "no evaluado" (decisión del plan del 2.7).
-- **Certificado de los servidores con los que `crypto/tls` no completa ningún handshake** (`ssl2`, `ssl3`, `export`, `dhe1024`, `secp224`): testssl.sh lo lee y nosotros no. El certificado sale de los handshakes de `crypto/tls`; las sondas en crudo lo ven en claro (TLS 1.0–1.2) pero no lo leen. Queda como **no evaluado** (`CERT_MISSING`, y desde el 2.8.5 `pq_certificate`). Leerlo de esas sondas es una mejora posible.
+- **Certificado de los servidores con los que `crypto/tls` no completa ningún handshake** (`ssl2`, `ssl3`, `export`, `dhe1024`, `secp224`): hasta el 2.8.7 no lo leíamos (`CERT_MISSING`); desde el 2.8.7 sale de las sondas en crudo y coincide con testssl.sh (ver «Hito 2.8.7»).
 - **Vulnerabilidades de implementación** (Heartbleed, ROBOT…): fuera del alcance; tampoco se pidieron a testssl.sh.
 
 ### Hito 2.8.5: certificados post-cuánticos (ML-DSA)
@@ -122,6 +122,24 @@ Las mismas sondas, el modelo nuevo: dos ejes (`docs/scoring.md`). Laboratorio co
 | `mldsa-only` | A · 95 | A · 100 | 90 · Preparado |
 
 `kyber` queda por debajo de `modern` en preparación (10 frente a 25): aceptar el borrador obsoleto de Kyber resta 15. `mldsa-only` no pierde puntos por no tener certificado clásico de respaldo: es un hallazgo medio visible (`CERT_PQ_NO_CLASSICAL_FALLBACK`). En /examples, con el certificado simulado sin renovación automatizada: fizsar.com A · 100 / 75 Preparado, `modern` A · 90 / 10, `kyber` A · 90 / 0 y `export` F · 35 / 0 (`TestLabFixtures`).
+
+### Hito 2.8.7: certificado desde las sondas en crudo
+
+En TLS 1.0–1.2, SSLv3 y SSLv2 el certificado viaja en claro. Si ningún handshake de `crypto/tls` llega a él, el escáner lo lee de las sondas en crudo (sin completar nunca la conexión) y lo analiza igual: validez, cadena, nombre, clave, firma y renovación (`certificate.source: "raw"`; sin grapado OCSP ni SCT del handshake, que no se leen). La comparación con testssl.sh del laboratorio (`make tlslab-test`) cubre ahora, además del tipo de clave, el tamaño, la firma, la caducidad y la cadena: **coinciden en los 12 servidores**. Única diferencia: la caducidad de `kyber`, cuyo certificado genera el servidor (Go) en cada arranque.
+
+Notas de los escaneos reales del laboratorio (certificado autofirmado, así que todo es F), modelo 2026.3, antes y después:
+
+| Servidor | Antes | Después | Certificado |
+|---|---|---|---|
+| `ssl2` | F · 0 / 0 | F · 20 / 0 | antes no visto (`CERT_MISSING`); ahora RSA 2048, autofirmado: suman clave y firma (20) y el tope F sigue |
+| `ssl3` | F · 0 / 0 | F · 20 / 0 | ídem |
+| `export` | F · 0 / 0 | F · 20 / 0 | ídem |
+| `dhe1024` | F · 25 / 0 | F · 45 / 0 | ídem |
+| `secp224` | F · 25 / 0 | F · 45 / 0 | ídem |
+| `kyber` | F · 75 / 0 | F · 75 / 0 | `CERT_UNTRUSTED` → `CERT_SELF_SIGNED`: el certificado es autofirmado sin la marca de CA, y antes solo contaba como autofirmado si la tenía |
+| los otros 6 | — | sin cambios | — |
+
+Las conexiones por escaneo no cambian (el certificado llega en sondas que ya se hacían). La preparación cuántica tampoco: sin TLS 1.3 no hay certificados ML-DSA, así que el certificado visto es también el que recibe un cliente que ofrece ML-DSA y `pq_certificate` pasa a evaluado (0). /examples no cambia: sus fixtures son los escaneos del 14/10/2026 con un certificado simulado.
 
 ### Mediciones y tiempo máximo por escaneo
 
