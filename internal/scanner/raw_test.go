@@ -97,6 +97,49 @@ func TestCertificateFromRawProbes(t *testing.T) {
 	}
 }
 
+// Chrome 156's offer (2.8.7): what a crypto/tls server picks for it, in TLS
+// 1.3 and 1.2, logged with the offer as sent.
+func TestChromeOffer(t *testing.T) {
+	pki := newTestPKI(t)
+	cert := pki.leaf(t, leafOpts{})
+	for _, tc := range []struct {
+		name, version, suite, group string
+		max                         uint16
+		curves                      []tls.CurveID
+		retry                       bool
+	}{
+		{"TLS 1.3", "TLS 1.3", "", "X25519MLKEM768", 0, nil, false},
+		{"TLS 1.2", "TLS 1.2", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "x25519", tls.VersionTLS12, nil, false},
+		{"HelloRetryRequest", "TLS 1.3", "", "secp256r1", 0, []tls.CurveID{tls.CurveP256}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			port := startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}, MaxVersion: tc.max, CurvePreferences: tc.curves})
+			r := scan(t, newTestScanner(pki, Options{Intensity: IntensityFull}), port)
+			c := r.ChromeOffer
+			if c == nil || c.Status != Supported || c.Version != tc.version || c.Group != tc.group || tc.suite != "" && c.CipherSuite != tc.suite || r.ChromeHelloRetry != tc.retry {
+				t.Fatalf("chrome offer %+v (retry %v)", c, r.ChromeHelloRetry)
+			}
+			if c.Group != r.Default.Group || c.Version != r.Default.Version {
+				t.Errorf("Chrome got %s/%s, the browser-like crypto/tls offer %s/%s: same server, same choice expected", c.Version, c.Group, r.Default.Version, r.Default.Group)
+			}
+			var logged []ProbeRecord
+			for _, p := range r.ProbeLog.Probes {
+				if p.Purpose == PurposeChrome {
+					logged = append(logged, p)
+				}
+			}
+			if len(logged) != 1 || logged[0].Client != clientRaw || logged[0].Offer == nil ||
+				!slices.Equal(r.ProbeLog.Offers[*logged[0].Offer].ALPN, []string{"h2", "http/1.1"}) {
+				t.Errorf("logged %+v", logged)
+			}
+		})
+	}
+	basic := scan(t, newTestScanner(pki, Options{Intensity: IntensityBasic}), startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}}))
+	if basic.ChromeOffer != nil {
+		t.Errorf("basic: chrome offer %+v (raw probes are intensity full only)", basic.ChromeOffer)
+	}
+}
+
 func TestNoteChainKeepsTheHighestVersion(t *testing.T) {
 	a, b, c := [][]byte{{1}}, [][]byte{{2}}, [][]byte{{3}}
 	for _, order := range [][]int{{0, 1, 2}, {2, 1, 0}, {1, 2, 0}} {

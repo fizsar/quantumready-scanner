@@ -141,6 +141,20 @@ Notas de los escaneos reales del laboratorio (certificado autofirmado, así que 
 
 Las conexiones por escaneo no cambian (el certificado llega en sondas que ya se hacían). La preparación cuántica tampoco: sin TLS 1.3 no hay certificados ML-DSA, así que el certificado visto es también el que recibe un cliente que ofrece ML-DSA y `pq_certificate` pasa a evaluado (0). /examples no cambia: sus fixtures son los escaneos del 14/10/2026 con un certificado simulado.
 
+### Hito 2.8.7: oferta de Chrome 156 byte a byte
+
+Lo que elige cada servidor para la oferta tipo navegador de `crypto/tls` y para el ClientHello de Chrome 156 reconstruido byte a byte (sonda en crudo; `make tlslab-test` y un escaneo real de fizsar.com del 28/10/2026):
+
+| Servidor | `crypto/tls` (oferta tipo navegador) | Chrome 156 |
+|---|---|---|
+| `fizsar.com` | TLS 1.3 · AES-128-GCM · X25519MLKEM768 | igual |
+| `tls13`, `mldsa-dual`, `mldsa-only` | TLS 1.3 · AES-128-GCM · X25519MLKEM768 | igual |
+| `modern`, `kyber` | TLS 1.3 · AES-128-GCM · x25519 | igual |
+| `tls12` | TLS 1.2 · ECDHE-RSA-AES128-GCM · secp256r1 | igual |
+| `ssl2`, `ssl3`, `export`, `dhe1024`, `secp224`, `tls10` | sin conexión | sin conexión (Chrome solo ofrece TLS 1.2 y 1.3) |
+
+Ningún servidor elige distinto: la sonda queda como contraste y la nota sigue saliendo de la oferta de `crypto/tls`. Una conexión más por escaneo (intensidad `full`).
+
 ### Mediciones y tiempo máximo por escaneo
 
 Cada servidor, con intensidad `full` y `basic`, en local y con una latencia simulada de 100 ms de RTT (el dialer espera 2 RTT por conexión: TCP y el primer intercambio; solo en tests).

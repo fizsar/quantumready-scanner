@@ -2,18 +2,18 @@
 
 | Servidor | full: conexiones | full: sondas en crudo | full: duración (local) | full: duración (RTT 100 ms) | basic: conexiones | basic: duración (local) | basic: duración (RTT 100 ms) |
 |---|---|---|---|---|---|---|---|
-| `ssl2` | 21 | 6 | 47 ms | 1616 ms | 15 | 7 ms | 1007 ms |
-| `ssl3` | 45 | 30 | 167 ms | 6581 ms | 15 | 56 ms | 1036 ms |
-| `export` | 53 | 38 | 69 ms | 8100 ms | 15 | 5 ms | 1009 ms |
-| `dhe1024` | 31 | 16 | 91 ms | 3716 ms | 15 | 5 ms | 1007 ms |
-| `tls10` | 30 | 11 | 50 ms | 3453 ms | 19 | 48 ms | 1842 ms |
-| `secp224` | 31 | 16 | 64 ms | 3675 ms | 15 | 6 ms | 1009 ms |
-| `tls12` | 49 | 33 | 36 ms | 7071 ms | 16 | 8 ms | 1014 ms |
-| `tls13` | 33 | 18 | 21 ms | 3434 ms | 15 | 10 ms | 1015 ms |
-| `modern` | 30 | 12 | 25 ms | 2429 ms | 18 | 22 ms | 1422 ms |
-| `kyber` | 27 | 12 | 11 ms | 2219 ms | 15 | 8 ms | 1011 ms |
-| `mldsa-dual` | 37 | 16 | 53 ms | 3653 ms | 21 | 41 ms | 2044 ms |
-| `mldsa-only` | 29 | 14 | 36 ms | 2631 ms | 15 | 43 ms | 1023 ms |
+| `ssl2` | 22 | 7 | 87 ms | 1621 ms | 15 | 6 ms | 1016 ms |
+| `ssl3` | 46 | 31 | 155 ms | 6656 ms | 15 | 38 ms | 1053 ms |
+| `export` | 54 | 39 | 59 ms | 8164 ms | 15 | 6 ms | 1012 ms |
+| `dhe1024` | 32 | 17 | 75 ms | 3770 ms | 15 | 6 ms | 1013 ms |
+| `tls10` | 31 | 12 | 38 ms | 3494 ms | 19 | 26 ms | 1864 ms |
+| `secp224` | 32 | 17 | 50 ms | 3727 ms | 15 | 6 ms | 1012 ms |
+| `tls12` | 50 | 34 | 39 ms | 7116 ms | 16 | 8 ms | 1025 ms |
+| `tls13` | 34 | 19 | 21 ms | 3460 ms | 15 | 8 ms | 1021 ms |
+| `modern` | 31 | 13 | 26 ms | 2460 ms | 18 | 17 ms | 1433 ms |
+| `kyber` | 28 | 13 | 13 ms | 2230 ms | 15 | 8 ms | 1014 ms |
+| `mldsa-dual` | 38 | 17 | 43 ms | 3684 ms | 21 | 32 ms | 2051 ms |
+| `mldsa-only` | 30 | 15 | 36 ms | 2648 ms | 15 | 22 ms | 1032 ms |
 
 ## Comparación con testssl.sh
 

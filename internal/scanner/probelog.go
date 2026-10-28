@@ -157,6 +157,7 @@ const (
 	PurposeTLS13Groups = "tls13_groups" // raw, through HelloRetryRequest
 	PurposeTLS12Curves = "tls12_curves" // raw, through ServerKeyExchange (Subject: version)
 	PurposeCertificate = "certificate"  // raw TLS 1.3, decrypted: the certificate without ML-DSA (Subject)
+	PurposeChrome      = "chrome"       // raw: Chrome 156's ClientHello, byte for byte
 )
 
 const (

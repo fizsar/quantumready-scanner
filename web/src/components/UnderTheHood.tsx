@@ -332,7 +332,7 @@ function logReplyKind(p: LogProbe) {
   return 'other'
 }
 
-const PURPOSES = ['default', 'group', 'version', 'suites', 'sslv2', 'sslv3', 'tls13_suites', 'tls13_groups', 'tls12_curves', 'certificate'] as const
+const PURPOSES = ['default', 'group', 'version', 'suites', 'sslv2', 'sslv3', 'tls13_suites', 'tls13_groups', 'tls12_curves', 'certificate', 'chrome'] as const
 
 function purposeText(p: LogProbe, t: T) {
   const known = PURPOSES.find((k) => k === p.purpose)

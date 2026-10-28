@@ -171,6 +171,7 @@ func (s *Scanner) runRaw(ctx context.Context, t target, res *Result) [][]byte {
 	})
 	g.Go(func() error { rs.tls13Suites(ctx); return nil })
 	g.Go(func() error { rs.certificateWithoutMLDSA(ctx, res); return nil })
+	g.Go(func() error { rs.chromeOffer(ctx, res); return nil })
 	_ = g.Wait()
 
 	// Groups need to know whether TLS 1.3 / ECDHE is there at all.
@@ -673,6 +674,38 @@ func (rs *rawScan) certificateWithoutMLDSA(ctx context.Context, res *Result) {
 	}
 	rs.t.log.add(clientRaw, tag, start, rc, status, err, resp)
 	rs.setCertificateWithout(cert, status, err)
+}
+
+// chromeOffer sends Chrome 156's ClientHello and records what the server
+// picks, as Chrome would get it: version, suite and group (the key share in
+// TLS 1.3, the ServerKeyExchange curve in TLS 1.2).
+func (rs *rawScan) chromeOffer(ctx context.Context, res *Result) {
+	var resp *rawtls.Response
+	rc, start, err := rs.exchange(ctx, func(c net.Conn) error {
+		var err error
+		resp, err = rawtls.ExchangeChrome(c, rs.t.sni, rawtls.Options{ReadKeyExchange: true})
+		return err
+	})
+	o := classifyRaw(resp, err)
+	h := &Handshake{Status: o.status, Error: o.errString(), ErrorCode: errorCode(o.err)}
+	retry := false
+	if o.status == Supported {
+		sh := o.resp.ServerHello
+		h.Version, h.CipherSuite = tls.VersionName(sh.Version), tls.CipherSuiteName(sh.CipherSuite)
+		group := sh.KeyShareGroup
+		if ke := o.resp.KeyExchange; sh.Version <= rawtls.VersionTLS12 && ke != nil && ke.Kind == "EC" && !ke.ExplicitCurve {
+			group = ke.Group
+		}
+		if group != 0 {
+			h.Group, h.GroupID = groupName(tls.CurveID(group)), group
+		}
+		retry = sh.HelloRetry
+		rs.noteChain(o.resp.Certificates, sh.Version)
+	}
+	rs.t.log.add(clientRaw, probeTag{purpose: PurposeChrome}, start, rc, o.status, o.err, nil)
+	rs.mu.Lock()
+	res.ChromeOffer, res.ChromeHelloRetry = h, retry
+	rs.mu.Unlock()
 }
 
 func (rs *rawScan) setCertificateWithout(cert *PresentedCert, status Status, err error) {

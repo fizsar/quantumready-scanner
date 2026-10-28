@@ -169,6 +169,13 @@ describe('Under the hood: certificates by offer and the details 2.8.5 adds', () 
     expect(within(items[1]).getByText('Segundo ClientHello (tras el HelloRetryRequest)')).toBeTruthy()
   })
 
+  it('names the Chrome 156 probe (2.8.7)', async () => {
+    const r = structuredClone(fizsarV2) as unknown as ScanResult
+    r.probe_log!.probes[1].purpose = 'chrome'
+    const { items } = await panel(withResult(fizsarEs, r))
+    expect(items[1].textContent).toContain('Oferta de Chrome 156 (byte a byte)')
+  })
+
   it('scans from before show no certificate section', async () => {
     const { region } = await panel(withResult(fizsarEs, fizsarV2))
     expect(within(region).queryByRole('region', { name: 'Certificado según la oferta' })).toBeNull()

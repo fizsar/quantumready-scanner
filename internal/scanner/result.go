@@ -84,6 +84,16 @@ type Result struct {
 	// the server presents to a client that offers ML-DSA signatures and to
 	// one that does not.
 	CertificateSelection *CertificateSelection `json:"certificate_selection,omitempty"`
+
+	// ChromeOffer (milestone 2.8.7, intensity full) is what the server picks
+	// for Chrome 156's ClientHello, rebuilt byte for byte by a raw probe
+	// (rawtls.ChromeHello): version, suite and group, read from the
+	// ServerHello (and, in TLS 1.2, the ServerKeyExchange). It does not
+	// complete the handshake; Default stays the reference.
+	ChromeOffer *Handshake `json:"chrome_offer,omitempty"`
+	// ChromeHelloRetry: the server asked Chrome's offer for another key
+	// share (HelloRetryRequest); ChromeOffer.Group is the group it wants.
+	ChromeHelloRetry bool `json:"chrome_hello_retry,omitempty"`
 }
 
 // CertificateSelection compares the certificate a server presents to a
