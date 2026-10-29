@@ -39,6 +39,14 @@ func TestAPIJSONGolden(t *testing.T) {
 	}
 	sc, fs := realScan(t, "fizsar.com")
 	st.scans[sc.ID], st.findings[sc.ID], ids["fizsar.com"] = sc, fs, sc.ID
+	// The same scan as stored under model 2026.2 (its judgement, saved before
+	// 2026.3): shown with its model, one grade and outdated_model.
+	old, err := os.ReadFile(filepath.Join("..", "report", "testdata", "fizsar.com.scoring-2026.2.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc.ID, sc.Scoring = uuid.NewSHA1(uuid.NameSpaceURL, []byte("fizsar.com-2026.2")), old
+	st.scans[sc.ID], st.findings[sc.ID], ids["fizsar.com-2026.2"] = sc, fs, sc.ID
 	created := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
 	timeout := "timeout"
 	for name, s := range map[string]store.Scan{
@@ -86,7 +94,7 @@ func TestAPIJSONGolden(t *testing.T) {
 			}
 		}
 	}
-	if len(names) != 13 {
-		t.Errorf("%d scans, want 13 (10 lab servers, fizsar.com, queued, failed)", len(names))
+	if len(names) != 14 {
+		t.Errorf("%d scans, want 14 (10 lab servers, fizsar.com with the current model and with 2026.2, queued, failed)", len(names))
 	}
 }

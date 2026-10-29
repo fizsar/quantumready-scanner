@@ -78,7 +78,14 @@
 }
 .uth-facts dd {
   margin: 0;
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+/* A <div> grouping a dt and its dd (Full offer): its two children are the
+   cells of the grid. As one cell, the div landed in the max-content column
+   and took the whole unwrapped list with it. */
+.uth-fact {
+  display: contents;
 }
 /* Wide tables scroll inside the panel, never the page. */
 .uth-scroll {
@@ -119,6 +126,40 @@
   align-items: baseline;
   padding-bottom: 0.35rem;
   border-bottom: 1px solid var(--line);
+}
+/* Grid items do not shrink below their content by default: let the long
+   monospace summaries wrap instead of being cut. */
+.uth-probe > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* "Full offer" and the second ClientHello: the whole width of the row, under it. */
+.uth-probe > .uth-offer-details {
+  grid-column: 1 / -1;
+}
+.uth-offer-details > summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+/* The same label column in every offer, narrow enough to leave the lists room. */
+.uth-offer-details .uth-facts {
+  grid-template-columns: minmax(7rem, 13rem) minmax(0, 1fr);
+}
+.uth-offer-details .uth-facts dt {
+  overflow-wrap: anywhere;
+}
+.uth-offer-details[open] > .uth-facts {
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--line);
+}
+@media (max-width: 40rem) {
+  .uth-offer-details .uth-facts {
+    grid-template-columns: 1fr;
+  }
+  .uth-offer-details .uth-facts dd {
+    margin-bottom: 0.3rem;
+  }
 }
 .uth-src {
   color: var(--muted);

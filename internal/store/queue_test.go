@@ -274,7 +274,12 @@ func TestClaimCapped(t *testing.T) {
 }
 
 func publicBasic(ctx context.Context, s *Store, host string, cooldown time.Duration) (Scan, bool, error) {
-	return s.EnqueueOrReuse(ctx, Public, ScanRequest{Host: host, Port: 443, Intensity: IntensityBasic, Cooldown: cooldown})
+	return publicBasicWith(ctx, s, host, cooldown, "2026.3")
+}
+
+// publicBasicWith is publicBasic for a given scoring model.
+func publicBasicWith(ctx context.Context, s *Store, host string, cooldown time.Duration, model string) (Scan, bool, error) {
+	return s.EnqueueOrReuse(ctx, Public, ScanRequest{Host: host, Port: 443, Intensity: IntensityBasic, Cooldown: cooldown, ScoringVersion: model})
 }
 
 func TestEnqueueOrReuse(t *testing.T) {
@@ -300,6 +305,29 @@ func TestEnqueueOrReuse(t *testing.T) {
 	}
 	if fresh, reused, _ := publicBasic(ctx, s, "example.com", time.Minute); reused || fresh.ID == first.ID {
 		t.Errorf("a failed scan was reused")
+	}
+
+	// A scan judged with another scoring model is not handed out again; one
+	// with the same model is.
+	if _, err := s.Enqueue(ctx, "old.example", 443); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		c, err := s.Claim(ctx, time.Minute)
+		if err != nil {
+			break
+		}
+		p := completeParams(c)
+		p.ScoringVersion = ptr("2026.2")
+		if err := s.Complete(ctx, p, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, reused, _ := publicBasicWith(ctx, s, "old.example", time.Minute, "2026.3"); reused {
+		t.Error("a scan judged with 2026.2 was reused under 2026.3")
+	}
+	if _, reused, _ := publicBasicWith(ctx, s, "old.example", time.Minute, "2026.2"); !reused {
+		t.Error("a scan judged with the current model was not reused")
 	}
 
 	// Outside the cooldown a new scan is created.

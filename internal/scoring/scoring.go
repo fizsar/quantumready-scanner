@@ -13,7 +13,7 @@ import (
 // Version identifies the scoring model. Any change to weights, thresholds,
 // caps or the rules that emit findings must bump it (see docs/scoring.md):
 // stored results keep the version they were scored with.
-const Version = "2026.2"
+const Version = "2026.3"
 
 // Severity of a finding. Pass marks something done right.
 type Severity string
@@ -85,16 +85,21 @@ type Cap struct {
 	Codes []string `json:"codes"` // findings that impose it
 }
 
-// Result is the judgement of one scan.
+// Result is the judgement of one scan. Since 2026.3 it has two axes:
+// Score, Grade, Cap and Blocks are "security today" (A–F), Readiness is
+// "quantum readiness" (0–100 in three levels). A stored 2026.2 result has
+// one grade, no Readiness and, maybe, FloorPoints.
 type Result struct {
 	ScoringVersion string `json:"scoring_version"`
-	Score          int    `json:"score"`       // 0–100: sum of the blocks plus FloorPoints
+	Score          int    `json:"score"`       // 0–100: sum of the blocks (2026.2: plus FloorPoints)
 	ScoreGrade     string `json:"score_grade"` // letter from Score alone
-	// FloorPoints lifts the score to FloorScore when nothing is broken (no F
-	// cap): F is reserved for broken setups, weak ones (C cap) end in D or C.
+	// FloorPoints (2026.2 only) lifted the score to 40 when nothing was
+	// broken. Kept to read stored 2026.2 results.
 	FloorPoints int    `json:"floor_points,omitempty"`
 	Grade       string `json:"grade"` // final letter: the worse of ScoreGrade and Cap
 	Cap         *Cap   `json:"cap,omitempty"`
+	// Readiness is the quantum readiness axis (2026.3).
+	Readiness *Readiness `json:"readiness,omitempty"`
 	// PQC: the server negotiates a hybrid ML-KEM group with a browser-like offer.
 	PQC bool `json:"pqc"`
 	// Worst non-pass severity per axis ("none" if nothing to report).
@@ -106,22 +111,55 @@ type Result struct {
 	NotEvaluated []string `json:"not_evaluated"`
 }
 
-// Points per block and criterion. See docs/scoring.md before changing them.
+// Readiness is the quantum readiness axis: how far the server is from
+// resisting a quantum adversary, 0–100, in three levels.
+type Readiness struct {
+	Score  int     `json:"score"`
+	Level  string  `json:"level"` // LevelReady, LevelOnTrack, LevelNotReady
+	Blocks []Block `json:"blocks"`
+}
+
+// Readiness levels and the minimum score of each.
 const (
-	PointsKexPreferred = 50 // hybrid ML-KEM picked with a browser-like offer
-	PointsKexSupported = 30 // hybrid accepted only when offered alone
-	PointsTLS13        = 15
-	PointsFS           = 10
-	PointsVariety      = 5 // more than one hybrid group
-	PointsCertValid    = 5
-	PointsCertKey      = 5
-	PointsCertSig      = 5
-	PointsCertAuto     = 5
+	LevelReady    = "ready"     // >= ReadyMin
+	LevelOnTrack  = "on_track"  // >= OnTrackMin
+	LevelNotReady = "not_ready" // below
+	ReadyMin      = 70
+	OnTrackMin    = 35
 )
 
-// FloorScore is the minimum score of a server with no F cap: the bottom of D.
-// F is reserved for broken setups.
-const FloorScore = 40
+// LevelFor returns the readiness level of a score.
+func LevelFor(score int) string {
+	switch {
+	case score >= ReadyMin:
+		return LevelReady
+	case score >= OnTrackMin:
+		return LevelOnTrack
+	}
+	return LevelNotReady
+}
+
+// Points of "security today" per block and criterion (2026.3). See
+// docs/scoring.md before changing them.
+const (
+	PointsTLS13     = 30
+	PointsFS        = 25 // in every active version; partial earns nothing
+	PointsCertValid = 15
+	PointsCertKey   = 10
+	PointsCertSig   = 10
+	PointsCertAuto  = 10
+)
+
+// Points of "quantum readiness" (2026.3).
+const (
+	ReadyKexPreferred = 50 // hybrid ML-KEM picked with a browser-like offer
+	ReadyKexSupported = 30 // hybrid accepted only when offered alone
+	ReadyTLS13        = 10 // the condition for hybrid groups
+	ReadyVariety      = 10 // more than one standard post-quantum group
+	ReadyAutomation   = 15 // automated certificate renewal: agility
+	ReadyPQCert       = 15 // a post-quantum certificate (CERT_PQ_SIGNATURE)
+	ReadyKyberPenalty = 15 // accepting the obsolete Kyber draft codepoint; the score stays at 0 or more
+)
 
 // Grade thresholds: minimum score per letter.
 var gradeThresholds = []struct {
@@ -168,7 +206,8 @@ func Evaluate(r *scanner.Result) Result {
 
 type evaluator struct {
 	r        *scanner.Result
-	blocks   []Block
+	blocks   []Block // security today
+	ready    []Block // quantum readiness
 	findings []Finding
 	caps     map[string][]string // grade -> codes
 }
@@ -186,6 +225,11 @@ func (e *evaluator) capAt(grade, code string) {
 
 func (e *evaluator) block(id string, points, maxPoints int, items ...Item) {
 	e.blocks = append(e.blocks, Block{ID: id, Points: points, Max: maxPoints, Items: items})
+}
+
+// readiness adds a block to the quantum readiness axis.
+func (e *evaluator) readiness(id string, points, maxPoints int) {
+	e.ready = append(e.ready, Block{ID: id, Points: points, Max: maxPoints})
 }
 
 func (e *evaluator) hybridSupported() []string {
@@ -239,30 +283,33 @@ func (e *evaluator) keyExchange() {
 	hybrids := e.hybridSupported()
 	switch {
 	case e.r.KeyExchange.SelectedHybrid:
-		e.block("key_exchange", PointsKexPreferred, PointsKexPreferred)
+		e.readiness("key_exchange", ReadyKexPreferred, ReadyKexPreferred)
 		e.add("KEX_HYBRID_PREFERRED", AxisQuantum, Pass, CatKeyExchange, map[string]string{"group": e.r.KeyExchange.Selected})
 	case len(hybrids) > 0:
-		e.block("key_exchange", PointsKexSupported, PointsKexPreferred)
+		e.readiness("key_exchange", ReadyKexSupported, ReadyKexPreferred)
 		e.add("KEX_HYBRID_NOT_PREFERRED", AxisQuantum, High, CatKeyExchange, map[string]string{"groups": strings.Join(hybrids, ", ")})
 	case e.hybridProbeFailed():
 		// Not preferred, and support could not be checked: no points without
 		// evidence, but no claim that it is unsupported either.
-		e.block("key_exchange", 0, PointsKexPreferred)
+		e.readiness("key_exchange", 0, ReadyKexPreferred)
 		e.add("KEX_HYBRID_UNKNOWN", AxisQuantum, High, CatKeyExchange, nil)
 	default:
-		e.block("key_exchange", 0, PointsKexPreferred)
+		e.readiness("key_exchange", 0, ReadyKexPreferred)
 		e.add("KEX_NO_HYBRID", AxisQuantum, Critical, CatKeyExchange, nil)
 	}
 }
 
-// tls13: hybrid ML-KEM groups only exist in TLS 1.3.
+// tls13: today's best protocol (security today), and the condition for
+// hybrid ML-KEM groups, which only exist in TLS 1.3 (quantum readiness).
 func (e *evaluator) tls13() {
 	if e.supports("TLS 1.3") {
 		e.block("tls13", PointsTLS13, PointsTLS13)
+		e.readiness("tls13", ReadyTLS13, ReadyTLS13)
 		e.add("TLS13_SUPPORTED", AxisQuantum, Pass, CatProtocol, nil)
 		return
 	}
 	e.block("tls13", 0, PointsTLS13)
+	e.readiness("tls13", 0, ReadyTLS13)
 	if e.version("TLS 1.3") == scanner.NotSupported {
 		e.add("TLS13_MISSING", AxisQuantum, High, CatProtocol, nil)
 	} // a probe error is reported by coverage(), not judged
@@ -318,16 +365,16 @@ func (e *evaluator) variety() {
 	standard := append(append([]string{}, hybrids...), pure...)
 	switch {
 	case len(standard) > 1 && len(pure) > 0:
-		e.block("hybrid_variety", PointsVariety, PointsVariety)
+		e.readiness("hybrid_variety", ReadyVariety, ReadyVariety)
 		e.add("KEX_MULTIPLE_PQC", AxisQuantum, Pass, CatKeyExchange, map[string]string{"groups": strings.Join(standard, ", ")})
 	case len(standard) > 1:
-		e.block("hybrid_variety", PointsVariety, PointsVariety)
+		e.readiness("hybrid_variety", ReadyVariety, ReadyVariety)
 		e.add("KEX_MULTIPLE_HYBRIDS", AxisQuantum, Pass, CatKeyExchange, map[string]string{"groups": strings.Join(hybrids, ", ")})
 	case len(hybrids) == 1:
-		e.block("hybrid_variety", 0, PointsVariety)
+		e.readiness("hybrid_variety", 0, ReadyVariety)
 		e.add("KEX_SINGLE_HYBRID", AxisQuantum, Low, CatKeyExchange, map[string]string{"group": hybrids[0]})
 	default:
-		e.block("hybrid_variety", 0, PointsVariety)
+		e.readiness("hybrid_variety", 0, ReadyVariety)
 	}
 	if len(pure) > 0 {
 		e.add("KEX_PURE_MLKEM", AxisQuantum, Info, CatKeyExchange, map[string]string{"groups": strings.Join(pure, ", ")})
@@ -350,8 +397,13 @@ func (e *evaluator) rawGroups(kinds ...rawtls.GroupKind) []string {
 
 // experimentalPQC: pre-standard Kyber or draft hybrids. Browsers no longer
 // offer them (Chrome dropped Kyber in 2024), so they protect nobody and earn
-// no points; alone they mean a PQC migration started and got stuck.
+// no points; alone they mean a PQC migration started and got stuck. Since
+// 2026.3 the obsolete Kyber codepoint costs readiness points: it puts the
+// server below one with no post-quantum group at all.
 func (e *evaluator) experimentalPQC() {
+	if kyber := e.rawGroups(rawtls.GroupKyberDraft); len(kyber) > 0 {
+		e.readiness("kyber_draft", -ReadyKyberPenalty, 0)
+	}
 	exp := e.rawGroups(rawtls.GroupKyberDraft, rawtls.GroupHybridDraft)
 	if len(exp) == 0 {
 		return
@@ -427,6 +479,8 @@ func (e *evaluator) certificate() {
 	maxPoints := PointsCertValid + PointsCertKey + PointsCertSig + PointsCertAuto
 	if c == nil {
 		e.block("certificate", 0, maxPoints)
+		e.readiness("cert_automation", 0, ReadyAutomation)
+		e.readiness("pq_certificate", 0, ReadyPQCert)
 		e.add("CERT_MISSING", AxisCurrent, Info, CatScan, nil)
 		return
 	}
@@ -460,8 +514,10 @@ func (e *evaluator) certificate() {
 		}
 	}
 
+	// A post-quantum key (ML-DSA, SLH-DSA; milestone 2.8.5) is a sound key:
+	// it gets the key points, as ECDSA does, and nothing more in 2026.2.
 	keyOK := (c.KeyAlgorithm == "RSA" && c.KeySize >= 2048) ||
-		(c.KeyAlgorithm == "ECDSA" && c.KeySize >= 256) || c.KeyAlgorithm == "Ed25519"
+		(c.KeyAlgorithm == "ECDSA" && c.KeySize >= 256) || c.KeyAlgorithm == "Ed25519" || postQuantumKey(c)
 	if !keyOK && (c.KeyAlgorithm == "RSA" || c.KeyAlgorithm == "ECDSA") {
 		e.add("CERT_WEAK_KEY", AxisCurrent, High, CatCertificate, map[string]string{"key": keyLabel(c)})
 		e.capAt("C", "CERT_WEAK_KEY")
@@ -476,8 +532,29 @@ func (e *evaluator) certificate() {
 	// Future quantum risk: every WebPKI signature today is classical. Not
 	// harvest-now-decrypt-later (a signature only has to hold during the
 	// handshake), so it never costs points.
+	sel := e.r.CertificateSelection
 	if c.KeyAlgorithm == "RSA" || c.KeyAlgorithm == "ECDSA" || c.KeyAlgorithm == "Ed25519" {
-		e.add("CERT_CLASSICAL_SIGNATURE", AxisQuantum, Low, CatCertificate, map[string]string{"key": keyLabel(c)})
+		params := map[string]string{"key": keyLabel(c)}
+		if sel != nil && sel.WithMLDSA != nil && !sel.WithMLDSA.PostQuantum {
+			params["pq_offered"] = "1" // offered ML-DSA, as Chrome does, it chose this one
+		}
+		e.add("CERT_CLASSICAL_SIGNATURE", AxisQuantum, Low, CatCertificate, params)
+	}
+
+	// Post-quantum certificate (milestone 2.8.5): readiness points since
+	// 2026.3. Without a classical one for clients that do not offer ML-DSA,
+	// those clients cannot connect: an availability problem today, not a
+	// confidentiality one (medium, no cap, no points taken on either axis).
+	pqCert := sel != nil && sel.WithMLDSA != nil && sel.WithMLDSA.PostQuantum
+	if pqCert {
+		alg := sel.WithMLDSA.KeyAlgorithm
+		if alg == "" {
+			alg = sel.WithMLDSA.KeyOID
+		}
+		e.add("CERT_PQ_SIGNATURE", AxisQuantum, Info, CatCertificate, map[string]string{"algorithm": alg})
+		if sel.WithoutStatus == scanner.NotSupported || sel.WithoutMLDSA != nil && sel.WithoutMLDSA.PostQuantum {
+			e.add("CERT_PQ_NO_CLASSICAL_FALLBACK", AxisCurrent, Medium, CatCertificate, map[string]string{"algorithm": alg})
+		}
 	}
 
 	automated, reason := automation(c)
@@ -489,6 +566,8 @@ func (e *evaluator) certificate() {
 	default:
 		e.add("CERT_NOT_AUTOMATED", AxisQuantum, Low, CatCertificate, map[string]string{"days": strconv.Itoa(c.ValidityDays), "issuer": issuerName(c)})
 	}
+	e.readiness("cert_automation", pts(automated, ReadyAutomation), ReadyAutomation)
+	e.readiness("pq_certificate", pts(pqCert, ReadyPQCert), ReadyPQCert)
 
 	// Certificate Transparency: informational only.
 	if c.SCTsEmbedded+c.SCTsHandshake > 0 {
@@ -700,6 +779,19 @@ func (e *evaluator) suites() {
 	if len(tls13) > 0 && len(integrity) == 0 && len(ccm8) == 0 {
 		e.add("TLS13_SUITES_AEAD", AxisCurrent, Pass, CatCipherSuites, map[string]string{"suites": strings.Join(tls13, ", ")})
 	}
+
+	// Whose order of TLS 1.3 suites the server follows (milestone 2.8.7):
+	// evaluated, informational, no points (every TLS 1.3 suite is sound).
+	// Only scans that carry it: earlier ones keep their judgement.
+	if raw := e.r.Raw; raw != nil && raw.TLS13SuiteOrder != nil && len(raw.TLS13SuiteOrder.Picks) == 2 {
+		o := raw.TLS13SuiteOrder
+		switch o.Order {
+		case scanner.SuiteOrderServer:
+			e.add("TLS13_SUITE_ORDER_SERVER", AxisCurrent, Info, CatCipherSuites, map[string]string{"suite": o.Picks[0]})
+		case scanner.SuiteOrderClient:
+			e.add("TLS13_SUITE_ORDER_CLIENT", AxisCurrent, Info, CatCipherSuites, map[string]string{"first": o.Picks[0], "second": o.Picks[1]})
+		}
+	}
 }
 
 // symmetric: AES-128 and Grover. Informational: NIST still deems AES-128
@@ -759,12 +851,8 @@ func (e *evaluator) result() Result {
 	for _, b := range e.blocks {
 		res.Score += b.Points
 	}
-	// Only an F cap (broken) cancels the floor: with a C cap (weak) the score
-	// stays at 40 or more and the cap brings the letter to D or C.
-	if _, broken := e.caps["F"]; !broken && res.Score < FloorScore {
-		res.FloorPoints = FloorScore - res.Score
-		res.Score = FloorScore
-	}
+	// No floor since 2026.3: the lack of post-quantum protection, which the
+	// floor of 2026.2 compensated, no longer counts on this axis.
 	res.ScoreGrade = GradeFor(res.Score)
 	res.Grade = res.ScoreGrade
 	for _, g := range []string{"F", "D", "C", "B"} { // worst cap wins
@@ -790,6 +878,13 @@ func (e *evaluator) result() Result {
 		return strings.Compare(a.Code, b.Code)
 	})
 	res.Findings = e.findings
+	ready := &Readiness{Blocks: e.ready}
+	for _, b := range e.ready {
+		ready.Score += b.Points
+	}
+	ready.Score = max(ready.Score, 0) // the Kyber penalty does not go below 0
+	ready.Level = LevelFor(ready.Score)
+	res.Readiness = ready
 	res.QuantumRisk = worst(e.findings, AxisQuantum)
 	res.CurrentRisk = worst(e.findings, AxisCurrent)
 	return res
@@ -824,8 +919,40 @@ func issuerName(c *scanner.Certificate) string {
 }
 
 func keyLabel(c *scanner.Certificate) string {
+	if c.KeySize == 0 { // post-quantum keys: the name says it all
+		return c.KeyAlgorithm
+	}
 	if c.Curve != "" {
 		return c.KeyAlgorithm + " " + c.Curve
 	}
 	return c.KeyAlgorithm + "-" + strconv.Itoa(c.KeySize)
+}
+
+// postQuantumKey reports whether the leaf's key is ML-DSA or SLH-DSA, by its
+// OID (schema 2).
+func postQuantumKey(c *scanner.Certificate) bool {
+	if len(c.Chain) == 0 {
+		return false
+	}
+	_, ok := scanner.PostQuantumOID(c.Chain[0].PublicKeyOID)
+	return ok
+}
+
+// Quantum threats a finding of the quantum axis concerns: Shor breaks
+// today's key exchange and signatures; Grover only halves the strength of
+// symmetric ciphers (informational).
+const (
+	ThreatShor   = "shor"
+	ThreatGrover = "grover"
+)
+
+// ThreatOf is the quantum threat of a finding ("" off the quantum axis).
+func ThreatOf(code string, axis Axis) string {
+	switch {
+	case axis != AxisQuantum:
+		return ""
+	case strings.HasPrefix(code, "SYM_"):
+		return ThreatGrover
+	}
+	return ThreatShor
 }

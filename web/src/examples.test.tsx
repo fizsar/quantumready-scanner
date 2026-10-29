@@ -28,7 +28,8 @@ function renderAt(path: string, lang: Lang) {
 // The grades the page explains. The Go test TestLabFixtures pins the same
 // numbers against the current scoring model and checks the fixtures are what
 // the API returns now, so a model change fails there and here.
-const shown = { fizsar: ['A', 95], modern: ['D', 40], kyber: ['D', 40], export: ['F', 15] } as const
+// Model 2026.3: security today (letter, score) and quantum readiness (score, level code).
+const shown = { fizsar: ['A', 100, 75, 'ready'], modern: ['A', 90, 10, 'not_ready'], kyber: ['A', 90, 0, 'not_ready'], export: ['F', 35, 0, 'not_ready'] } as const
 const labLabel = { es: 'Servidor de laboratorio aislado; no es un sitio real', en: 'Isolated lab server; not a real website' }
 
 describe('/examples', () => {
@@ -45,14 +46,18 @@ describe('/examples', () => {
       await waitFor(() => expect(document.title).toBe(showcaseDict[lang]['examples.meta.title']))
       for (const { key, lab, scans } of EXAMPLES) {
         const scan = scans[lang]
-        const [grade, score] = shown[key]
-        expect([scan.report!.grade, scan.report!.score], key).toEqual([grade, score])
+        const [grade, score, ready, level] = shown[key]
+        const r = scan.report!
+        expect([r.grade, r.score, r.readiness?.score, r.readiness?.level.code], key).toEqual([grade, score, ready, level])
         const section = document.getElementById(key)!
         expect(section, key).not.toBeNull()
-        expect(within(section).getByRole('heading', { level: 2, name: `${scan.host} · ${grade} · ${score}` })).toBeTruthy()
-        // The report itself, with the same component as a scan.
-        expect(within(section).getByText(lang === 'es' ? `Nota: ${grade}` : `Grade: ${grade}`)).toBeTruthy()
-        expect(within(section).getByText(lang === 'es' ? `${score} de 100 puntos` : `${score} out of 100 points`)).toBeTruthy()
+        const levelLabel = r.readiness!.level.label
+        const heading = lang === 'es' ? `${scan.host} · ${grade} · ${score} · preparación: ${levelLabel}` : `${scan.host} · ${grade} · ${score} · readiness: ${levelLabel}`
+        expect(within(section).getByRole('heading', { level: 2, name: heading })).toBeTruthy()
+        // The report itself, with the same component as a scan: both axes.
+        expect(within(section).getByText(lang === 'es' ? `Seguridad hoy: ${grade}` : `Security today: ${grade}`)).toBeTruthy()
+        expect(within(section).getAllByText(lang === 'es' ? `${score} de 100 puntos` : `${score} out of 100 points`).length).toBeGreaterThan(0)
+        expect(within(section).getAllByText(levelLabel).length).toBeGreaterThan(0)
         for (const part of ['config', 'why', 'fix'] as const) {
           expect(within(section).getByText(showcaseDict[lang][`examples.${key}.${part}`]), `${key}.${part}`).toBeTruthy()
         }

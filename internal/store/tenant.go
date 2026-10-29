@@ -77,6 +77,9 @@ type ScanRequest struct {
 	Port      int32
 	Intensity string        // IntensityBasic or IntensityFull
 	Cooldown  time.Duration // reuse a non-failed scan this recent
+	// ScoringVersion: reuse only a scan judged (or to be judged) with this
+	// model (scoring.Version); an older judgement is not handed out again.
+	ScoringVersion string
 }
 
 // EnqueueOrReuse enqueues a scan for the tenant unless one of the same
@@ -97,7 +100,8 @@ func (s *Store) EnqueueOrReuse(ctx context.Context, t Tenant, r ScanRequest) (sc
 			return err
 		}
 		recent, err := q.RecentScanForTarget(ctx, RecentScanForTargetParams{
-			Host: r.Host, Port: r.Port, Intensity: r.Intensity, OrganizationID: t.OrgID, WithinSeconds: r.Cooldown.Seconds(),
+			Host: r.Host, Port: r.Port, Intensity: r.Intensity, OrganizationID: t.OrgID, ScoringVersion: r.ScoringVersion,
+			WithinSeconds: r.Cooldown.Seconds(),
 		})
 		if err == nil {
 			sc, reused = recent, true
@@ -121,11 +125,12 @@ func (s *Store) EnqueueOrReuse(ctx context.Context, t Tenant, r ScanRequest) (sc
 
 // RecentPublicScan returns a public basic scan of host:port to reuse — in
 // flight or done within cooldown, or done within doneWithin — or
-// pgx.ErrNoRows. It reads with the public tenant, so row-level security
-// alone already keeps organizations' scans out.
-func (s *Store) RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration) (sc Scan, err error) {
+// pgx.ErrNoRows; only one judged (or to be judged) with scoringVersion. It
+// reads with the public tenant, so row-level security alone already keeps
+// organizations' scans out.
+func (s *Store) RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration, scoringVersion string) (sc Scan, err error) {
 	err = s.Tx(ctx, Public, func(q *Queries) error {
-		sc, err = q.RecentPublicScan(ctx, RecentPublicScanParams{Host: host, Port: port,
+		sc, err = q.RecentPublicScan(ctx, RecentPublicScanParams{Host: host, Port: port, ScoringVersion: scoringVersion,
 			CooldownSeconds: cooldown.Seconds(), DoneSeconds: doneWithin.Seconds()})
 		return err
 	})

@@ -11,6 +11,7 @@ import (
 
 	"github.com/fizsar/quantumready-saas/internal/domains"
 	"github.com/fizsar/quantumready-saas/internal/org"
+	"github.com/fizsar/quantumready-saas/internal/scoring"
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
 
@@ -57,7 +58,7 @@ func (a *api) createOrgScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), t,
-		store.ScanRequest{Host: host, Port: ScanPort, Intensity: store.IntensityFull, Cooldown: a.cfg.TargetCooldown})
+		store.ScanRequest{Host: host, Port: ScanPort, Intensity: store.IntensityFull, Cooldown: a.cfg.TargetCooldown, ScoringVersion: scoring.Version})
 	if err != nil {
 		a.cfg.AuthLimits.OrgScans.Cancel(key)
 		a.internal(w, r, "enqueue scan", err)

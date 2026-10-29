@@ -8,7 +8,11 @@ import (
 
 // SchemaVersion identifies the JSON layout of Result. Bump it on breaking
 // changes: results are stored as JSON and scored later.
-const SchemaVersion = 1
+//
+// Version 2 (milestone 2.8.4) adds, all optional, so a version 1 result reads
+// the same: ProbeLog, an ErrorCode beside every Error (TrustErrorCode beside
+// TrustError) and the OIDs of the chain. Scoring reads none of them.
+const SchemaVersion = 2
 
 // Status is the outcome of a single probe.
 type Status string
@@ -71,6 +75,58 @@ type Result struct {
 	Connections int `json:"connections,omitempty"`
 	// Raw holds what the raw ClientHello probes found (intensity full).
 	Raw *RawResult `json:"raw,omitempty"`
+
+	// ProbeLog (schema 2) is every connection the scan made, as it went on
+	// the wire.
+	ProbeLog *ProbeLog `json:"probe_log,omitempty"`
+
+	// CertificateSelection (schema 2, milestone 2.8.5) is which certificate
+	// the server presents to a client that offers ML-DSA signatures and to
+	// one that does not.
+	CertificateSelection *CertificateSelection `json:"certificate_selection,omitempty"`
+
+	// ChromeOffer (milestone 2.8.7, intensity full) is what the server picks
+	// for Chrome 156's ClientHello, rebuilt byte for byte by a raw probe
+	// (rawtls.ChromeHello): version, suite and group, read from the
+	// ServerHello (and, in TLS 1.2, the ServerKeyExchange). It does not
+	// complete the handshake; Default stays the reference.
+	ChromeOffer *Handshake `json:"chrome_offer,omitempty"`
+	// ChromeHelloRetry: the server asked Chrome's offer for another key
+	// share (HelloRetryRequest); ChromeOffer.Group is the group it wants.
+	ChromeHelloRetry bool `json:"chrome_hello_retry,omitempty"`
+}
+
+// CertificateSelection compares the certificate a server presents to a
+// client that offers ML-DSA signatures (as Chrome does; the browser-like
+// probe) with the one it presents to a client that does not (as Firefox or
+// an older client; a raw TLS 1.3 probe with Firefox's signature schemes that
+// decrypts the server's flight to read it, intensity full).
+type CertificateSelection struct {
+	// WithMLDSA is nil when no certificate was seen.
+	WithMLDSA *PresentedCert `json:"with_mldsa,omitempty"`
+	// WithoutMLDSA is nil when the server presented none: see WithoutStatus.
+	WithoutMLDSA *PresentedCert `json:"without_mldsa,omitempty"`
+	// WithoutStatus is supported (a certificate came), not_supported (the
+	// server refused the handshake) or error (it could not be told); empty
+	// when the probe did not run (intensity basic, no TLS 1.3).
+	WithoutStatus    Status `json:"without_status,omitempty"`
+	WithoutError     string `json:"without_error,omitempty"`
+	WithoutErrorCode string `json:"without_error_code,omitempty"`
+}
+
+// PresentedCert is the leaf a server presented, by the OIDs it carries.
+type PresentedCert struct {
+	KeyAlgorithm       string `json:"key_algorithm,omitempty"` // ML-DSA-65, ECDSA… ("" if unknown: see KeyOID)
+	KeyOID             string `json:"key_oid"`
+	SignatureAlgorithm string `json:"signature_algorithm,omitempty"`
+	SignatureOID       string `json:"signature_oid"`
+	SHA256             string `json:"sha256"` // of the leaf, to tell two certificates apart
+	// PostQuantum: the leaf's key is ML-DSA or SLH-DSA, so the handshake is
+	// signed with a post-quantum algorithm.
+	PostQuantum bool `json:"post_quantum"`
+	// PostQuantumChain: some certificate of the chain has a post-quantum key
+	// or signature.
+	PostQuantumChain bool `json:"post_quantum_chain,omitempty"`
 }
 
 // RawResult is what the raw ClientHello probes (internal/scanner/rawtls)
@@ -109,6 +165,10 @@ type RawResult struct {
 	// negotiated one).
 	TLS13Suites         []RawSuite `json:"tls13_suites"`
 	TLS13SuitesComplete bool       `json:"tls13_suites_complete"`
+	// TLS13SuiteOrder (milestone 2.8.7) says whether the server imposes its
+	// own order of TLS 1.3 suites or follows the client's; nil when it has
+	// fewer than two or was not probed (results from before).
+	TLS13SuiteOrder *SuiteOrder `json:"tls13_suite_order,omitempty"`
 
 	// DH lists the finite-field DH groups seen in ServerKeyExchange.
 	DH []DHParams `json:"dh,omitempty"`
@@ -153,8 +213,9 @@ type RawProtocol struct {
 	Status Status `json:"status"`
 	// Ciphers: for SSLv2 the cipher kinds the server listed, for SSLv3 the
 	// suite it picked.
-	Ciphers []string `json:"ciphers,omitempty"`
-	Error   string   `json:"error,omitempty"`
+	Ciphers   []string `json:"ciphers,omitempty"`
+	Error     string   `json:"error,omitempty"`
+	ErrorCode string   `json:"error_code,omitempty"` // stable, see errorCode
 }
 
 // RawSuite is a suite accepted in a raw probe, with the attributes scoring needs.
@@ -212,6 +273,7 @@ type Handshake struct {
 	Group       string `json:"group,omitempty"`
 	GroupID     uint16 `json:"group_id,omitempty"`
 	Error       string `json:"error,omitempty"`
+	ErrorCode   string `json:"error_code,omitempty"`
 }
 
 // KeyExchange describes the key exchange groups: the one the server picks for
@@ -229,19 +291,21 @@ type KeyExchange struct {
 
 // GroupProbe is the result of offering a single key exchange group.
 type GroupProbe struct {
-	Name   string `json:"name"`
-	ID     uint16 `json:"id"`
-	Hybrid bool   `json:"hybrid"` // classical + ML-KEM hybrid
-	Status Status `json:"status"`
-	Error  string `json:"error,omitempty"`
+	Name      string `json:"name"`
+	ID        uint16 `json:"id"`
+	Hybrid    bool   `json:"hybrid"` // classical + ML-KEM hybrid
+	Status    Status `json:"status"`
+	Error     string `json:"error,omitempty"`
+	ErrorCode string `json:"error_code,omitempty"`
 }
 
 // VersionProbe is the result of offering a single protocol version.
 type VersionProbe struct {
-	Version string `json:"version"`
-	ID      uint16 `json:"id"`
-	Status  Status `json:"status"`
-	Error   string `json:"error,omitempty"`
+	Version   string `json:"version"`
+	ID        uint16 `json:"id"`
+	Status    Status `json:"status"`
+	Error     string `json:"error,omitempty"`
+	ErrorCode string `json:"error_code,omitempty"`
 }
 
 // CipherSuite is a TLS 1.2 (or earlier) cipher suite accepted by the server.
@@ -269,12 +333,13 @@ type Certificate struct {
 	Curve              string `json:"curve,omitempty"`
 	SignatureAlgorithm string `json:"signature_algorithm"`
 
-	Trusted       bool   `json:"trusted"` // chains to a trusted root, valid now
-	TrustError    string `json:"trust_error,omitempty"`
-	HostnameMatch bool   `json:"hostname_match"`
-	Expired       bool   `json:"expired"`
-	NotYetValid   bool   `json:"not_yet_valid"`
-	SelfSigned    bool   `json:"self_signed"`
+	Trusted        bool   `json:"trusted"` // chains to a trusted root, valid now
+	TrustError     string `json:"trust_error,omitempty"`
+	TrustErrorCode string `json:"trust_error_code,omitempty"` // stable, see trustErrorCode
+	HostnameMatch  bool   `json:"hostname_match"`
+	Expired        bool   `json:"expired"`
+	NotYetValid    bool   `json:"not_yet_valid"`
+	SelfSigned     bool   `json:"self_signed"`
 
 	OCSPStapled bool `json:"ocsp_stapled"`
 	// Signed Certificate Timestamps (Certificate Transparency): embedded in the
@@ -283,7 +348,15 @@ type Certificate struct {
 	SCTsHandshake int `json:"scts_handshake"`
 
 	Chain []ChainCert `json:"chain"` // as sent by the server, leaf first
+	// Source (milestone 2.8.7) is "raw" when no crypto/tls handshake got as
+	// far as the certificate and it was read in clear from the raw probes
+	// (TLS 1.0–1.2, SSLv3, SSLv2): no OCSP staple or handshake SCTs then.
+	// Empty: from crypto/tls, as always before.
+	Source string `json:"source,omitempty"`
 }
+
+// CertSourceRaw is Certificate.Source for a chain read from the raw probes.
+const CertSourceRaw = "raw"
 
 // ChainCert is one certificate of the chain sent by the server.
 type ChainCert struct {
@@ -293,6 +366,10 @@ type ChainCert struct {
 	KeySize            int       `json:"key_size"`
 	SignatureAlgorithm string    `json:"signature_algorithm"`
 	NotAfter           time.Time `json:"not_after"`
+	// The algorithm identifiers as sent (schema 2), also those crypto/x509
+	// does not know (SLH-DSA, drafts…).
+	SignatureOID string `json:"signature_oid,omitempty"`
+	PublicKeyOID string `json:"public_key_oid,omitempty"`
 }
 
 // Checks crypto/tls cannot perform. Codes are stable; their explanation lives
@@ -311,6 +388,35 @@ const (
 // NotEvalCredentialSuites (intensity full): PSK, SRP, Kerberos and GOST
 // suites need credentials or algorithms a scanner does not have.
 const NotEvalCredentialSuites = "credential_suites" //nolint:gosec // a code name, not a credential
+
+// SuiteOrder is the outcome of two offers of the same suites in opposite
+// orders: the suite chosen for each.
+type SuiteOrder struct {
+	// Order is SuiteOrderServer (the same suite both times),
+	// SuiteOrderClient (the first one offered each time) or "" (neither, or
+	// a probe failed: not evaluated).
+	Order string   `json:"order"`
+	Offer []string `json:"offer"` // the first offer; the second is it reversed
+	Picks []string `json:"picks"` // chosen for the first and the second offer ("" if the probe failed)
+}
+
+// The values of SuiteOrder.Order.
+const (
+	SuiteOrderServer = "server" // the server imposes its order
+	SuiteOrderClient = "client" // the server follows the client's order
+)
+
+// NotEvalTLS13SuiteOrder (intensity full): the server has two or more TLS 1.3
+// suites and whose order it follows could not be told.
+const NotEvalTLS13SuiteOrder = "tls13_suite_order"
+
+// Post-quantum certificates (milestone 2.8.5): no certificate was seen with
+// an offer that includes ML-DSA; or a post-quantum one was, and whether the
+// server has a classical one for clients without ML-DSA could not be told.
+const (
+	NotEvalPQCertificate         = "pq_certificate"
+	NotEvalPQCertificateFallback = "pq_certificate_fallback"
+)
 
 // notEvaluated is the list for intensity basic (unchanged since milestone 2.1).
 var notEvaluated = []string{
@@ -336,6 +442,9 @@ func notEvaluatedFull(r *RawResult) []string {
 	}
 	if !r.TLS13SuitesComplete {
 		out = append(out, NotEvalTLS13Suites)
+	}
+	if o := r.TLS13SuiteOrder; o != nil && o.Order == "" {
+		out = append(out, NotEvalTLS13SuiteOrder)
 	}
 	out = append(out, NotEvalServerPreference)
 	if !r.TLS13GroupsComplete || !r.TLS12CurvesComplete {

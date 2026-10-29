@@ -32,6 +32,7 @@ const (
 	ssl2MsgError       = 0
 	ssl2MsgClientHello = 1
 	ssl2MsgServerHello = 4
+	ssl2CertX509       = 1 // SSL_X509_CERTIFICATE
 )
 
 // SSLv2ServerHello is a parsed SSLv2 SERVER-HELLO.
@@ -40,6 +41,9 @@ type SSLv2ServerHello struct {
 	SessionIDHit bool
 	CertType     uint8
 	CertLen      int
+	// Certificate is the server's certificate (DER) when CertType is X.509
+	// (1): SSLv2 sends the leaf alone.
+	Certificate []byte
 	// Ciphers are the cipher kinds the server has in common with our offer
 	// (possibly none: SSLv2 is enabled but without a common cipher).
 	Ciphers []uint32
@@ -185,6 +189,9 @@ func ParseSSLv2ServerHello(body []byte) (*SSLv2ServerHello, error) {
 	}
 	sh.SessionIDHit = hit != 0
 	sh.CertLen = int(certLen)
+	if sh.CertType == ssl2CertX509 && len(cert) > 0 {
+		sh.Certificate = slices.Clone(cert)
+	}
 	for i := 0; i < len(specs); i += 3 {
 		sh.Ciphers = append(sh.Ciphers, uint32(specs[i])<<16|uint32(specs[i+1])<<8|uint32(specs[i+2]))
 	}

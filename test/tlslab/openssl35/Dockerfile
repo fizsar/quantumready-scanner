@@ -1,6 +1,6 @@
 # OpenSSL 3.5.9 (LTS): TLS 1.3 with every suite (CCM and CCM_8 included),
 # ffdhe and brainpool groups, pure and hybrid ML-KEM; Camellia, ARIA and CCM
-# in TLS 1.2. Test lab only.
+# in TLS 1.2; ML-DSA certificates (TLS 1.3). Test lab only.
 FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 AS build
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gcc libc6-dev make perl \
 	&& rm -rf /var/lib/apt/lists/*
@@ -15,6 +15,9 @@ RUN make -j"$(nproc)" >/dev/null 2>&1 && make install_sw install_ssldirs >/dev/n
 RUN mkdir /lab && cd /lab && /opt/openssl/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
 		-subj /CN=tlslab.test -keyout key.pem -out cert.pem 2>/dev/null \
 	&& chmod 444 /lab/*
+# Milestone 2.8.5: an ML-DSA-65 and an ECDSA P-256 certificate (mldsa-dual,
+# mldsa-only). A separate layer, so the RSA certificate above stays cached.
+RUN cd /lab && O=/opt/openssl/bin/openssl 	&& $O genpkey -algorithm ML-DSA-65 -out mldsa.key 2>/dev/null 	&& $O req -x509 -new -key mldsa.key -days 3650 -subj /CN=tlslab.test -out mldsa.pem 2>/dev/null 	&& $O genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out ecdsa.key 2>/dev/null 	&& $O req -x509 -new -key ecdsa.key -days 3650 -subj /CN=tlslab.test -out ecdsa.pem 2>/dev/null 	&& chmod 444 /lab/*
 
 FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
 COPY --from=build /opt/openssl/bin/openssl /usr/local/bin/openssl

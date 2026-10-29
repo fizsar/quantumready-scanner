@@ -157,11 +157,11 @@ function Diagram({ layout: l }: { layout: Layout }) {
         return (
           <g key={key} className={`arch-node ${b.kind ? `arch-node-${b.kind}` : ''}`}>
             <rect x={x} y={y} width={W} height={H} rx="8" />
-            <text className="arch-label" x={x + W / 2} y={y + (b.sub ? 22 : 31)} textAnchor="middle" {...fit(t(b.label), 14, W - 12)}>
+            <text className="arch-label" x={x + W / 2} y={y + (b.sub ? 22 : 31)} textAnchor="middle" {...fit(t(b.label), 14, W - 20)}>
               {t(b.label)}
             </text>
             {b.sub && (
-              <text className="arch-sub" x={x + W / 2} y={y + 40} textAnchor="middle" {...fit(t(b.sub), 11, W - 12)}>
+              <text className="arch-sub" x={x + W / 2} y={y + 40} textAnchor="middle" {...fit(t(b.sub), 11, W - 20)}>
                 {t(b.sub)}
               </text>
             )}

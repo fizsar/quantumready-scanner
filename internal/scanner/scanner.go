@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -105,6 +106,7 @@ type target struct {
 	sni   string // "" for IP literals
 	addr  netip.AddrPort
 	conns *atomic.Int32 // connections opened by this scan
+	log   *probeLog     // every connection, as sent and received (nil: not logged)
 }
 
 // Scan probes host:port (port 0 means 443) with the scanner's intensity. It
@@ -139,7 +141,7 @@ func (s *Scanner) ScanWith(ctx context.Context, host string, port int, intensity
 	if err != nil {
 		return nil, err
 	}
-	t := target{host: name, sni: name, addr: netip.AddrPortFrom(ip, uint16(port)), conns: new(atomic.Int32)}
+	t := target{host: name, sni: name, addr: netip.AddrPortFrom(ip, uint16(port)), conns: new(atomic.Int32), log: newProbeLog()}
 	if literal.IsValid() {
 		t.sni = ""
 	}
@@ -160,7 +162,7 @@ func (s *Scanner) ScanWith(ctx context.Context, host string, port int, intensity
 	}
 
 	// Browser-like handshake first: it tells us whether the target speaks TLS at all.
-	base := s.handshake(ctx, t, &tls.Config{MinVersion: tls.VersionTLS12, CurvePreferences: BrowserGroups})
+	base := s.handshake(ctx, t, &tls.Config{MinVersion: tls.VersionTLS12, CurvePreferences: BrowserGroups}, probeTag{purpose: PurposeDefault}, nil)
 	if base.status == ProbeFailed {
 		return nil, fmt.Errorf("%w: %w", ErrUnreachable, base.err)
 	}
@@ -172,15 +174,19 @@ func (s *Scanner) ScanWith(ctx context.Context, host string, port int, intensity
 	}
 
 	var (
-		mu    sync.Mutex
-		certs = base.certs
-		state = base.state
+		mu       sync.Mutex
+		certs    = base.certs
+		state    = base.state
+		rawCerts = base.raw
 	)
 	keep := func(p probe) { // first certificate chain seen, in case the default handshake failed
 		mu.Lock()
 		defer mu.Unlock()
 		if len(certs) == 0 && len(p.certs) > 0 {
 			certs, state = p.certs, p.state
+		}
+		if len(rawCerts) == 0 && len(p.raw) > 0 {
+			rawCerts = p.raw
 		}
 	}
 
@@ -194,15 +200,15 @@ func (s *Scanner) ScanWith(ctx context.Context, host string, port int, intensity
 		g.Go(func() error {
 			p := s.probeGroup(ctx, t, id)
 			keep(p)
-			res.KeyExchange.Groups[i] = GroupProbe{Name: groupName(id), ID: uint16(id), Hybrid: isHybrid(id), Status: p.status, Error: p.errString()}
+			res.KeyExchange.Groups[i] = GroupProbe{Name: groupName(id), ID: uint16(id), Hybrid: isHybrid(id), Status: p.status, Error: p.errString(), ErrorCode: errorCode(p.err)}
 			return nil
 		})
 	}
 	for i, v := range probedVersions {
 		g.Go(func() error {
-			p := s.handshake(ctx, t, versionConfig(v))
+			p := s.handshake(ctx, t, versionConfig(v), probeTag{PurposeVersion, tls.VersionName(v)}, nil)
 			keep(p)
-			res.Versions[i] = VersionProbe{Version: tls.VersionName(v), ID: v, Status: p.status, Error: p.errString()}
+			res.Versions[i] = VersionProbe{Version: tls.VersionName(v), ID: v, Status: p.status, Error: p.errString(), ErrorCode: errorCode(p.err)}
 			if v == tls.VersionTLS13 && p.state != nil {
 				res.TLS13Suite = tls.CipherSuiteName(p.state.CipherSuite)
 			}
@@ -225,16 +231,61 @@ func (s *Scanner) ScanWith(ctx context.Context, host string, port int, intensity
 	})
 	_ = g.Wait()
 	res.LegacySuitesComplete = legacy10 && legacy11
+	// Every crypto/tls probe offers ML-DSA signatures (Go 1.27 does, as
+	// Chrome): the certificate seen is the one such a client gets. The raw
+	// probes add the one a client without them gets.
+	res.CertificateSelection = &CertificateSelection{WithMLDSA: presented(rawCerts)}
+	var clearChain [][]byte
 	if intensity == IntensityFull {
-		s.runRaw(ctx, t, res)
+		clearChain = s.runRaw(ctx, t, res)
+	}
+	// No crypto/tls handshake got to the certificate (SSLv2/v3, EXPORT, only
+	// DHE, only secp224…): the raw probes read it in clear. Without TLS 1.3
+	// there are no ML-DSA certificates, so it is also what a client offering
+	// ML-DSA gets.
+	certSource := ""
+	if len(certs) == 0 {
+		if parsed := parseChain(clearChain); len(parsed) > 0 {
+			certs, state, certSource = parsed, nil, CertSourceRaw
+			if res.CertificateSelection.WithMLDSA == nil && !tls13Seen(res) {
+				res.CertificateSelection.WithMLDSA = presented(clearChain)
+			}
+		}
+	}
+	switch sel := res.CertificateSelection; {
+	case sel.WithMLDSA == nil:
+		res.NotEvaluated = append(slices.Clone(res.NotEvaluated), NotEvalPQCertificate)
+	case sel.WithMLDSA.PostQuantum && sel.WithoutStatus != Supported && sel.WithoutStatus != NotSupported:
+		res.NotEvaluated = append(slices.Clone(res.NotEvaluated), NotEvalPQCertificateFallback)
 	}
 
 	if len(certs) > 0 {
 		res.Certificate = analyzeCertificate(certs, state, t.host, s.opts.Now(), s.opts.RootCAs)
+		res.Certificate.Source = certSource
 	}
 	res.Connections = int(t.conns.Load())
+	res.ProbeLog = t.log.result()
 	res.DurationMS = s.opts.Now().Sub(start).Milliseconds()
 	return res, nil
+}
+
+// parseChain parses a chain as sent (leaf first), up to the first
+// certificate crypto/x509 cannot parse, as the crypto/tls probes do.
+func parseChain(chain [][]byte) []*x509.Certificate {
+	var out []*x509.Certificate
+	for _, der := range chain {
+		c, err := x509.ParseCertificate(der)
+		if err != nil {
+			break
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// tls13Seen reports whether any probe, crypto/tls or raw, got TLS 1.3.
+func tls13Seen(res *Result) bool {
+	return versionStatusOf(res, tls.VersionTLS13) == Supported || res.Raw != nil && len(res.Raw.TLS13Suites) > 0
 }
 
 // probeGroup offers a single group. Hybrids need TLS 1.3; classical groups are
@@ -245,12 +296,12 @@ func (s *Scanner) probeGroup(ctx context.Context, t target, id tls.CurveID) prob
 	if isHybrid(id) {
 		cfg.MinVersion = tls.VersionTLS13
 	}
-	p := s.handshake(ctx, t, cfg)
-	if p.status == Supported && p.state.CurveID != id {
-		p.status = NotSupported
-		p.err = fmt.Errorf("server negotiated %s instead", groupName(p.state.CurveID))
-	}
-	return p
+	return s.handshake(ctx, t, cfg, probeTag{PurposeGroup, groupName(id)}, func(st *tls.ConnectionState) error {
+		if st.CurveID != id {
+			return &outcomeError{"other_group", fmt.Sprintf("server negotiated %s instead", groupName(st.CurveID))}
+		}
+		return nil
+	})
 }
 
 // versionConfig offers exactly one version with every suite and group Go has.
@@ -274,7 +325,7 @@ func (s *Scanner) enumerateSuites(ctx context.Context, t target, v uint16) (foun
 			MaxVersion:       v,
 			CipherSuites:     remaining,
 			CurvePreferences: ClassicGroups,
-		})
+		}, probeTag{PurposeSuites, tls.VersionName(v)}, nil)
 		switch p.status {
 		case NotSupported:
 			return found, true

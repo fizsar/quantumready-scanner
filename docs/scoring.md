@@ -2,40 +2,47 @@
 
 **ES** · [EN](#english)
 
-Versión del modelo: **2026.2** (`scoring.Version`; historial al final). `internal/scoring` convierte un resultado del escáner en una **nota de preparación post-cuántica** (0–100 y letra A–F) y una lista de **hallazgos**. Es determinista: el mismo escaneo da siempre el mismo resultado.
+Versión del modelo: **2026.3** (`scoring.Version`; historial al final). `internal/scoring` convierte un resultado del escáner en **dos ejes**, «Seguridad hoy» (0–100 y letra A–F) y «Preparación cuántica» (0–100 en tres niveles), y una lista de **hallazgos**. Es determinista: el mismo escaneo da siempre el mismo resultado. Los escaneos analizados con un modelo anterior conservan su juicio (ver «Escaneos de modelos anteriores»).
 
-## Dos ejes de riesgo
+## Dos ejes
 
-- **Riesgo cuántico**: el intercambio de claves sin PQC permite *cosechar ahora, descifrar después* (el tráfico de hoy se podrá descifrar cuando exista un ordenador cuántico): es lo urgente. Las firmas clásicas del certificado son un riesgo **futuro**: una firma solo tiene que resistir durante el handshake, así que el peligro empieza el día que exista ese ordenador, no antes.
-- **Riesgo actual**: debilidades explotables hoy (certificado no válido, versiones o suites obsoletas…).
+- **Seguridad hoy**: lo que protege la conexión frente a un atacante actual. Nota de 0 a 100 y letra de A a F, con los topes del peor caso (abajo).
+- **Preparación cuántica**: lo que protege frente a un ordenador cuántico. El intercambio de claves sin PQC permite *cosechar ahora, descifrar después* (el tráfico de hoy se podrá descifrar cuando exista ese ordenador): es lo urgente. Las firmas clásicas del certificado son un riesgo **futuro**: una firma solo tiene que resistir durante el handshake, así que el peligro empieza el día que exista ese ordenador, no antes. Nota de 0 a 100 en tres niveles, sin letra.
 
-Cada eje muestra su severidad más alta (`quantum_risk`, `current_risk`). Los hallazgos `pass` (bien hecho) e `info` no cuentan como riesgo.
+Los hallazgos siguen teniendo dos ejes de **riesgo**, cuántico y actual, y cada uno muestra su severidad más alta (`quantum_risk`, `current_risk`); los `pass` (bien hecho) e `info` no cuentan como riesgo. Dentro del riesgo cuántico, el informe separa **Shor** (intercambio de claves y firmas) de **Grover** (cifrado simétrico, solo informativo: `SYM_AES128`).
 
-## Nota (0–100)
+## Seguridad hoy (0–100, A–F)
 
 | Bloque | Puntos | Criterio |
 |---|---|---|
-| Intercambio de claves | **50** / 30 / 0 | 50 si con la oferta de un navegador actual el servidor **elige** un híbrido ML-KEM; 30 si lo **soporta** pero no lo elige (el tráfico real sigue siendo clásico); 0 si no lo soporta |
-| TLS 1.3 | 15 | Los grupos híbridos solo existen en TLS 1.3 |
-| Forward secrecy | 10 | Todas las suites aceptadas, en cualquier versión activa (TLS 1.0–1.2 y SSLv3), con intercambio efímero (ECDHE o DHE), o solo TLS 1.3. Hasta 2026.1 solo se miraba TLS 1.2 |
-| Variedad de híbridos | 5 | Más de un grupo híbrido (p. ej. `SecP256r1MLKEM768` para clientes FIPS) |
-| Certificado y agilidad | 20 | 5 válido (cadena de confianza, nombre, fechas) · 5 clave (RSA ≥ 2048, ECDSA ≥ 256, Ed25519) · 5 firma (SHA-256 o superior) · 5 renovación automatizada (ver abajo) |
+| TLS 1.3 | 30 | La versión que hoy da la mejor protección |
+| Forward secrecy | 25 | Todas las suites aceptadas, en cualquier versión activa (TLS 1.0–1.2 y SSLv3), con intercambio efímero (ECDHE o DHE), o solo TLS 1.3. **Parcial: 0** |
+| Certificado | 45 | 15 válido (cadena de confianza, nombre, fechas) · 10 clave (RSA ≥ 2048, ECDSA ≥ 256, Ed25519, ML-DSA o SLH-DSA) · 10 firma (SHA-256 o superior) · 10 renovación automatizada (ver abajo) |
 
-Letra por nota: **A** ≥ 90 · **B** ≥ 75 · **C** ≥ 60 · **D** ≥ 40 · **F** < 40.
+Letra por nota: **A** ≥ 90 · **B** ≥ 75 · **C** ≥ 60 · **D** ≥ 40 · **F** < 40, y la letra final es la peor entre esa y el tope más severo. **Sin suelo** desde 2026.3: el suelo de 40 de 2026.2 compensaba que la falta de PQC restara la mitad de la nota única; con dos ejes ya no resta aquí. Un certificado que no se ve puntúa 0 en su bloque (`CERT_MISSING`, informativo, sin tope).
+
+## Preparación cuántica (0–100, en niveles)
+
+| Bloque | Puntos | Criterio |
+|---|---|---|
+| Intercambio de claves | **50** / 30 / 0 | 50 si con la oferta de un navegador actual el servidor **elige** un híbrido ML-KEM; 30 si solo lo acepta cuando se le ofrece solo (el tráfico real sigue siendo clásico); 0 si no lo soporta |
+| TLS 1.3 | 10 | Los grupos híbridos solo existen en TLS 1.3 |
+| Variedad | 10 | Más de un grupo post-cuántico estándar (p. ej. `SecP256r1MLKEM768` para clientes FIPS; ML-KEM puro cuenta aquí) |
+| Renovación automatizada | 15 | Agilidad: pasar a certificados post-cuánticos exigirá reemitirlos todos |
+| Certificado post-cuántico | 15 | El servidor presenta un certificado ML-DSA o SLH-DSA cuando el cliente lo ofrece (`CERT_PQ_SIGNATURE`, hito 2.8.5) |
+| Kyber obsoleto | **−15** | Aceptar el codepoint del borrador de Kyber (`X25519Kyber768Draft00`). La nota no baja de 0 |
+
+Niveles: **Preparado** ≥ 70 · **En camino** 35–69 · **No preparado** < 35. **Mientras no haya certificados post-cuánticos en la web pública, lo habitual es como mucho 85.** `CERT_PQ_NO_CLASSICAL_FALLBACK` (sin certificado clásico de respaldo) es un hallazgo medio visible en el informe y **no resta puntos en ningún eje**: los del certificado post-cuántico se mantienen. Grover solo se informa.
 
 ### Por qué estos pesos
 
-- La idea acordada: **un TLS clásico bien configurado saca D** y la **F queda para lo roto**. Un servidor sin PQC con TLS 1.3, forward secrecy y un certificado comercial RSA-2048 de un año suma 15 + 10 + 15 = **40 (D)**; con un certificado automatizado (Let's Encrypt), **45 (D)**. Con la propuesta inicial (55/35/0 y certificado de 15) ese mismo servidor comercial quedaba en 35 (F), así que el intercambio de claves baja a 50/30 y el certificado sube a 20, con el criterio "válido" añadido.
-- Soportar ML-KEM sin preferirlo vale 30 y no 50: lo que protege a los usuarios es lo que negocia su navegador. Con todo lo demás bien, eso da **75 (B)**.
-- Un servidor **solo TLS 1.2** bien configurado suma 30 (o 25 con certificado comercial) y llega a **40 (D)** por el suelo (abajo). Además recibe el hallazgo alto del eje cuántico *"Sin TLS 1.3 no es posible adoptar intercambio de claves híbrido ML-KEM"* (`TLS13_MISSING`).
+- **Dos ejes en vez de una nota**: con una sola nota, un TLS clásico impecable sacaba una D (2026.2), que mezclaba «inseguro hoy» con «no preparado para lo cuántico». Ahora es **A hoy** y **No preparado**.
+- **50 por el híbrido preferido, 30 si solo se acepta**: lo que protege a los usuarios es lo que negocia su navegador.
+- **Kyber −15**: lo deja por debajo de no tener PQC (en el laboratorio, `kyber` 10 frente a `modern` 25). Es una migración que empezó y se quedó a medias con un codepoint que los navegadores ya no ofrecen.
+- **La renovación automatizada cuenta en los dos ejes**: es higiene del certificado hoy (10) y la agilidad que permitirá pasar a certificados post-cuánticos (15).
+- **Forward secrecy parcial suma 0**: una sola suite sin intercambio efímero deja abierto ese camino.
 
-### Suelo: la F es para lo roto
-
-Si **no hay ningún tope F** (nada roto), la nota mínima es **40**, el fondo de la D. El desglose lo muestra como un ajuste explícito (`floor_points`, "Suelo: nada roto"). **Solo un tope F anula el suelo** (desde 2026.2; en 2026.1 también lo anulaba el tope C): con un tope C (débil: RC4, 3DES, sin forward secrecy, clave o firma débiles, SSLv3, DH de 1024 bits) la nota se queda en 40 o más y el tope deja la letra en **D o C**; con un tope B (mejorable: TLS 1.0/1.1, CBC), entre D y B. Así se respeta "F = roto, C = débil": TLS clásico sin nada roto nunca es F, sea cual sea su certificado o si le falta TLS 1.3.
-
-Por qué un suelo y no más puntos para TLS 1.2: con los pesos aprobados, dar puntos a TLS 1.2 dejaba un servidor solo TLS 1.2 con certificado comercial en 35 (F), y subirlo más exigía igualar TLS 1.2 con TLS 1.3. El suelo cumple la regla "F = roto" sin tocar los pesos.
-
-### Renovación automatizada (5 puntos)
+### Renovación automatizada (10 puntos de seguridad y 15 de preparación)
 
 El cambio a certificados post-cuánticos (ML-DSA o híbridos) exigirá reemitir todos los certificados: quien lo tenga automatizado lo hará sin esfuerzo. Se considera automatizado si:
 
@@ -43,6 +50,12 @@ El cambio a certificados post-cuánticos (ML-DSA o híbridos) exigirá reemitir 
 2. lo emite una **autoridad que funciona con ACME por defecto**: Let's Encrypt, Google Trust Services o ZeroSSL (por organización del emisor).
 
 Por qué no "100 días o menos": el CA/Browser Forum reduce la validez máxima a **200 días (15/03/2026), 100 (15/03/2027) y 47 (15/03/2029)**, así que pronto *todos* los certificados tendrán 100 días o menos y el criterio dejaría de distinguir. 47 días sigue distinguiendo hasta 2029 (hoy solo se llega ahí automatizando), y el emisor ACME reconoce la automatización aunque el certificado dure 90 días. **En 2029 el criterio 1 dejará de distinguir**: habrá que revisarlo (y subir la versión del modelo). Limitación: una CA comercial con ACME pero certificados de un año no puntúa; no se puede saber desde fuera cómo se renueva.
+
+## Escaneos de modelos anteriores
+
+Cada resultado guarda su `scoring_version`, y la nota no se recalcula: un escaneo analizado con 2026.2 se muestra con su modelo, **una sola nota** (y su suelo, si lo tuvo), el aviso **«Analizado con el modelo 2026.2»** y un botón **«Repetir el análisis»**, que lanza un escaneo nuevo del mismo dominio (`outdated_model` en la API). La reutilización de escaneos recientes (la espera de 2 minutos por destino) solo devuelve uno del modelo actual o aún sin analizar.
+
+Modelo **2026.2**, para leer esos informes: intercambio de claves 50 / 30 / 0, TLS 1.3 15, forward secrecy 10, variedad 5 y certificado 20 (5 cada criterio); suelo de 40 si no había tope F; mismas letras y topes.
 
 ## Topes por riesgo actual (regla del peor caso)
 
@@ -54,9 +67,9 @@ La letra final es la **peor** entre la de la nota y el tope más severo:
 | **C** | Clave RSA < 2048 (o ECDSA < 256), firma SHA-1/MD5, RC4 o 3DES aceptados, ninguna suite con forward secrecy · *desde 2026.2*: SSLv3, DH de 1024 a 2047 bits |
 | **B** | TLS 1.0 o 1.1 activos, suites CBC |
 
-Ejemplo: un sitio con PQC y todo perfecto pero con el certificado caducado tiene nota 95 y letra **F**. El tope F anula además el suelo de 40; el C no (ver "Suelo").
+Ejemplo: un sitio con PQC y todo perfecto pero con el certificado caducado tiene 85 de seguridad (pierde los 15 de «válido») y letra **F**. Los topes solo afectan a «Seguridad hoy».
 
-## Modelo 2026.2: lo que ven las sondas en crudo
+## Reglas de las sondas en crudo (desde 2026.2)
 
 Con intensidad `full` (`docs/scanner.md`), el escáner ve lo que `crypto/tls` no podía: SSLv2/SSLv3, todas las suites de IANA, el tamaño del grupo DH, la lista completa de TLS 1.3 y los grupos no habituales. El modelo 2026.2 los juzga con la regla de siempre: **F = roto** (se rompe o se suplanta hoy con medios al alcance de cualquiera), **C = débil** (atacable con recursos serios o en condiciones concretas), **B = mejorable**. Los atributos de cada suite (cifrado, bits, modo, EXPORT, anónima) salen del registro de IANA incrustado en `rawtls`.
 
@@ -78,8 +91,9 @@ Con intensidad `full` (`docs/scanner.md`), el escáner ve lo que `crypto/tls` no
 | `GROUPS_EXTRA`: ffdhe, brainpool, x448… | actual · informativo | — | Válidos, poco habituales. |
 | `SUITE_MODERN_AEAD`: AEGIS, Ascon | actual · informativo | — | AEAD modernos (Ascon es el estándar ligero del NIST, SP 800-232): ni suman ni restan, y no cuentan como débiles. |
 | `TLS13_SUITES_AEAD`: lista de TLS 1.3 sin CCM_8 ni solo-integridad | actual · correcto | — | |
-| `KEX_PURE_MLKEM`: ML-KEM sin componente clásico | cuántico · informativo | +5 en **variedad** si hay más de un grupo PQC estándar (`KEX_MULTIPLE_PQC`) | Estándar (FIPS 203) y preferido por CNSA 2.0, pero ningún navegador lo ofrece: no protege el tráfico real, así que **no** cuenta en el bloque de 50/30 del intercambio de claves. |
-| `KEX_EXPERIMENTAL_PQC_ONLY`: solo Kyber pre-estándar o híbridos en borrador | cuántico · medio | 0 puntos (como sin PQC); se mantiene `KEX_NO_HYBRID` | Kyber (`X25519Kyber768Draft00`, 0x6399) es anterior a FIPS 203 e IANA lo marca como obsoleto (RFC 10024); Chrome lo retiró a finales de 2024, así que hoy no protege a nadie. Medio y no crítico porque indica una migración empezada: el remedio es actualizar, no empezar de cero. |
+| `TLS13_SUITE_ORDER_SERVER` / `TLS13_SUITE_ORDER_CLIENT`: orden de suites de TLS 1.3 (desde el 2.8.7) | actual · informativo | **sin puntos** | **Evaluado**: dos sondas en crudo ofrecen las suites de TLS 1.3 que acepta el servidor en un orden y en el inverso; la misma elección las dos veces = impone su orden, la primera de cada oferta = sigue al cliente. Sin efecto en la nota: en TLS 1.3 todas las suites son seguras, y seguir al cliente es razonable (sabe si tiene AES por hardware). Con una sola suite no hay nada que medir; si no se puede saber, no evaluado (`tls13_suite_order`). El orden de TLS 1.2 sigue sin evaluar (`tls12_server_cipher_preference`). |
+| `KEX_PURE_MLKEM`: ML-KEM sin componente clásico | cuántico · informativo | +10 de preparación en **variedad** si hay más de un grupo PQC estándar (`KEX_MULTIPLE_PQC`; +5 en 2026.2) | Estándar (FIPS 203) y preferido por CNSA 2.0, pero ningún navegador lo ofrece: no protege el tráfico real, así que **no** cuenta en el bloque de 50/30 del intercambio de claves. |
+| `KEX_EXPERIMENTAL_PQC_ONLY`: solo Kyber pre-estándar o híbridos en borrador | cuántico · medio | 0 puntos de intercambio (como sin PQC); se mantiene `KEX_NO_HYBRID`; desde 2026.3, **−15** de preparación si es el borrador de Kyber | Kyber (`X25519Kyber768Draft00`, 0x6399) es anterior a FIPS 203 e IANA lo marca como obsoleto (RFC 10024); Chrome lo retiró a finales de 2024, así que hoy no protege a nadie. Medio y no crítico porque indica una migración empezada: el remedio es actualizar, no empezar de cero. |
 | `KEX_EXPERIMENTAL_PQC_EXTRA`: lo mismo junto al estándar | cuántico · informativo | — | Conviene retirarlo, pero no es un riesgo. |
 
 ### Suites "solo de integridad" de TLS 1.3 (RFC 9150)
@@ -102,7 +116,8 @@ Pruebas: `internal/scoring/lab_test.go` puntúa el resultado real de los 10 serv
 
 - **Lo "no evaluado"** (lo que `crypto/tls` no puede comprobar: SSLv3, suites DHE…, ver `docs/scanner.md`) **nunca suma ni resta**: se muestra aparte. Un test lo verifica (`TestNotEvaluatedNeverAffectsTheScore`).
 - **Una sonda con error** (timeout, red) no cuenta como soportado ni como no soportado: no da puntos y genera `SCAN_PARTIAL` (y `KEX_HYBRID_UNKNOWN` si afecta al intercambio de claves).
-- **Informativos sin efecto en la nota**: firma clásica del certificado (`CERT_CLASSICAL_SIGNATURE`), AES-128 y Grover (`SYM_AES128`: NIST sigue considerando AES-128 adecuado), transparencia de certificados (`CERT_CT`, distingue SCT incrustados y entregados en el handshake).
+- **Certificados post-cuánticos (hito 2.8.5)**: el escáner pide el certificado ofreciendo firmas ML-DSA (como Chrome) y sin ellas (como Firefox o un cliente antiguo; ver docs/scanner.md). `CERT_PQ_SIGNATURE` (eje cuántico, informativo) dice que el servidor presenta un certificado ML-DSA o SLH-DSA cuando se le ofrece; en 2026.2 era informativo; desde 2026.3 suma 15 de preparación cuántica. En «Seguridad hoy», una clave ML-DSA o SLH-DSA cuenta en el criterio «clave» igual que una ECDSA, ni más ni menos. `CERT_PQ_NO_CLASSICAL_FALLBACK` (eje actual, **gravedad media**, sin tope y sin restar puntos en ningún eje) dice que, sin ML-DSA en la oferta, el servidor rechaza la conexión o vuelve a presentar el certificado post-cuántico: los clientes sin ML-DSA no pueden conectarse. Es media y no alta porque no debilita el cifrado ni la autenticación de quien sí conecta: es un problema de disponibilidad, pero deja fuera a una parte grande de los visitantes (en octubre de 2026, Firefox no ofrece ML-DSA). Si no se puede saber (intensidad básica, error de la sonda), queda como no evaluado (`pq_certificate_fallback`); si no se vio ningún certificado, `pq_certificate`.
+- **Informativos sin efecto en la nota**: firma clásica del certificado (`CERT_CLASSICAL_SIGNATURE`; desde el 2.8.5 dice si el servidor la eligió aunque se le ofreció ML-DSA), AES-128 y Grover (`SYM_AES128`: NIST sigue considerando AES-128 adecuado), transparencia de certificados (`CERT_CT`, distingue SCT incrustados y entregados en el handshake).
 
 ## Hallazgos
 
@@ -110,7 +125,7 @@ Cada hallazgo tiene `code` estable, `axis` (`quantum`/`current`), `severity` (`c
 
 ### Referencias por hallazgo
 
-La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/scoring/references_test.go`) comprueba que cada código del catálogo tiene aquí una fila con al menos una fuente (RFC, CVE, borrador del IETF, publicación del NIST/FIPS o votación del CA/Browser Forum), que cada fuente es un enlace a su sitio oficial (rfc-editor.org, nvd.nist.gov, csrc.nist.gov, datatracker.ietf.org o cabforum.org) con su título en «Fuentes», y que no sobra ninguna fila. Quedan fuera tres códigos que no juzgan al servidor, sino que dicen que el escaneo no pudo comprobar algo (no puntúan, ver «Lo que no puntúa»): `SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN` y `CERT_MISSING`.
+La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/catalog/references_test.go`) comprueba que cada código del catálogo tiene aquí una fila con al menos una fuente (RFC, CVE, borrador del IETF, publicación del NIST/FIPS o votación del CA/Browser Forum), que cada fuente es un enlace a su sitio oficial (rfc-editor.org, nvd.nist.gov, csrc.nist.gov, datatracker.ietf.org o cabforum.org) con su título en «Fuentes», y que no sobra ninguna fila. Quedan fuera tres códigos que no juzgan al servidor, sino que dicen que el escaneo no pudo comprobar algo (no puntúan, ver «Lo que no puntúa»): `SCAN_PARTIAL`, `KEX_HYBRID_UNKNOWN` y `CERT_MISSING`.
 
 | Código | Referencia |
 |---|---|
@@ -120,6 +135,8 @@ La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/scoring/refe
 | `KEX_EXPERIMENTAL_PQC_ONLY`, `KEX_EXPERIMENTAL_PQC_EXTRA` | [draft-tls-westerbaan-xyber768d00](https://datatracker.ietf.org/doc/draft-tls-westerbaan-xyber768d00/) (borrador caducado, anterior al estándar) |
 | `TLS13_SUPPORTED`, `TLS13_MISSING` | [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446); [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024) (los grupos híbridos son de TLS 1.3) |
 | `TLS13_SUITES_AEAD` | [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446), sección 9.1 y apéndice B.4 |
+| `TLS13_SUITE_ORDER_SERVER` | [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) (4.1.1: el servidor elige la suite entre las que ofrece el cliente; 9.1: suites obligatorias) |
+| `TLS13_SUITE_ORDER_CLIENT` | [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) (4.1.1 y 9.1) |
 | `SUITE_INTEGRITY_ONLY` | [RFC 9150](https://www.rfc-editor.org/rfc/rfc9150) |
 | `SUITE_CCM8` | [RFC 6655](https://www.rfc-editor.org/rfc/rfc6655); [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) |
 | `SUITE_MODERN_AEAD` | [NIST SP 800-232](https://csrc.nist.gov/pubs/sp/800/232/final) (Ascon) |
@@ -145,6 +162,8 @@ La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/scoring/refe
 | `CERT_WEAK_KEY` | [NIST SP 800-131A Rev. 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final) |
 | `CERT_WEAK_SIGNATURE` | [RFC 9155](https://www.rfc-editor.org/rfc/rfc9155); [NIST SP 800-131A Rev. 2](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final) |
 | `CERT_CLASSICAL_SIGNATURE` | [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final) (ML-DSA); [FIPS 205](https://csrc.nist.gov/pubs/fips/205/final) (SLH-DSA) |
+| `CERT_PQ_SIGNATURE` | [FIPS 204](https://csrc.nist.gov/pubs/fips/204/final) (ML-DSA); [FIPS 205](https://csrc.nist.gov/pubs/fips/205/final) (SLH-DSA); [draft-ietf-tls-mldsa](https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/) (ML-DSA en TLS 1.3); [draft-ietf-lamps-dilithium-certificates](https://datatracker.ietf.org/doc/draft-ietf-lamps-dilithium-certificates/) (ML-DSA en X.509) |
+| `CERT_PQ_NO_CLASSICAL_FALLBACK` | [RFC 8446](https://www.rfc-editor.org/rfc/rfc8446) (4.4.2.2: el servidor elige el certificado según `signature_algorithms`); [draft-ietf-tls-mldsa](https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/) |
 | `CERT_CT`, `CERT_CT_MISSING` | [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) |
 | `CERT_AUTOMATED_ACME`, `CERT_NOT_AUTOMATED` | [RFC 8555](https://www.rfc-editor.org/rfc/rfc8555) (ACME) |
 | `CERT_AUTOMATED_SHORT` | [CA/Browser Forum, SC081v3](https://cabforum.org/2025/04/11/ballot-sc081v3-introduce-schedule-of-reducing-validity-and-data-reuse-periods/) (validez máxima de 47 días en 2029) |
@@ -177,6 +196,8 @@ La fuente de cada regla. `TestEveryFindingHasAReference` (`internal/scoring/refe
 | RFC 10024 | Post-Quantum Traditional (PQ/T) Hybrid Key Agreement Mechanisms for TLS 1.3 | https://www.rfc-editor.org/rfc/rfc10024 |
 | draft-ietf-tls-mlkem | ML-KEM Post-Quantum Key Agreement for TLS 1.3 | https://datatracker.ietf.org/doc/draft-ietf-tls-mlkem/ |
 | draft-tls-westerbaan-xyber768d00 | X25519Kyber768Draft00 hybrid post-quantum key agreement | https://datatracker.ietf.org/doc/draft-tls-westerbaan-xyber768d00/ |
+| draft-ietf-tls-mldsa | Use of ML-DSA in TLS 1.3 | https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/ |
+| draft-ietf-lamps-dilithium-certificates | Internet X.509 Public Key Infrastructure -- Algorithm Identifiers for the Module-Lattice-Based Digital Signature Algorithm (ML-DSA) | https://datatracker.ietf.org/doc/draft-ietf-lamps-dilithium-certificates/ |
 | CVE-2013-0169 | Lucky Thirteen: CBC padding timing attack in TLS/DTLS | https://nvd.nist.gov/vuln/detail/CVE-2013-0169 |
 | CVE-2014-3566 | POODLE: SSL 3.0 CBC padding oracle | https://nvd.nist.gov/vuln/detail/CVE-2014-3566 |
 | CVE-2015-0204 | FREAK: RSA EXPORT key downgrade | https://nvd.nist.gov/vuln/detail/CVE-2015-0204 |
@@ -198,11 +219,13 @@ Los CVE no tienen título oficial en el NVD: se indica el nombre con que se cono
 
 Cada resultado lleva `scoring_version`. **Cambiar pesos, umbrales, topes o las reglas que emiten hallazgos obliga a subir `scoring.Version`** (formato `AAAA.N`: `2026.1`, `2026.2`…), para que una nota guardada se interprete siempre con el modelo con que se calculó. Corregir la redacción de un texto no cambia la versión. La columna para guardarla llega con la tabla `scans` (hito 2.3).
 
-Historial: **2026.1** (13/10/2026, primera versión en producción) · **2026.2** (15/10/2026, hito 2.7.4: hallazgos y topes de las sondas en crudo; ver arriba).
+Historial: **2026.1** (13/10/2026, primera versión en producción) · **2026.2** (15/10/2026, hito 2.7.4: hallazgos y topes de las sondas en crudo) · **2026.3** (27/10/2026, hito 2.8.6: dos ejes, «Seguridad hoy» y «Preparación cuántica»; sin suelo; certificado post-cuántico y penalización de Kyber).
 
 ---
 
 ## English
+
+**Model 2026.3 (milestone 2.8.6)** has two axes. **Security today** (0–100, A–F; same thresholds and caps as before, no floor): TLS 1.3 30, forward secrecy in every active version 25 (partial: 0), certificate 45 (valid 15, key 10 — RSA ≥ 2048, ECDSA ≥ 256, Ed25519, ML-DSA, SLH-DSA —, signature 10, automated renewal 10). **Quantum readiness** (0–100 in three levels: Ready ≥ 70, On track 35–69, Not ready < 35, no letter): hybrid ML-KEM chosen with a browser-like offer 50 (accepted only when offered alone 30), TLS 1.3 10, more than one standard post-quantum group 10, automated renewal 15, a post-quantum certificate 15; accepting the obsolete Kyber draft −15 (not below 0). While there are no post-quantum certificates on the public web, 85 is usually the most a server gets. `CERT_PQ_NO_CLASSICAL_FALLBACK` is a medium finding that takes no points on either axis; Grover (AES-128) is informational. Scans judged with an earlier model keep their judgement and are shown with it, a notice and a "run the analysis again" button. Since milestone 2.8.7 the TLS 1.3 suite order is evaluated (two raw probes offer the accepted suites in one order and reversed: the same choice both times means the server imposes its order, the first of each offer means it follows the client), as an informational finding with no points (TLS13_SUITE_ORDER_SERVER or _CLIENT). The paragraphs below describe the earlier models, for reading their reports.
 
 Model version **2026.1**. `internal/scoring` turns a scan into a **post-quantum readiness score** (0–100, grade A–F) and **findings**, deterministically.
 

@@ -255,6 +255,18 @@ var findingTexts = map[string]langTexts{
 		"en": {Title: "Sound TLS 1.3 suites",
 			Detail: "Every TLS 1.3 suite accepted uses authenticated encryption with a full-size tag: {suites}."},
 	},
+	"TLS13_SUITE_ORDER_SERVER": {
+		"es": {Title: "TLS 1.3: el servidor impone su orden de suites",
+			Detail: "Con las mismas suites ofrecidas en un orden y en el inverso, el servidor eligió las dos veces {suite}: decide él, no el cliente. Informativo: en TLS 1.3 todas las suites son seguras, así que no suma ni resta."},
+		"en": {Title: "TLS 1.3: the server imposes its suite order",
+			Detail: "Offered the same suites in one order and reversed, the server chose {suite} both times: it decides, not the client. Informational: every TLS 1.3 suite is sound, so it neither adds nor takes away."},
+	},
+	"TLS13_SUITE_ORDER_CLIENT": {
+		"es": {Title: "TLS 1.3: el servidor sigue el orden del cliente",
+			Detail: "Con las mismas suites ofrecidas en un orden y en el inverso, el servidor eligió cada vez la primera del cliente ({first} y {second}). Informativo: en TLS 1.3 todas las suites son seguras y el cliente sabe mejor cuál le conviene (AES con aceleración por hardware o ChaCha20), así que no suma ni resta."},
+		"en": {Title: "TLS 1.3: the server follows the client's order",
+			Detail: "Offered the same suites in one order and reversed, the server chose the client's first each time ({first} and {second}). Informational: every TLS 1.3 suite is sound and the client knows best which suits it (AES with hardware support or ChaCha20), so it neither adds nor takes away."},
+	},
 	"DH_WEAK": {
 		"es": {Title: "Diffie-Hellman demasiado débil ({bits} bits)",
 			Detail:      "Las suites DHE usan un grupo de menos de 1024 bits. Con el ataque Logjam (CVE-2015-4000) se puede romper en tiempo real y descifrar o manipular la conexión.",
@@ -321,9 +333,9 @@ var findingTexts = map[string]langTexts{
 	},
 	"SYM_AES128": {
 		"es": {Title: "AES-128 y el algoritmo de Grover",
-			Detail: "La conexión usa {suite}. En teoría, el algoritmo de Grover reduce la seguridad de AES-128 a unos 64 bits, pero no es paralelizable de forma práctica y NIST sigue considerando AES-128 adecuado. Informativo: no afecta a la nota."},
+			Detail: "La conexión usa {suite}. En teoría, el algoritmo de Grover reduce la seguridad de AES-128 a unos 64 bits, pero no es paralelizable de forma práctica y NIST sigue considerando AES-128 adecuado. Informativo: no suma ni resta en ningún eje."},
 		"en": {Title: "AES-128 and Grover's algorithm",
-			Detail: "The connection uses {suite}. In theory Grover's algorithm reduces AES-128 to about 64-bit security, but it does not parallelize in practice and NIST still considers AES-128 adequate. Informational: it does not affect the grade."},
+			Detail: "The connection uses {suite}. In theory Grover's algorithm reduces AES-128 to about 64-bit security, but it does not parallelize in practice and NIST still considers AES-128 adequate. Informational: it neither adds nor takes away on either axis."},
 	},
 
 	// --- Certificate ---
@@ -365,11 +377,25 @@ var findingTexts = map[string]langTexts{
 	},
 	"CERT_CLASSICAL_SIGNATURE": {
 		"es": {Title: "Firma clásica ({key}): riesgo cuántico futuro",
-			Detail:      "La identidad del servidor se demuestra con {key}, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes. Hoy no hay certificados post-cuánticos (ML-DSA) en la web pública. No afecta a la nota.",
+			Detail:      "La identidad del servidor se demuestra con {key}, que un ordenador cuántico podrá falsificar. No es \"cosechar ahora, descifrar después\": una firma solo tiene que resistir durante el handshake, así que el riesgo empieza el día que exista ese ordenador, no antes.{pq_selection} No limita la nota de seguridad de hoy; en la preparación cuántica (modelo 2026.3), un certificado post-cuántico sumaría 15 puntos.",
 			Remediation: "Nada que hacer todavía en la firma. {renewal_advice}"},
 		"en": {Title: "Classical signature ({key}): future quantum risk",
-			Detail:      "The server proves its identity with {key}, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before. There are no post-quantum (ML-DSA) certificates on the public web yet. It does not affect the grade.",
+			Detail:      "The server proves its identity with {key}, which a quantum computer will be able to forge. This is not \"harvest now, decrypt later\": a signature only has to hold during the handshake, so the risk starts the day such a computer exists, not before.{pq_selection} It does not limit today's security grade; in quantum readiness (model 2026.3), a post-quantum certificate would add 15 points.",
 			Remediation: "Nothing to do on the signature yet. {renewal_advice}"},
+	},
+	"CERT_PQ_SIGNATURE": {
+		"es": {Title: "Certificado post-cuántico ({algorithm})",
+			Detail: "Al ofrecerle firmas ML-DSA, como hace Chrome, el servidor presentó un certificado {algorithm}: demuestra su identidad con un algoritmo de firma post-cuántico, diseñado para resistir a un ordenador cuántico. Suma 15 puntos de preparación cuántica (modelo 2026.3; en el 2026.2 era informativo)."},
+		"en": {Title: "Post-quantum certificate ({algorithm})",
+			Detail: "Offered ML-DSA signatures, as Chrome does, the server presented a {algorithm} certificate: it proves its identity with a post-quantum signature algorithm, designed to resist a quantum computer. It adds 15 points of quantum readiness (model 2026.3; informational in 2026.2)."},
+	},
+	"CERT_PQ_NO_CLASSICAL_FALLBACK": {
+		"es": {Title: "Solo certificado post-cuántico: sin respaldo clásico",
+			Detail:      "Con una oferta sin firmas ML-DSA, como la de Firefox o la de un cliente antiguo, el servidor no presentó un certificado clásico: rechazó la conexión o volvió a presentar el {algorithm}. Los clientes que no aceptan ML-DSA no pueden conectarse. No debilita el cifrado, pero deja fuera a esos visitantes.",
+			Remediation: "Configura también un certificado clásico (ECDSA o RSA) junto al {algorithm}: el servidor elegirá en cada conexión según las firmas que ofrezca el cliente (en OpenSSL, un segundo par de certificado y clave; en nginx, dos directivas ssl_certificate)."},
+		"en": {Title: "Post-quantum certificate only: no classical fallback",
+			Detail:      "To an offer without ML-DSA signatures, such as Firefox's or an older client's, the server did not present a classical certificate: it refused the connection or presented the {algorithm} one again. Clients that do not accept ML-DSA cannot connect. It does not weaken encryption, but it locks those visitors out.",
+			Remediation: "Also configure a classical certificate (ECDSA or RSA) beside the {algorithm} one: the server will choose on each connection from the signatures the client offers (in OpenSSL, a second certificate and key pair; in nginx, two ssl_certificate directives)."},
 	},
 	"CERT_AUTOMATED_SHORT": {
 		"es": {Title: "Certificado de vida corta ({days} días)", Detail: "Una validez tan corta solo es viable con renovación automatizada, que es lo que permitirá cambiar a certificados post-cuánticos sin esfuerzo."},
@@ -413,6 +439,14 @@ var labels = map[string]map[string]string{
 	"block.forward_secrecy": {"es": "Secreto hacia adelante (forward secrecy)", "en": "Forward secrecy"},
 	"block.hybrid_variety":  {"es": "Variedad de grupos híbridos", "en": "Hybrid group variety"},
 	"block.certificate":     {"es": "Certificado y agilidad", "en": "Certificate and agility"},
+	// Quantum readiness blocks (2026.3); key_exchange, tls13 and
+	// hybrid_variety keep their labels.
+	"block.cert_automation": {"es": "Renovación automatizada del certificado", "en": "Automated certificate renewal"},
+	"block.pq_certificate":  {"es": "Certificado post-cuántico (ML-DSA, SLH-DSA)", "en": "Post-quantum certificate (ML-DSA, SLH-DSA)"},
+	"block.kyber_draft":     {"es": "Kyber obsoleto aceptado (penalización)", "en": "Obsolete Kyber accepted (penalty)"},
+	"level.ready":           {"es": "Preparado", "en": "Ready"},
+	"level.on_track":        {"es": "En camino", "en": "On track"},
+	"level.not_ready":       {"es": "No preparado", "en": "Not ready"},
 	"item.valid":            {"es": "Válido (cadena, nombre, fechas)", "en": "Valid (chain, name, dates)"},
 	"item.key":              {"es": "Clave", "en": "Key"},
 	"item.signature":        {"es": "Firma", "en": "Signature"},
@@ -435,10 +469,13 @@ var labels = map[string]map[string]string{
 	"noteval.tls12_ccm_camellia_aria_null_export_suites": {"es": "Suites CCM, Camellia, ARIA, NULL y EXPORT", "en": "CCM, Camellia, ARIA, NULL and EXPORT suites"},
 	"noteval.tls13_suite_list":                           {"es": "Lista completa de suites de TLS 1.3", "en": "Full TLS 1.3 suite list"},
 	"noteval.tls12_server_cipher_preference":             {"es": "Orden de preferencia de suites del servidor", "en": "Server cipher suite preference"},
+	"noteval.tls13_suite_order":                          {"es": "Orden de suites de TLS 1.3 (servidor o cliente)", "en": "TLS 1.3 suite order (server or client)"},
 	"noteval.legacy_groups":                              {"es": "Grupos antiguos (ffdhe, brainpool…)", "en": "Legacy groups (ffdhe, brainpool…)"},
 	"noteval.non_standard_pqc_groups":                    {"es": "Grupos post-cuánticos no estándar", "en": "Non-standard post-quantum groups"},
 	"noteval.credential_suites":                          {"es": "Suites PSK, SRP, Kerberos y GOST (requieren credenciales o algoritmos que un escáner no tiene)", "en": "PSK, SRP, Kerberos and GOST suites (they need credentials or algorithms a scanner does not have)"},
 	"noteval.implementation_vulnerabilities":             {"es": "Vulnerabilidades de implementación (Heartbleed, ROBOT…)", "en": "Implementation vulnerabilities (Heartbleed, ROBOT…)"},
+	"noteval.pq_certificate":                             {"es": "Certificado post-cuántico (no se vio ningún certificado)", "en": "Post-quantum certificate (no certificate was seen)"},
+	"noteval.pq_certificate_fallback":                    {"es": "Certificado clásico de respaldo para clientes sin ML-DSA", "en": "Classical fallback certificate for clients without ML-DSA"},
 }
 
 // Codes returns every finding code the catalog has texts for, sorted.

@@ -11,7 +11,7 @@ PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
 # Pinned by digest; bump tag and digest together (CI uses the same image).
 SQLC_IMAGE := sqlc/sqlc:1.31.1@sha256:70f53171d27b2424e9358869975455a6e955a5aa8e58a998a270a6e34e525537
 
-.PHONY: help dev psl signup-code test lint build clean prod-up prod-down deploy sqlc check-compose test-deploy test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down tlslab-test tlslab-scan
+.PHONY: help dev psl signup-code test lint build clean prod-up prod-down deploy sqlc check-compose check-files test-deploy test-backup b2-verify fuzz tlslab-up tlslab-check tlslab-testssl tlslab-down tlslab-test tlslab-scan
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-6s %s\n", $$1, $$2}'
@@ -36,7 +36,7 @@ test: web/node_modules ## Run Go tests (integration tests too if the dev databas
 	npm --prefix web test
 
 FUZZTIME ?= 1m
-FUZZ_TARGETS := FuzzReadResponse FuzzParseServerHello FuzzParseServerKeyExchange FuzzReadSSLv2Response
+FUZZ_TARGETS := FuzzReadResponse FuzzParseServerHello FuzzParseServerKeyExchange FuzzReadSSLv2Response FuzzParseClientHello FuzzParseServerFlight FuzzParseTLS13Certificate FuzzReadCertificateFlight FuzzDecryptedFlight
 fuzz: ## Fuzz the raw TLS parsers (FUZZTIME per target, default 1m)
 	@for t in $(FUZZ_TARGETS); do \
 		echo "== $$t"; go test -run='^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) ./internal/scanner/rawtls || exit 1; \
@@ -66,12 +66,17 @@ check-compose: ## Check the security policy of deploy/compose.prod.yaml (network
 	docker compose -f deploy/compose.prod.yaml --profile mail config --format json | python3 deploy/check_compose.py
 	python3 deploy/check_images.py
 
-test-deploy: ## Test the deploy helpers without the VPS (deploy.sh refs, check-installed.sh, predeploy-dump.sh, image pins, compose plan)
+check-files: ## No executable binaries and no files over 1 MB in the repository (exceptions in deploy/check_files.py)
+	python3 deploy/check_files.py
+
+test-deploy: ## Test the deploy helpers without the VPS (deploy.sh refs, check-installed.sh, predeploy-dump.sh, prune-predeploy-dumps.sh, image pins, compose plan, repository files)
 	bash deploy/test-deploy-ref.sh
 	bash deploy/test-check-installed.sh
 	bash deploy/test-predeploy-dump.sh
+	bash deploy/test-prune-predeploy-dumps.sh
 	bash deploy/test-check-images.sh
 	bash deploy/test-compose-plan.sh
+	bash deploy/test-check-files.sh
 
 test-backup: ## Test the backup scripts (local restic repository, throwaway PostgreSQL)
 	bash deploy/backup/test.sh

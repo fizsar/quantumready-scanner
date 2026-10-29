@@ -140,7 +140,7 @@ func TestEndToEndWithRealScanner(t *testing.T) {
 		t.Fatalf("stored result: %v %+v", err, res)
 	}
 	var s scoring.Result
-	if err := json.Unmarshal(got.Scoring, &s); err != nil || s.Score != int(*got.Score) || len(s.Blocks) != 5 || s.Findings != nil {
+	if err := json.Unmarshal(got.Scoring, &s); err != nil || s.Score != int(*got.Score) || len(s.Blocks) != 3 || s.Readiness == nil || s.Findings != nil {
 		t.Fatalf("stored scoring: %v %+v", err, s)
 	}
 	fs, err := st.ListFindings(context.Background(), queued.ID)

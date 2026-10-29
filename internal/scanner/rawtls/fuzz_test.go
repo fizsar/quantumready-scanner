@@ -56,7 +56,7 @@ func captureFlight(t testing.TB, cfg *tls.Config, h *Hello) []byte {
 }
 
 func responseSeeds(t testing.TB) [][]byte {
-	cert := hsMsg(typeCertificate, make([]byte, 64))
+	cert := hsMsg(typeCertificate, certificateBody([]byte("leaf"), []byte("ca")))
 	ks, _ := X25519KeyShare()
 	h13 := &Hello{Version: VersionTLS12, SupportedVersions: []uint16{VersionTLS13}, Suites: tls13Hello.Suites, Groups: []uint16{x25519}, KeyShares: []KeyShare{ks}}
 	return [][]byte{
@@ -114,6 +114,14 @@ func FuzzReadResponse(f *testing.F) {
 			}
 			if resp.KeyExchange != nil && (sh.Version > VersionTLS12 || !opts.ReadKeyExchange) {
 				t.Fatal("key exchange read when not asked")
+			}
+			if resp.Certificates != nil && (sh.Version > VersionTLS12 || !opts.ReadKeyExchange) {
+				t.Fatal("certificates read when not asked")
+			}
+			for _, c := range resp.Certificates {
+				if len(c) == 0 {
+					t.Fatal("empty certificate accepted")
+				}
 			}
 		} else if resp.KeyExchange != nil {
 			t.Fatal("key exchange without ServerHello")

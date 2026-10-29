@@ -6,9 +6,11 @@ RETURNING *;
 -- name: RecentPublicScan :one
 -- A public basic scan to hand out instead of a new one: in flight (or done)
 -- within the cooldown, or done within @done_seconds. Run with the public
--- tenant: RLS hides organizations' scans even without the filter below.
+-- tenant: RLS hides organizations' scans even without the filter below. Only
+-- one judged (or to be judged) with the current scoring model.
 SELECT * FROM scans
 WHERE host = @host AND port = @port AND intensity = 'basic' AND organization_id IS NULL
+  AND (scoring_version IS NULL OR scoring_version = @scoring_version::text)
   AND ((status <> 'failed' AND created_at > now() - make_interval(secs => @cooldown_seconds::float8))
        OR (status = 'done' AND finished_at > now() - make_interval(secs => @done_seconds::float8)))
 ORDER BY created_at DESC
@@ -87,12 +89,15 @@ SELECT pg_advisory_xact_lock(hashtextextended(@target::text, 0));
 
 -- name: RecentScanForTarget :one
 -- The latest scan of a target created within the cooldown that has not
--- failed, with the same intensity and the same owner: a basic scan never
--- answers a full request, and an organization never gets another one's scan
--- (public scans have no organization).
+-- failed, with the same intensity and the same owner, and judged (or to be
+-- judged) with the current scoring model: a basic scan never answers a full
+-- request, an organization never gets another one's scan (public scans have
+-- no organization), and a scan judged with an earlier model is not handed out
+-- again.
 SELECT * FROM scans
 WHERE host = @host AND port = @port AND status <> 'failed'
   AND intensity = @intensity AND organization_id IS NOT DISTINCT FROM sqlc.narg(organization_id)
+  AND (scoring_version IS NULL OR scoring_version = @scoring_version::text)
   AND created_at > now() - make_interval(secs => @within_seconds::float8)
 ORDER BY created_at DESC
 LIMIT 1;

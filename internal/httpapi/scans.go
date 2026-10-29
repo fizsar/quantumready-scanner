@@ -14,6 +14,7 @@ import (
 
 	"github.com/fizsar/quantumready-saas/internal/domains"
 	"github.com/fizsar/quantumready-saas/internal/report"
+	"github.com/fizsar/quantumready-saas/internal/scoring"
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
 
@@ -33,8 +34,9 @@ type ScanStore interface {
 	OrgScans(ctx context.Context, t store.Tenant, limit int32) ([]store.Scan, error)
 	// PublicScanBlocked: excluded or opted out (a yes or no, nothing else).
 	PublicScanBlocked(ctx context.Context, host string) (bool, error)
-	// RecentPublicScan: a public basic scan to reuse (pgx.ErrNoRows if none).
-	RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration) (store.Scan, error)
+	// RecentPublicScan: a public basic scan to reuse (pgx.ErrNoRows if none),
+	// judged (or to be judged) with scoringVersion.
+	RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration, scoringVersion string) (store.Scan, error)
 	// PublicQueueLength and PublicQueuePosition count public scans only.
 	PublicQueueLength(ctx context.Context) (int64, error)
 	PublicQueuePosition(ctx context.Context, createdAt time.Time) (int64, error)
@@ -130,7 +132,7 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 	// Reuse before the limits: a recent public result costs nothing, so it is
 	// served even when this client or this domain has used up its quota.
 	// Read with the public tenant: an organization's scan is never handed out.
-	if recent, err := a.cfg.Scans.RecentPublicScan(r.Context(), host, ScanPort, a.cfg.TargetCooldown, PublicReuseWindow); err == nil {
+	if recent, err := a.cfg.Scans.RecentPublicScan(r.Context(), host, ScanPort, a.cfg.TargetCooldown, PublicReuseWindow, scoring.Version); err == nil {
 		a.writeScan(w, r, recent, true)
 		return
 	} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -169,7 +171,7 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), store.Public,
-		store.ScanRequest{Host: host, Port: ScanPort, Intensity: store.IntensityBasic, Cooldown: a.cfg.TargetCooldown})
+		store.ScanRequest{Host: host, Port: ScanPort, Intensity: store.IntensityBasic, Cooldown: a.cfg.TargetCooldown, ScoringVersion: scoring.Version})
 	if err != nil {
 		cancelAll(slots)
 		a.internal(w, r, "enqueue scan", err)
