@@ -33,21 +33,42 @@ export function Report({ scan, report, level = 1, uthAnchor }: { scan: ScanView;
       {report.outdated_model && <OutdatedModel scan={scan} version={report.scoring_version} />}
 
       <section className="summary" aria-label={t('grade.label')}>
-        <div className={`grade grade-${report.grade}`}>
-          {report.readiness && <span className="grade-axis">{t('axis2.security')}</span>}
-          <span className="grade-letter" aria-hidden="true">
-            {report.grade}
-          </span>
-          <span className="sr-only">
-            {t(report.readiness ? 'axis2.security' : 'grade.label')}: {report.grade}
-          </span>
-          <span className="grade-score">{t('grade.score', { score: report.score })}</span>
-        </div>
-        {report.readiness && (
-          <div className={`readiness readiness-${report.readiness.level.code}`}>
-            <span className="grade-axis">{t('axis2.readiness')}</span>
-            <span className="readiness-level">{report.readiness.level.label}</span>
-            <span className="grade-score">{t('grade.score', { score: report.readiness.score })}</span>
+        {report.readiness ? (
+          // Model 2026.3: two axes, two cards of the same weight.
+          <div className="axis-cards">
+            <div className={`axis-card grade-${report.grade}`} role="group" aria-labelledby={`${uid}-sec`}>
+              <p id={`${uid}-sec`} className="axis-card-title">
+                {t('axis2.security')}
+              </p>
+              <p className="axis-card-value grade-letter" aria-hidden="true">
+                {report.grade}
+              </p>
+              <p className="sr-only">
+                {t('axis2.security')}: {report.grade}
+              </p>
+              <p className="grade-score">{t('grade.score', { score: report.score })}</p>
+              <meter className="bar" min={0} max={100} value={report.score} aria-label={t('axis2.security')} />
+              {report.cap && <p className="muted small">{t('grade.cappedShort', { grade: report.cap.grade })}</p>}
+            </div>
+            <div className={`axis-card readiness-${report.readiness.level.code}`} role="group" aria-labelledby={`${uid}-ready`}>
+              <p id={`${uid}-ready`} className="axis-card-title">
+                {t('axis2.readiness')}
+              </p>
+              <p className="axis-card-value readiness-level">{report.readiness.level.label}</p>
+              <p className="grade-score">{t('grade.score', { score: report.readiness.score })}</p>
+              <meter className="bar" min={0} max={100} value={report.readiness.score} aria-label={t('axis2.readiness')} />
+              <p className="muted small">{t('axis2.cap85')}</p>
+            </div>
+          </div>
+        ) : (
+          <div className={`grade grade-${report.grade}`}>
+            <span className="grade-letter" aria-hidden="true">
+              {report.grade}
+            </span>
+            <span className="sr-only">
+              {t('grade.label')}: {report.grade}
+            </span>
+            <span className="grade-score">{t('grade.score', { score: report.score })}</span>
           </div>
         )}
         <div className="summary-facts">

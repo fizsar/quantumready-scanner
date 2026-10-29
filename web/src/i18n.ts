@@ -52,6 +52,7 @@ export const dict = {
     'headline.pqcExperimental': 'Tu servidor probó una versión experimental del cifrado post-cuántico que los navegadores ya no usan, así que hoy no protege a nadie. Actualizar el software del servidor al estándar (ML-KEM) completa el trabajo.',
     'axis2.security': 'Seguridad hoy',
     'axis2.readiness': 'Preparación cuántica',
+    'axis2.cap85': 'Hoy lo habitual es como mucho 85: aún no hay certificados post-cuánticos en la web pública.',
     'axis2.readinessHelp':
       'Preparación cuántica (modelo 2026.3): intercambio de claves híbrido ML-KEM, TLS 1.3, variedad de grupos, renovación automatizada y certificado post-cuántico. Mientras no haya certificados post-cuánticos en la web pública, lo habitual es como mucho 85.',
     'breakdown.penalty': '{points}',
@@ -64,6 +65,7 @@ export const dict = {
     'grade.label': 'Nota',
     'grade.score': '{score} de 100 puntos',
     'grade.capped': 'La letra está limitada a {grade} por: {reasons}.',
+    'grade.cappedShort': 'Letra limitada a {grade} (motivos debajo).',
     'pqc.yes': 'PQC: sí',
     'pqc.no': 'PQC: no',
     'pqc.group': 'Grupo negociado: {group}',
@@ -134,6 +136,7 @@ export const dict = {
     'headline.pqcExperimental': 'Your server tried an experimental version of post-quantum encryption that browsers no longer use, so today it protects nobody. Updating the server software to the standard (ML-KEM) finishes the job.',
     'axis2.security': 'Security today',
     'axis2.readiness': 'Quantum readiness',
+    'axis2.cap85': 'Today 85 is usually the most: there are no post-quantum certificates on the public web yet.',
     'axis2.readinessHelp':
       'Quantum readiness (model 2026.3): hybrid ML-KEM key exchange, TLS 1.3, group variety, automated renewal and a post-quantum certificate. While there are no post-quantum certificates on the public web, 85 is usually the most a server can get.',
     'breakdown.penalty': '{points}',
@@ -146,6 +149,7 @@ export const dict = {
     'grade.label': 'Grade',
     'grade.score': '{score} out of 100 points',
     'grade.capped': 'The grade is capped at {grade} because of: {reasons}.',
+    'grade.cappedShort': 'Grade capped at {grade} (reasons below).',
     'pqc.yes': 'PQC: yes',
     'pqc.no': 'PQC: no',
     'pqc.group': 'Negotiated group: {group}',

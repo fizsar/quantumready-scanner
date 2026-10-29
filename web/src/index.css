@@ -353,6 +353,62 @@ a.btn:hover {
 .grade-score {
   color: var(--muted);
 }
+/* Model 2026.3: the two axes as two cards of the same weight, side by side
+   when they fit and stacked otherwise. Letter and level share the size and
+   the glow; the size follows the card, so "No preparado" fits at 320 px. */
+.axis-cards {
+  flex: 1 1 32rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+.axis-card {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 1rem 1.25rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  text-align: center;
+}
+.axis-card p {
+  margin: 0;
+}
+.axis-card-title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.axis-card .axis-card-value {
+  font-size: clamp(2.25rem, 12.5cqi, 4.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.axis-card .bar {
+  margin-top: 0.2rem;
+}
+.axis-card .small {
+  max-width: 28rem;
+}
+.readiness-ready .readiness-level {
+  color: var(--green);
+  text-shadow:
+    0 0 12px rgba(61, 255, 162, 0.6),
+    0 0 40px rgba(61, 255, 162, 0.25);
+}
+.readiness-on_track .readiness-level {
+  color: var(--amber);
+  text-shadow: 0 0 14px rgba(255, 200, 87, 0.45);
+}
+.readiness-not_ready .readiness-level {
+  color: var(--red);
+  text-shadow: 0 0 14px rgba(255, 122, 147, 0.5);
+}
 .summary-facts {
   display: flex;
   flex-direction: column;
