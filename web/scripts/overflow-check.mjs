@@ -4,8 +4,11 @@
 //
 //   node overflow-check.mjs <chrome-host> <width> <url>...
 //
-// For each URL: document width vs viewport, and the elements sticking out on
-// the right. Exits 1 if any page overflows.
+// For each URL, with every "Under the hood" panel and every <details> open:
+// document width vs viewport, and every element that sticks out on the right
+// of the viewport, of a box that clips it (cut text), or of its container.
+// Content inside a box that scrolls on its own (overflow-x auto/scroll: the
+// wide tables) may be wider. Exits 1 if any page overflows.
 const [host, widthArg, ...urls] = process.argv.slice(2)
 const width = Number(widthArg)
 
@@ -41,14 +44,45 @@ for (const url of urls) {
   await send('Page.navigate', { url })
   for (let i = 0; i < 100 && !events.includes('Page.loadEventFired'); i++) await sleep(50)
   await sleep(1000) // the SPA renders after load (lazy pages too)
+  await send('Runtime.evaluate', {
+    awaitPromise: true,
+    expression: `(async () => {
+      for (const b of document.querySelectorAll('button.uth-toggle[aria-expanded="false"]')) b.click()
+      await new Promise((r) => setTimeout(r, 300))
+      for (const d of document.querySelectorAll('details')) d.open = true
+      await new Promise((r) => setTimeout(r, 300))
+    })()`,
+  })
   const { result } = await send('Runtime.evaluate', {
     returnByValue: true,
     expression: `(() => {
       const vw = document.documentElement.clientWidth
-      const out = [...document.querySelectorAll('body *')]
-        .filter((e) => e.getClientRects().length && e.getBoundingClientRect().right > vw + 0.5)
-        .slice(0, 5)
-        .map((e) => e.tagName.toLowerCase() + (e.getAttribute('class') ? '.' + e.getAttribute('class').split(' ').join('.') : '') + ' right=' + Math.round(e.getBoundingClientRect().right))
+      const tag = (e) => e.tagName.toLowerCase() + (e.getAttribute('class') ? '.' + e.getAttribute('class').trim().split(/\\s+/).join('.') : '')
+      const clipOf = (e) => {
+        for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) {
+          const ox = getComputedStyle(a).overflowX
+          if (ox === 'auto' || ox === 'scroll') return 'scroll'
+          if (ox === 'hidden' || ox === 'clip') return a
+        }
+        return null
+      }
+      const out = []
+      for (const e of document.querySelectorAll('body *')) {
+        if (!e.getClientRects().length || e.closest('.sr-only, marker, defs')) continue
+        const b = e.getBoundingClientRect()
+        if (b.width === 0) continue
+        const clip = clipOf(e)
+        if (clip === 'scroll') continue
+        if (clip && b.right > clip.getBoundingClientRect().right + 1) { out.push(tag(e) + ' cut by ' + tag(clip)); continue }
+        if (b.right > vw + 0.5) { out.push(tag(e) + ' right=' + Math.round(b.right)); continue }
+        const p = e.parentElement
+        if (!p || p === document.body || getComputedStyle(e).position !== 'static') continue
+        const d = getComputedStyle(p).display
+        if (d === 'inline' || d === 'contents') continue
+        const pr = p.getBoundingClientRect().right
+        if (b.right > pr + 1) out.push(tag(e) + ' out of ' + tag(p) + ' by ' + Math.round(b.right - pr) + 'px')
+      }
+      out.splice(5)
       const shown = [...document.querySelectorAll('svg.arch-diagram')].filter((s) => getComputedStyle(s).display !== 'none').map((s) => s.getAttribute('class'))
       return { scrollWidth: document.documentElement.scrollWidth, viewport: vw, h1: document.querySelector('h1')?.textContent ?? '', diagrams: shown, out }
     })()`,
