@@ -12,8 +12,13 @@
 .example {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.75rem; /* the intro panel, then its report */
   scroll-margin-top: 1rem;
+}
+/* Where one example ends and the next begins. */
+.example + .example {
+  padding-top: 2.5rem;
+  border-top: 1px dashed var(--line);
 }
 .example .report {
   width: 100%;

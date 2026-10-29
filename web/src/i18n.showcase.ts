@@ -188,7 +188,7 @@ const es = {
     'Cadena de suministro: las acciones de GitHub están fijadas por SHA. Cada imagen pasa por Trivy antes de publicarse: cualquier vulnerabilidad alta o crítica que ya tenga corrección bloquea la publicación. Las excepciones quedan documentadas con su motivo y caducan; al caducar, vuelven a bloquear. Las imágenes se publican en GHCR con una etiqueta inmutable por commit, y se despliega siempre por esa etiqueta.',
   'arch.quality.title': 'Calidad',
   'arch.quality.lab':
-    'Laboratorio TLS con 10 servidores: 9 deliberadamente vulnerables (SSLv2, SSLv3, EXPORT, DH débil, curvas antiguas, Kyber experimental…) y uno bien configurado sin criptografía post-cuántica, solo en una red Docker interna sin salida a Internet: nunca se prueba contra terceros.',
+    'Laboratorio TLS con 12 servidores: 9 deliberadamente vulnerables (SSLv2, SSLv3, EXPORT, DH débil, curvas antiguas, Kyber experimental…), uno bien configurado sin criptografía post-cuántica y dos con certificados post-cuánticos (ML-DSA), solo en una red Docker interna sin salida a Internet: nunca se prueba contra terceros.',
   'arch.quality.testssl': 'Los resultados del escáner contra esos servidores se comparan con los de testssl.sh, una herramienta de referencia.',
   'arch.quality.fuzz': 'El código que lee las respuestas de los servidores se prueba con fuzzing: toda respuesta es una entrada no fiable.',
   'arch.ops.title': 'Operación',
@@ -546,7 +546,7 @@ const en: Record<ShowcaseKey, string> = {
     'Supply chain: GitHub Actions are pinned by SHA. Every image goes through Trivy before it is published: any high or critical vulnerability that already has a fix blocks the release. Exceptions are documented with their reason and expire; once expired, they block again. Images are published to GHCR with an immutable tag per commit, and deployments always use that tag.',
   'arch.quality.title': 'Quality',
   'arch.quality.lab':
-    'A TLS lab with 10 servers: 9 deliberately vulnerable ones (SSLv2, SSLv3, EXPORT, weak DH, old curves, experimental Kyber…) and one well configured without post-quantum cryptography, only on an internal Docker network with no way out to the Internet: third parties are never probed.',
+    'A TLS lab with 12 servers: 9 deliberately vulnerable ones (SSLv2, SSLv3, EXPORT, weak DH, old curves, experimental Kyber…), one well configured without post-quantum cryptography and two with post-quantum certificates (ML-DSA), only on an internal Docker network with no way out to the Internet: third parties are never probed.',
   'arch.quality.testssl': "The scanner's results against those servers are compared with those of testssl.sh, a reference tool.",
   'arch.quality.fuzz': "The code that reads servers' answers is fuzzed: every answer is untrusted input.",
   'arch.ops.title': 'Operations',
