@@ -1,16 +1,29 @@
 name: CI
 
+# Minutes (GitHub Actions is billed for this private repository):
+# - pushes run CI only on main and showcase; any other branch is checked
+#   through its pull request, so a commit is not built twice;
+# - changes that only touch docs/ or Markdown files (screenshots included)
+#   run no CI, and so no Release either;
+# - a newer push to the same branch or PR cancels the run in progress: only
+#   the tip of a branch gets checked and released.
 on:
   push:
-    branches: ["**"]
+    branches: [main, showcase]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   go:

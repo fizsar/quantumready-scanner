@@ -13,9 +13,11 @@ on:
 
 permissions: {}
 
+# One release at a time per branch; a newer commit's release cancels the one
+# in progress (only the tip is deployed; its images are published in full).
 concurrency:
-  group: release
-  cancel-in-progress: false
+  group: release-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
 
 jobs:
   publish:
