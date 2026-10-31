@@ -2,7 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Me } from './api'
-import { json, stubFetch } from './test/fixtures'
+import { json } from './test/fixtures'
+import { stubFetch } from './test/accounts'
 import { renderAt } from './test/render'
 
 const me: Me = {
@@ -137,7 +138,8 @@ describe('email links', () => {
     window.history.replaceState(null, '', '/verify#token=tok_123-abc')
     const fetch = stubFetch((url) => (url.startsWith('/api/auth/verify-email') ? json({ status: 'verified' }) : unauthenticated()))
     renderAt('/verify')
-    expect(screen.getByRole('status').textContent).toBe('Confirmando tu email…')
+    // The page appears once the server's switches are known (accounts on).
+    expect((await screen.findByRole('status')).textContent).toBe('Confirmando tu email…')
     expect(await screen.findByText('Email confirmado. Ya puedes entrar.')).toBeTruthy()
     expect(sent(fetch, '/api/auth/verify-email').body).toEqual({ token: 'tok_123-abc' })
     expect(fetch.mock.calls.filter(([u]) => String(u).startsWith('/api/auth/verify-email'))).toHaveLength(1)

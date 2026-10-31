@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { solveAltcha, type AltchaChallenge } from './altcha'
 import type { Domain, Me, Org } from './api'
-import { json, reportA, scanView, stubFetch } from './test/fixtures'
+import { json, reportA, scanView } from './test/fixtures'
+import { stubFetch } from './test/accounts'
 import { renderAt } from './test/render'
 
 async function sha256hex(s: string) {

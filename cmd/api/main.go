@@ -68,6 +68,10 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	accountsOn, err := accountsConfig(os.Getenv, origin)
+	if err != nil {
+		return err
+	}
 	openScans, proof, err := publicScanConfig(os.Getenv)
 	if err != nil {
 		return err
@@ -80,7 +84,7 @@ func run(logger *slog.Logger) error {
 		logger.Warn("PUBLIC_SCAN_OPEN: anyone can scan any domain (basic), with a proof of work")
 	}
 	if origin == "" {
-		logger.Warn("PUBLIC_ORIGIN is empty: accounts (/api/auth) are disabled")
+		logger.Warn("PUBLIC_ORIGIN is empty: no Origin check on POST requests")
 	}
 	demoOn, _, err := demoConfig(os.Getenv) // the proof of work shares main's verifier (proof)
 	if err != nil {
@@ -127,7 +131,7 @@ func run(logger *slog.Logger) error {
 		Support:        os.Getenv("MAIL_SUPPORT"),
 		Logger:         logger,
 	}
-	if origin != "" {
+	if accountsOn {
 		cfg.Accounts, cfg.Orgs, cfg.Domains = st, st, st
 	}
 	// Closed beta: invited accounts cannot create organizations unless this is "true".
@@ -156,7 +160,8 @@ func run(logger *slog.Logger) error {
 	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,
 		"allowlist", allow.Len(), "trusted_proxies", len(trusted),
 		"rate_per_minute", lim.perMinute, "rate_per_day", lim.perDay, "target_cooldown", lim.cooldown.String(),
-		"demo_enabled", demoOn, "demo_proof_of_work", demoOn && proof != nil)
+		"demo_enabled", demoOn, "demo_proof_of_work", demoOn && proof != nil, "accounts_enabled", accountsOn,
+		"public_scan_open", openScans)
 
 	select {
 	case err := <-errCh:

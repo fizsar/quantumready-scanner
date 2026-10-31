@@ -2,7 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Invitation, Me, Member, Org } from './api'
-import { json, stubFetch } from './test/fixtures'
+import { json } from './test/fixtures'
+import { stubFetch } from './test/accounts'
 import { renderAt } from './test/render'
 
 const me = (orgs: Me['organizations'] = [{ id: 'oA', name: 'Acme', role: 'owner' }]): Me => ({
