@@ -56,6 +56,10 @@ func run(logger *slog.Logger) error {
 	if allow.Len() == 0 {
 		logger.Warn("SCAN_ALLOWLIST is empty: every scan request will be refused")
 	}
+	full, err := httpapi.ParseAllowlist(os.Getenv("SCAN_FULL_DOMAINS"))
+	if err != nil {
+		return fmt.Errorf("SCAN_FULL_DOMAINS: %w", err)
+	}
 	trusted, err := httpapi.ParsePrefixes(os.Getenv("TRUSTED_PROXIES"))
 	if err != nil {
 		return fmt.Errorf("TRUSTED_PROXIES: %w", err)
@@ -120,6 +124,7 @@ func run(logger *slog.Logger) error {
 		DemoAltcha:     proof, // one ALTCHA key and one replay cache for scans and demos
 		DemoEnabled:    demoOn,
 		Allowlist:      allow,
+		FullScanHosts:  full,
 		TrustedProxies: trusted,
 		Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
 		TargetCooldown: lim.cooldown,
@@ -158,7 +163,7 @@ func run(logger *slog.Logger) error {
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,
-		"allowlist", allow.Len(), "trusted_proxies", len(trusted),
+		"allowlist", allow.Len(), "full_scan_domains", full.Len(), "trusted_proxies", len(trusted),
 		"rate_per_minute", lim.perMinute, "rate_per_day", lim.perDay, "target_cooldown", lim.cooldown.String(),
 		"demo_enabled", demoOn, "demo_proof_of_work", demoOn && proof != nil, "accounts_enabled", accountsOn,
 		"public_scan_open", openScans)

@@ -34,9 +34,9 @@ type ScanStore interface {
 	OrgScans(ctx context.Context, t store.Tenant, limit int32) ([]store.Scan, error)
 	// PublicScanBlocked: excluded or opted out (a yes or no, nothing else).
 	PublicScanBlocked(ctx context.Context, host string) (bool, error)
-	// RecentPublicScan: a public basic scan to reuse (pgx.ErrNoRows if none),
-	// judged (or to be judged) with scoringVersion.
-	RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration, scoringVersion string) (store.Scan, error)
+	// RecentPublicScan: a public scan of that intensity to reuse
+	// (pgx.ErrNoRows if none), judged (or to be judged) with scoringVersion.
+	RecentPublicScan(ctx context.Context, host string, port int32, intensity string, cooldown, doneWithin time.Duration, scoringVersion string) (store.Scan, error)
 	// PublicQueueLength and PublicQueuePosition count public scans only.
 	PublicQueueLength(ctx context.Context) (int64, error)
 	PublicQueuePosition(ctx context.Context, createdAt time.Time) (int64, error)
@@ -71,8 +71,9 @@ func cancelAll(slots []slot) {
 	}
 }
 
-// createScan: POST /api/scans {"host": "...", "altcha": "..."}: a public,
-// basic scan. Closed (default): only the allowlist. Open
+// createScan: POST /api/scans {"host": "...", "altcha": "..."}: a public
+// scan, full for the operator's own domains (SCAN_FULL_DOMAINS) and basic
+// for any other. Closed (default): only the allowlist. Open
 // (PUBLIC_SCAN_OPEN): any domain, with a proof of work, unless excluded or
 // opted out by its verified owner, within per-IP, per-domain and global
 // limits. A public scan is never an organization's: the tenant is always
@@ -130,10 +131,17 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The operator's own domains (SCAN_FULL_DOMAINS) are scanned in full, raw
+	// probes included; any other domain, basic (decision of 01/11/2026).
+	intensity, listed := store.IntensityBasic, a.cfg.FullScanHosts.Allows(host)
+	if listed {
+		intensity = store.IntensityFull
+	}
+
 	// Reuse before the limits: a recent public result costs nothing, so it is
 	// served even when this client or this domain has used up its quota.
 	// Read with the public tenant: an organization's scan is never handed out.
-	if recent, err := a.cfg.Scans.RecentPublicScan(r.Context(), host, ScanPort, a.cfg.TargetCooldown, PublicReuseWindow, scoring.Version); err == nil {
+	if recent, err := a.cfg.Scans.RecentPublicScan(r.Context(), host, ScanPort, intensity, a.cfg.TargetCooldown, PublicReuseWindow, scoring.Version); err == nil {
 		a.writeScan(w, r, recent, true)
 		return
 	} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -172,7 +180,7 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), store.Public,
-		store.ScanRequest{Host: host, Port: ScanPort, Intensity: store.IntensityBasic, Cooldown: a.cfg.TargetCooldown, ScoringVersion: scoring.Version})
+		store.ScanRequest{Host: host, Port: ScanPort, Intensity: intensity, OperatorListed: listed, Cooldown: a.cfg.TargetCooldown, ScoringVersion: scoring.Version})
 	if err != nil {
 		cancelAll(slots)
 		a.internal(w, r, "enqueue scan", err)

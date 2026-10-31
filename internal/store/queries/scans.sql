@@ -4,12 +4,13 @@ VALUES (@host, @port, sqlc.narg(organization_id), @intensity, sqlc.narg(requeste
 RETURNING *;
 
 -- name: RecentPublicScan :one
--- A public basic scan to hand out instead of a new one: in flight (or done)
+-- A public scan of @intensity (basic, or full for the operator's own
+-- domains) to hand out instead of a new one: in flight (or done)
 -- within the cooldown, or done within @done_seconds. Run with the public
 -- tenant: RLS hides organizations' scans even without the filter below. Only
 -- one judged (or to be judged) with the current scoring model.
 SELECT * FROM scans
-WHERE host = @host AND port = @port AND intensity = 'basic' AND organization_id IS NULL
+WHERE host = @host AND port = @port AND intensity = @intensity AND organization_id IS NULL
   AND (scoring_version IS NULL OR scoring_version = @scoring_version::text)
   AND ((status <> 'failed' AND created_at > now() - make_interval(secs => @cooldown_seconds::float8))
        OR (status = 'done' AND finished_at > now() - make_interval(secs => @done_seconds::float8)))

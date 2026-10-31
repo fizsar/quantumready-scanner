@@ -108,7 +108,7 @@ Definidos en `internal/org` (un test fija la matriz entera). La API decide con l
 ## Escaneo público (hito 3.5)
 
 - **Cerrado por defecto** (`PUBLIC_SCAN_OPEN` desactivado): solo los dominios de la allowlist. Se abre después de la revisión de seguridad.
-- **Abierto**: cualquier dominio, siempre en intensidad `basic` y siempre como inquilino público. Se rechazan IPs, nombres reservados, terminaciones desconocidas y sufijos públicos (las mismas reglas que al añadir dominios). Se exige además la prueba de trabajo (ALTCHA, 3.5b) y se aplican límites:
+- **Abierto**: cualquier dominio, siempre como inquilino público y en intensidad `basic`, salvo los dominios propios del operador (`SCAN_FULL_DOMAINS`, coincidencia exacta como la allowlist; hoy fizsar.com y quantumready.fizsar.com), que se escanean en `full`, con las sondas en crudo (decisión del 01/11/2026). Un `full` público solo existe con esa marca (`ScanRequest.OperatorListed`; si no, `ErrFullNeedsOrg`), y la reutilización nunca cruza intensidades. Se rechazan IPs, nombres reservados, terminaciones desconocidas y sufijos públicos (las mismas reglas que al añadir dominios). Se exige además la prueba de trabajo (ALTCHA, 3.5b) y se aplican límites:
   - por IP: 5 por minuto y 30 al día (`RATE_LIMIT_*`);
   - por dominio registrable: 10 al día;
   - globales: 30 por minuto y 1.000 al día;

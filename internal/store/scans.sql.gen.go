@@ -393,10 +393,10 @@ func (q *Queries) PublicQueuePosition(ctx context.Context, createdAt time.Time) 
 
 const recentPublicScan = `-- name: RecentPublicScan :one
 SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at FROM scans
-WHERE host = $1 AND port = $2 AND intensity = 'basic' AND organization_id IS NULL
-  AND (scoring_version IS NULL OR scoring_version = $3::text)
-  AND ((status <> 'failed' AND created_at > now() - make_interval(secs => $4::float8))
-       OR (status = 'done' AND finished_at > now() - make_interval(secs => $5::float8)))
+WHERE host = $1 AND port = $2 AND intensity = $3 AND organization_id IS NULL
+  AND (scoring_version IS NULL OR scoring_version = $4::text)
+  AND ((status <> 'failed' AND created_at > now() - make_interval(secs => $5::float8))
+       OR (status = 'done' AND finished_at > now() - make_interval(secs => $6::float8)))
 ORDER BY created_at DESC
 LIMIT 1
 `
@@ -404,12 +404,14 @@ LIMIT 1
 type RecentPublicScanParams struct {
 	Host            string
 	Port            int32
+	Intensity       string
 	ScoringVersion  string
 	CooldownSeconds float64
 	DoneSeconds     float64
 }
 
-// A public basic scan to hand out instead of a new one: in flight (or done)
+// A public scan of @intensity (basic, or full for the operator's own
+// domains) to hand out instead of a new one: in flight (or done)
 // within the cooldown, or done within @done_seconds. Run with the public
 // tenant: RLS hides organizations' scans even without the filter below. Only
 // one judged (or to be judged) with the current scoring model.
@@ -417,6 +419,7 @@ func (q *Queries) RecentPublicScan(ctx context.Context, arg RecentPublicScanPara
 	row := q.db.QueryRow(ctx, recentPublicScan,
 		arg.Host,
 		arg.Port,
+		arg.Intensity,
 		arg.ScoringVersion,
 		arg.CooldownSeconds,
 		arg.DoneSeconds,

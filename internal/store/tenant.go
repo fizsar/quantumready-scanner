@@ -43,7 +43,8 @@ func (s *Store) OrgScans(ctx context.Context, t Tenant, limit int32) (scs []Scan
 }
 
 // ErrFullNeedsOrg is returned for a full scan without an organization: full
-// scans exist only for an organization's verified domains.
+// scans exist only for an organization's verified domains and, as public
+// scans, for the operator's own domains (ScanRequest.OperatorListed).
 var ErrFullNeedsOrg = errors.New("store: a full scan needs an organization")
 
 // Tx runs fn in a transaction as the database role qr_app, with the tenant
@@ -80,6 +81,9 @@ type ScanRequest struct {
 	// ScoringVersion: reuse only a scan judged (or to be judged) with this
 	// model (scoring.Version); an older judgement is not handed out again.
 	ScoringVersion string
+	// OperatorListed: the host is one of the operator's own domains
+	// (SCAN_FULL_DOMAINS), the only ones a public scan may scan in full.
+	OperatorListed bool
 }
 
 // EnqueueOrReuse enqueues a scan for the tenant unless one of the same
@@ -92,7 +96,7 @@ func (s *Store) EnqueueOrReuse(ctx context.Context, t Tenant, r ScanRequest) (sc
 	if r.Intensity != IntensityBasic && r.Intensity != IntensityFull {
 		return Scan{}, false, errors.New("store: unknown intensity " + r.Intensity)
 	}
-	if r.Intensity == IntensityFull && t.OrgID == nil {
+	if r.Intensity == IntensityFull && t.OrgID == nil && !r.OperatorListed {
 		return Scan{}, false, ErrFullNeedsOrg
 	}
 	err = s.Tx(ctx, t, func(q *Queries) error {
@@ -123,14 +127,14 @@ func (s *Store) EnqueueOrReuse(ctx context.Context, t Tenant, r ScanRequest) (sc
 	return sc, reused, err
 }
 
-// RecentPublicScan returns a public basic scan of host:port to reuse — in
+// RecentPublicScan returns a public scan of host:port and intensity to reuse — in
 // flight or done within cooldown, or done within doneWithin — or
 // pgx.ErrNoRows; only one judged (or to be judged) with scoringVersion. It
 // reads with the public tenant, so row-level security alone already keeps
 // organizations' scans out.
-func (s *Store) RecentPublicScan(ctx context.Context, host string, port int32, cooldown, doneWithin time.Duration, scoringVersion string) (sc Scan, err error) {
+func (s *Store) RecentPublicScan(ctx context.Context, host string, port int32, intensity string, cooldown, doneWithin time.Duration, scoringVersion string) (sc Scan, err error) {
 	err = s.Tx(ctx, Public, func(q *Queries) error {
-		sc, err = q.RecentPublicScan(ctx, RecentPublicScanParams{Host: host, Port: port, ScoringVersion: scoringVersion,
+		sc, err = q.RecentPublicScan(ctx, RecentPublicScanParams{Host: host, Port: port, Intensity: intensity, ScoringVersion: scoringVersion,
 			CooldownSeconds: cooldown.Seconds(), DoneSeconds: doneWithin.Seconds()})
 		return err
 	})

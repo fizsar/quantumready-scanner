@@ -41,6 +41,9 @@ type Config struct {
 	Scans ScanStore
 	// Allowlist holds the only hosts that may be scanned (SCAN_ALLOWLIST).
 	Allowlist *Allowlist
+	// FullScanHosts are the operator's own domains (SCAN_FULL_DOMAINS): a
+	// public scan of one of them is full (raw probes); of any other, basic.
+	FullScanHosts *Allowlist
 	// Limiter rate-limits scan creation per client; nil means 5/min and 30/day.
 	Limiter *Limiter
 	// TrustedProxies are the addresses whose X-Forwarded-For is believed (the

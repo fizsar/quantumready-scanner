@@ -37,7 +37,7 @@ func (f *fixtureStore) PublicQueueLength(context.Context) (int64, error) { retur
 func (f *fixtureStore) PublicQueuePosition(context.Context, time.Time) (int64, error) {
 	return 0, nil
 }
-func (f *fixtureStore) RecentPublicScan(context.Context, string, int32, time.Duration, time.Duration, string) (store.Scan, error) {
+func (f *fixtureStore) RecentPublicScan(context.Context, string, int32, string, time.Duration, time.Duration, string) (store.Scan, error) {
 	panic("not used")
 }
 func (f *fixtureStore) PublicScanBlocked(context.Context, string) (bool, error) {

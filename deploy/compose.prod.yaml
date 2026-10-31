@@ -82,6 +82,9 @@ services:
       DATABASE_URL: *database-url
       # Exact hosts that may be scanned in this phase.
       SCAN_ALLOWLIST: ${SCAN_ALLOWLIST:-fizsar.com,quantumready.fizsar.com}
+      # Our own domains (exact hosts): their public scans are full, raw probes
+      # included; any other domain's, basic.
+      SCAN_FULL_DOMAINS: ${SCAN_FULL_DOMAINS:-fizsar.com,quantumready.fizsar.com}
       # X-Forwarded-For is only believed from the Caddy network (subnet of the
       # `web` network; deploy.sh and make prod-up fill it in).
       TRUSTED_PROXIES: ${QR_TRUSTED_PROXIES:-}

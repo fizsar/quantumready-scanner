@@ -297,6 +297,24 @@ func TestReuseNeverCrossesIntensityOrTenant(t *testing.T) {
 	if _, _, err := w.s.EnqueueOrReuse(ctx, Public, req(IntensityFull)); !errors.Is(err, ErrFullNeedsOrg) {
 		t.Errorf("public full request: %v, want ErrFullNeedsOrg", err)
 	}
+	// One of the operator's own domains (SCAN_FULL_DOMAINS): public and full,
+	// never the public basic scan, and reused as full only.
+	listed := req(IntensityFull)
+	listed.OperatorListed = true
+	pubFull, reused, err := w.s.EnqueueOrReuse(ctx, Public, listed)
+	if err != nil || reused || pubFull.ID == pub.ID || pubFull.Intensity != IntensityFull || pubFull.OrganizationID != nil ||
+		pubFull.ExpiresAt == nil || time.Until(*pubFull.ExpiresAt) > 31*24*time.Hour {
+		t.Errorf("listed public full: %+v reused=%v err=%v, want a new public full scan expiring in 30 days", pubFull, reused, err)
+	}
+	if again, reused, _ := w.s.EnqueueOrReuse(ctx, Public, listed); !reused || again.ID != pubFull.ID {
+		t.Errorf("listed public full again: reused=%v, want the same", reused)
+	}
+	for intensity, want := range map[string]Scan{IntensityBasic: pub, IntensityFull: pubFull} {
+		got, err := w.s.RecentPublicScan(ctx, "target.example", 443, intensity, time.Hour, time.Hour, "")
+		if err != nil || got.ID != want.ID {
+			t.Errorf("RecentPublicScan(%s) = %s, %v; want %s", intensity, got.ID, err, want.ID)
+		}
+	}
 	if _, _, err := w.s.EnqueueOrReuse(ctx, a, req("lab")); err == nil {
 		t.Error("unknown intensity accepted")
 	}
