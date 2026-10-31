@@ -2,7 +2,7 @@
 
 Chromium headless (zenika/alpine-chrome 124 con JetBrains Mono y Noto, para ver la tipografía real) contra el build de la web servido con la configuración de nginx de producción, en una red Docker interna. Para los informes se usaron las respuestas de la API generadas con el código actual a partir de escaneos reales: fizsar.com y `export` del 29/10/2026 (`internal/scoring/testdata/lab_v3`, con el registro por sonda) y fizsar.com analizado con el modelo 2026.2. Se revisaron 375, 768 y 1280 px, en ES y EN, con todos los paneles «Bajo el capó» y **todos** los `<details>` abiertos.
 
-Aquí está el principio de cada página (`<página>-<idioma>-<ancho>.jpeg`) y, del informe de fizsar.com, el tramo de «Bajo el capó» con «Oferta completa» desplegada (`report-fizsar-*-under-the-hood.jpeg`). La revisión completa, página entera y con todo abierto, son unas 400 capturas: no se guardan.
+Aquí está el principio de cada página (`<página>-<idioma>-<ancho>.webp`) y, del informe de fizsar.com, el tramo de «Bajo el capó» con «Oferta completa» desplegada (`report-fizsar-*-under-the-hood.webp`). La revisión completa, página entera y con todo abierto, son unas 400 capturas: no se guardan.
 
 ## Fallos encontrados y arreglos
 
