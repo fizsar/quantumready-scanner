@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Public pages only. /architecture and /examples come with showcase S3 and S4
-     (deployed together in S6), /privacy with M1; scan results are noindex and
-     never listed. -->
+     (deployed together in S6), /privacy with M1, /about-scans with the first
+     deploy of main; scan results are noindex and never listed. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://quantumready.fizsar.com/</loc></url>
   <url><loc>https://quantumready.fizsar.com/architecture</loc></url>
   <url><loc>https://quantumready.fizsar.com/examples</loc></url>
   <url><loc>https://quantumready.fizsar.com/privacy</loc></url>
+  <url><loc>https://quantumready.fizsar.com/about-scans</loc></url>
 </urlset>
