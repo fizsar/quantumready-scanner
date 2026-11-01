@@ -16,9 +16,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/big"
-	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -102,7 +101,9 @@ func (v *Verifier) Challenge() (Challenge, error) {
 	if err != nil {
 		return Challenge{}, err
 	}
-	salt := hex.EncodeToString(b) + "?expires=" + strconv.FormatInt(v.now().Add(v.ttl).Unix(), 10)
+	// The final & ends the salt: the digits of n, hashed right after it,
+	// can never be read as part of ?expires= (see saltRe).
+	salt := hex.EncodeToString(b) + "?expires=" + strconv.FormatInt(v.now().Add(v.ttl).Unix(), 10) + "&"
 	c := hashHex(salt, n.Int64())
 	return Challenge{Algorithm: Algorithm, Challenge: c, MaxNumber: v.maxNumber, Salt: salt, Signature: v.sign(c)}, nil
 }
@@ -110,6 +111,9 @@ func (v *Verifier) Challenge() (Challenge, error) {
 // Verify checks a solution (the base64 payload of the browser). Each
 // challenge is accepted once.
 func (v *Verifier) Verify(payload string) error {
+	v.mu.Lock()
+	v.sweep(v.now()) // on every call, valid or not: used never holds expired entries for long
+	v.mu.Unlock()
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(payload))
 	if err != nil || len(raw) > 1024 {
 		return ErrInvalid
@@ -122,20 +126,30 @@ func (v *Verifier) Verify(payload string) error {
 	if !hmac.Equal([]byte(v.sign(s.Challenge)), []byte(s.Signature)) {
 		return ErrInvalid
 	}
+	// Only the challenge is signed, and it is SHA-256(salt + n): without one
+	// exact salt form, digits of n could be moved into ?expires= (same hash,
+	// later expiry).
+	m := saltRe.FindStringSubmatch(s.Salt)
+	if m == nil {
+		return ErrInvalid
+	}
 	if subtle.ConstantTimeCompare([]byte(hashHex(s.Salt, s.Number)), []byte(s.Challenge)) != 1 {
 		return ErrInvalid
 	}
-	expires, err := expiry(s.Salt)
+	sec, err := strconv.ParseInt(m[1], 10, 64)
 	if err != nil {
 		return ErrInvalid
 	}
+	expires := time.Unix(sec, 0)
 	now := v.now()
+	if expires.After(now.Add(v.ttl)) { // never issued by us: no proof outlives the TTL
+		return ErrInvalid
+	}
 	if !now.Before(expires) {
 		return ErrExpired
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.sweep(now)
 	if _, seen := v.used[s.Challenge]; seen {
 		return ErrReplay
 	}
@@ -143,28 +157,16 @@ func (v *Verifier) Verify(payload string) error {
 	return nil
 }
 
-// expiry reads the ?expires= Unix time that the salt carries (it is part
-// of the hashed and signed challenge, so it cannot be changed).
-func expiry(salt string) (time.Time, error) {
-	i := strings.IndexByte(salt, '?')
-	if i < 0 {
-		return time.Time{}, errors.New("no parameters")
-	}
-	q, err := url.ParseQuery(salt[i+1:])
-	if err != nil {
-		return time.Time{}, err
-	}
-	sec, err := strconv.ParseInt(q.Get("expires"), 10, 64)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("expires: %w", err)
-	}
-	return time.Unix(sec, 0), nil
-}
+// saltRe is the only salt Challenge issues: 12 random bytes in hex, the
+// ?expires= Unix time (10 digits) and a final &. Nothing can be appended
+// to it, so the expiry hashed into the signed challenge is the one read.
+var saltRe = regexp.MustCompile(`^[0-9a-f]{24}\?expires=([0-9]{10})&$`)
 
 // sweep forgets expired challenges (they fail on expiry anyway), at most
-// once a minute; memory stays bounded by the challenges of the last TTL.
+// once a minute; memory stays bounded by the challenges of the last TTL,
+// since no accepted expiry is later than now + TTL.
 func (v *Verifier) sweep(now time.Time) {
-	if now.Sub(v.swept) < time.Minute {
+	if d := now.Sub(v.swept); d >= 0 && d < time.Minute { // a clock that went back sweeps at once
 		return
 	}
 	v.swept = now
