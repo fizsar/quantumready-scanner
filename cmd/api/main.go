@@ -108,11 +108,19 @@ func run(logger *slog.Logger) error {
 	if err := store.UseRole(poolCfg, store.RoleApp); err != nil {
 		return err
 	}
+	// Never as a superuser or with BYPASSRLS: every connection is checked,
+	// and the API does not start on a privileged one (Apertura step 4).
+	store.RequireUnprivileged(poolCfg)
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return fmt.Errorf("configure database pool: %w", err)
 	}
 	defer pool.Close()
+	if reachable, err := store.CheckPoolAtStart(ctx, pool, 30*time.Second); err != nil {
+		return err
+	} else if !reachable {
+		logger.Warn("database unreachable at start: its role is checked on every connection")
+	}
 
 	st := store.NewStore(pool)
 	cfg := httpapi.Config{

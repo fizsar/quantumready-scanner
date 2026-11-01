@@ -68,6 +68,8 @@ func run(logger *slog.Logger) error {
 	if err := store.UseRole(cfg, store.RoleWorker); err != nil {
 		return err
 	}
+	// Never as a superuser or with BYPASSRLS (Apertura step 4).
+	store.RequireUnprivileged(cfg)
 	concurrency, err := envInt("WORKER_CONCURRENCY", 2)
 	if err != nil {
 		return err
@@ -87,6 +89,12 @@ func run(logger *slog.Logger) error {
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("database pool: %w", err)
+	}
+	if reachable, err := store.CheckPoolAtStart(ctx, pool, 30*time.Second); err != nil {
+		pool.Close()
+		return err
+	} else if !reachable {
+		logger.Warn("database unreachable at start: its role is checked on every connection")
 	}
 	// Close the pool on the way out, but never hang on it: a stuck slot may
 	// still hold a connection when the worker gives up on it.

@@ -22,7 +22,13 @@ x-hardening: &hardening
 
 x-api-image: &api-image ghcr.io/fizsar/quantumready-saas-api:${QR_TAG:?set QR_TAG in .env}
 
+# The owner (POSTGRES_USER, a superuser) only for migrate; the API and the
+# worker log in as their own users, qr_app and qr_worker (Apertura step 4):
+# migrate gives them LOGIN and these passwords (generated on the VPS,
+# openssl rand -hex 32), and both refuse to start as a privileged role.
 x-database-url: &database-url "postgres://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@db:5432/${POSTGRES_DB:?set in .env}?sslmode=disable"
+x-database-url-app: &database-url-app "postgres://qr_app:${QR_APP_DB_PASSWORD:?set in .env}@db:5432/${POSTGRES_DB:?set in .env}?sslmode=disable"
+x-database-url-worker: &database-url-worker "postgres://qr_worker:${QR_WORKER_DB_PASSWORD:?set in .env}@db:5432/${POSTGRES_DB:?set in .env}?sslmode=disable"
 
 services:
   db:
@@ -64,6 +70,8 @@ services:
     restart: "no"
     environment:
       DATABASE_URL: *database-url
+      QR_APP_DB_PASSWORD: ${QR_APP_DB_PASSWORD:?set in .env}
+      QR_WORKER_DB_PASSWORD: ${QR_WORKER_DB_PASSWORD:?set in .env}
     networks: [backend]
     depends_on:
       db: { condition: service_healthy }
@@ -79,7 +87,7 @@ services:
     restart: unless-stopped
     environment:
       API_ADDR: ":8080"
-      DATABASE_URL: *database-url
+      DATABASE_URL: *database-url-app
       # Exact hosts that may be scanned in this phase.
       SCAN_ALLOWLIST: ${SCAN_ALLOWLIST:-fizsar.com,quantumready.fizsar.com}
       # Our own domains (exact hosts): their public scans are full, raw probes
@@ -142,7 +150,7 @@ services:
     entrypoint: ["/worker"]
     restart: unless-stopped
     environment:
-      DATABASE_URL: *database-url
+      DATABASE_URL: *database-url-worker
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       # Scans started per minute by all workers together (good Internet citizen).
       WORKER_MAX_SCANS_PER_MINUTE: ${WORKER_MAX_SCANS_PER_MINUTE:-20}

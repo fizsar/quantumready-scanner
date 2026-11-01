@@ -12,7 +12,7 @@ cp -r "$tmp" "$tmp.orig" && trap 'rm -rf "$tmp" "$tmp.orig"' EXIT
 
 fails=0
 compose() { # check_compose.py on the copy's production compose
-	(cd "$tmp" && QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d \
+	(cd "$tmp" && QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d QR_APP_DB_PASSWORD=a QR_WORKER_DB_PASSWORD=w \
 		docker compose -f deploy/compose.prod.yaml --profile mail config --format json | python3 deploy/check_compose.py)
 }
 images() { python3 deploy/check_images.py "$tmp"; }

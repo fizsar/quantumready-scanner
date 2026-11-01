@@ -60,6 +60,13 @@ if "worker" in services:
     env = services["worker"].get("environment", {})
     check("sslmode=disable" in env.get("DATABASE_URL", ""), "worker: DATABASE_URL must set sslmode=disable")
 
+# Least privilege (Apertura step 4): the API and the worker log in as their
+# own users, never as the owner (a superuser skips row-level security).
+for name, role in (("api", "qr_app"), ("worker", "qr_worker")):
+    if name in services:
+        url = services[name].get("environment", {}).get("DATABASE_URL", "")
+        check(url.startswith(f"postgres://{role}:"), f"{name}: DATABASE_URL must log in as {role}")
+
 if "mailer" in services:
     env = services["mailer"].get("environment", {})
     # Credentials only over TLS (the mailer refuses them anyway).

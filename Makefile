@@ -21,8 +21,9 @@ dev: .env web/node_modules ## Start PostgreSQL, Mailpit (:8025), the API (:8080)
 	@set -a; . ./.env; set +a; \
 	go run ./cmd/migrate && \
 	trap 'kill 0' EXIT; \
-	go run -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT)" ./cmd/api & \
-	WORKER_HEARTBEAT_FILE=$${TMPDIR:-/tmp}/qr-worker-heartbeat go run ./cmd/worker & \
+	as() { echo "$$DATABASE_URL" | sed -E "s#//[^@]*@#//$$1:$$2@#"; }; \
+	DATABASE_URL=$$(as qr_app "$$QR_APP_DB_PASSWORD") go run -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT)" ./cmd/api & \
+	DATABASE_URL=$$(as qr_worker "$$QR_WORKER_DB_PASSWORD") WORKER_HEARTBEAT_FILE=$${TMPDIR:-/tmp}/qr-worker-heartbeat go run ./cmd/worker & \
 	MAILER_HEARTBEAT_FILE=$${TMPDIR:-/tmp}/qr-mailer-heartbeat go run ./cmd/mailer & \
 	npm --prefix web run dev; \
 	wait
@@ -62,7 +63,7 @@ sqlc: ## Regenerate internal/store from migrations/ and internal/store/queries/
 	docker run --rm --user $$(id -u):$$(id -g) -v "$$PWD:/src" -w /src $(SQLC_IMAGE) generate
 
 check-compose: ## Check the security policy of deploy/compose.prod.yaml (networks, limits, ports, digests) and that every image is pinned
-	QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d \
+	QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d QR_APP_DB_PASSWORD=a QR_WORKER_DB_PASSWORD=w \
 	docker compose -f deploy/compose.prod.yaml --profile mail config --format json | python3 deploy/check_compose.py
 	python3 deploy/check_images.py
 

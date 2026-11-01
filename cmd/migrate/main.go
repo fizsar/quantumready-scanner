@@ -16,6 +16,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/fizsar/quantumready-saas/internal/store"
 	"github.com/fizsar/quantumready-saas/migrations"
 )
 
@@ -59,5 +60,13 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	logger.Info("migrations up to date", "applied", len(results))
+
+	// The services' own login users (Apertura step 4): LOGIN and the
+	// passwords of the .env, on every deploy. Passwords are never logged.
+	roles, err := store.SyncLoginRoles(ctx, db, os.Getenv)
+	if err != nil {
+		return err
+	}
+	logger.Info("login users", "enabled", roles)
 	return nil
 }
