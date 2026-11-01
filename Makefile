@@ -6,6 +6,7 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 # Local run of the production stack: build images (compose.build.yaml) tagged with the git version.
 PROD := QR_TAG=$(VERSION) QR_VERSION=$(VERSION) QR_COMMIT=$(COMMIT) \
+	QR_API_IMAGE=ghcr.io/fizsar/quantumready-saas-api:$(VERSION) QR_WEB_IMAGE=ghcr.io/fizsar/quantumready-saas-web:$(VERSION) \
 	docker compose -f deploy/compose.prod.yaml -f deploy/compose.build.yaml --env-file .env
 
 # Pinned by digest; bump tag and digest together (CI uses the same image).
@@ -38,9 +39,12 @@ test: web/node_modules ## Run Go tests (integration tests too if the dev databas
 
 FUZZTIME ?= 1m
 FUZZ_TARGETS := FuzzReadResponse FuzzParseServerHello FuzzParseServerKeyExchange FuzzReadSSLv2Response FuzzParseClientHello FuzzParseServerFlight FuzzParseTLS13Certificate FuzzReadCertificateFlight FuzzDecryptedFlight
-fuzz: ## Fuzz the raw TLS parsers (FUZZTIME per target, default 1m)
-	@for t in $(FUZZ_TARGETS); do \
-		echo "== $$t"; go test -run='^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) ./internal/scanner/rawtls || exit 1; \
+# package:target pairs outside rawtls.
+FUZZ_OTHER := internal/altcha:FuzzVerify
+fuzz: ## Fuzz the raw TLS parsers and the ALTCHA verifier (FUZZTIME per target, default 1m)
+	@for t in $(FUZZ_TARGETS) $(FUZZ_OTHER); do \
+		pkg=./internal/scanner/rawtls; case $$t in *:*) pkg=./$${t%%:*}; t=$${t#*:};; esac; \
+		echo "== $$t"; go test -run='^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) $$pkg || exit 1; \
 	done
 
 lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint and tsc
@@ -63,6 +67,7 @@ sqlc: ## Regenerate internal/store from migrations/ and internal/store/queries/
 	docker run --rm --user $$(id -u):$$(id -g) -v "$$PWD:/src" -w /src $(SQLC_IMAGE) generate
 
 check-compose: ## Check the security policy of deploy/compose.prod.yaml (networks, limits, ports, digests) and that every image is pinned
+	QR_API_IMAGE=ghcr.io/fizsar/quantumready-saas-api@sha256:0000000000000000000000000000000000000000000000000000000000000000 QR_WEB_IMAGE=ghcr.io/fizsar/quantumready-saas-web@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 	QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d QR_APP_DB_PASSWORD=a QR_WORKER_DB_PASSWORD=w \
 	docker compose -f deploy/compose.prod.yaml --profile mail config --format json | python3 deploy/check_compose.py
 	python3 deploy/check_images.py
@@ -72,6 +77,7 @@ check-files: ## No executable binaries and no files over 1 MB in the repository 
 
 test-deploy: ## Test the deploy helpers without the VPS (deploy.sh refs, check-installed.sh, predeploy-dump.sh, prune-predeploy-dumps.sh, image pins, compose plan, repository files, GHCR cleanup plan)
 	bash deploy/test-deploy-ref.sh
+	bash deploy/test-pin-images.sh
 	bash deploy/test-check-installed.sh
 	bash deploy/test-predeploy-dump.sh
 	bash deploy/test-prune-predeploy-dumps.sh

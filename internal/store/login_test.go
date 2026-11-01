@@ -112,10 +112,17 @@ func TestCheckUnprivileged(t *testing.T) {
 	b := make([]byte, 4)
 	_, _ = rand.Read(b)
 	bypass := "qr_test_bypass_" + hex.EncodeToString(b)
+	lastBypassRole = bypass
 	if _, err := owner.Exec(ctx, "CREATE ROLE "+bypass+" LOGIN BYPASSRLS PASSWORD '"+testRolePassword+"'"); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = owner.Exec(context.Background(), "DROP ROLE "+bypass) })
+	// On the pool, not on owner: the defer above closes owner before any
+	// cleanup runs, and the role (global to the cluster) stayed behind.
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), "DROP ROLE "+bypass); err != nil {
+			t.Errorf("drop %s: %v", bypass, err)
+		}
+	})
 	c, err := pgx.ConnectConfig(ctx, connAs(t, bypass, testRolePassword))
 	if err != nil {
 		t.Fatal(err)
@@ -162,5 +169,27 @@ func TestCheckPoolAtStartUnreachable(t *testing.T) {
 	reachable, err := CheckPoolAtStart(context.Background(), p, 2*time.Second)
 	if reachable || err != nil || time.Since(start) > 5*time.Second {
 		t.Errorf("unreachable: reachable=%v err=%v after %v", reachable, err, time.Since(start))
+	}
+}
+
+// lastBypassRole is the BYPASSRLS login role TestCheckUnprivileged created last.
+var lastBypassRole string
+
+// TestCheckUnprivileged creates a BYPASSRLS login role (global to the
+// cluster): it must be gone once the test has run. Only its own role is
+// looked for: another checkout testing on the same cluster may have older
+// code that leaves its own behind.
+func TestNoLeftoverBypassRoles(t *testing.T) {
+	lastBypassRole = ""
+	t.Run("check", TestCheckUnprivileged)
+	if lastBypassRole == "" {
+		t.Fatal("TestCheckUnprivileged created no role")
+	}
+	var left bool
+	if err := newTestStore(t).Pool().QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)", lastBypassRole).Scan(&left); err != nil {
+		t.Fatal(err)
+	}
+	if left {
+		t.Errorf("BYPASSRLS login role %s left in the cluster", lastBypassRole)
 	}
 }

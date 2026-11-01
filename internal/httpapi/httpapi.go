@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -277,9 +278,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, limit int64, v any) bool
 		writeError(w, r, http.StatusUnsupportedMediaType, "unsupported_media_type")
 		return false
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
+	if err := decodeStrict(http.MaxBytesReader(w, r.Body, limit), v); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
 			writeError(w, r, http.StatusRequestEntityTooLarge, "body_too_large")
@@ -289,6 +288,23 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, limit int64, v any) bool
 		return false
 	}
 	return true
+}
+
+// decodeStrict reads exactly one JSON value into v: unknown fields and
+// anything after the value (a second object, garbage) are errors.
+func decodeStrict(body io.Reader, v any) error {
+	dec := json.NewDecoder(body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return err
+	}
+	if err := dec.Decode(&json.RawMessage{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("trailing data after the JSON body")
+		}
+		return err
+	}
+	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

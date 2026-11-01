@@ -1,6 +1,9 @@
 -- name: EnqueueScan :one
-INSERT INTO scans (host, port, organization_id, intensity, requested_by, expires_at)
-VALUES (@host, @port, sqlc.narg(organization_id), @intensity, sqlc.narg(requested_by), sqlc.narg(expires_at))
+-- Only the columns qr_app may insert (00021): status, created_at and the
+-- expiry (30 days if public, 395 days for an organization) come from the
+-- database.
+INSERT INTO scans (host, port, organization_id, intensity, requested_by)
+VALUES (@host, @port, sqlc.narg(organization_id), @intensity, sqlc.narg(requested_by))
 RETURNING *;
 
 -- name: RecentPublicScan :one

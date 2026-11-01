@@ -85,7 +85,7 @@ func TestLimiter(t *testing.T) {
 		t.Error("another client was limited")
 	}
 	l.Cancel("b")
-	if n := len(l.hits["b"]); n != 0 {
+	if n := len(l.clients["b"].hits); n != 0 {
 		t.Errorf("Cancel left %d hits", n)
 	}
 
@@ -110,7 +110,7 @@ func TestLimiter(t *testing.T) {
 	// Idle keys are swept.
 	now = now.Add(48 * time.Hour)
 	l.Reserve("c")
-	if _, ok := l.hits["a"]; ok {
+	if _, ok := l.clients["a"]; ok {
 		t.Error("idle key not swept")
 	}
 }

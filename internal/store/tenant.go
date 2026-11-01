@@ -27,7 +27,9 @@ const (
 )
 
 // How long scans are kept (privacy: data minimization): public ones 30
-// days, an organization's history 13 months. The purge comes with milestone 3.6.
+// days, an organization's history 13 months. The database sets expires_at
+// from them (trigger scans_set_expiry, migration 00021: keep both equal);
+// public scans are purged by the worker (00019).
 const (
 	PublicScanTTL = 30 * 24 * time.Hour
 	OrgScanTTL    = 395 * 24 * time.Hour
@@ -114,13 +116,8 @@ func (s *Store) EnqueueOrReuse(ctx context.Context, t Tenant, r ScanRequest) (sc
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		e := time.Now().Add(PublicScanTTL)
-		if t.OrgID != nil {
-			e = time.Now().Add(OrgScanTTL)
-		}
-		expires := &e
 		sc, err = q.EnqueueScan(ctx, EnqueueScanParams{
-			Host: r.Host, Port: r.Port, OrganizationID: t.OrgID, Intensity: r.Intensity, RequestedBy: t.UserID, ExpiresAt: expires,
+			Host: r.Host, Port: r.Port, OrganizationID: t.OrgID, Intensity: r.Intensity, RequestedBy: t.UserID,
 		})
 		return err
 	})

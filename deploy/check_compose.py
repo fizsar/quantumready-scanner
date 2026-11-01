@@ -74,13 +74,17 @@ if "mailer" in services:
     check(services["mailer"].get("profiles") == ["mail"], "mailer: must be behind the mail profile until configured")
 # Images: pinned by digest, so a deploy never pulls something nobody chose
 # (on 23/10/2026 the moving postgres:17-alpine tag recreated the database
-# with 17.11). Our own images are exempt: release.yml publishes them with an
-# immutable tag per commit (sha-<commit>), set by QR_TAG.
+# with 17.11). Ours too (security review of 01/11/2026): a GHCR tag can be
+# pushed again, so the VPS runs the digest the Release recorded after Trivy
+# (QR_API_IMAGE, QR_WEB_IMAGE, set by deploy.sh).
 OWN = "ghcr.io/fizsar/quantumready-saas-"
 for name, svc in services.items():
     image = svc.get("image", "")
     pinned = re.search(r"@sha256:[0-9a-f]{64}$", image) is not None
-    check(pinned or image.startswith(OWN), f"{name}: image {image!r} must be pinned by digest (name:tag@sha256:...)")
+    check(pinned, f"{name}: image {image!r} must be pinned by digest (name[:tag]@sha256:...)")
+    if name != "db":
+        own = OWN + ("web" if name == "web" else "api") + "@"
+        check(image.startswith(own), f"{name}: image {image!r} must be {own}sha256:...")
 
 if errors:
     print("compose policy violations:\n  " + "\n  ".join(errors))

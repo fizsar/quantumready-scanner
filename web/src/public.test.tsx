@@ -14,7 +14,7 @@ async function sha256hex(s: string) {
 
 /** A challenge whose answer is n (the server picks it at random). */
 async function challenge(n: number): Promise<AltchaChallenge> {
-  const salt = 'abc123?expires=9999999999'
+  const salt = 'abc123?expires=9999999999&'
   return { algorithm: 'SHA-256', challenge: await sha256hex(salt + n), maxnumber: 50, salt, signature: 'sig' }
 }
 
@@ -23,7 +23,7 @@ const unauth = () => json({ error: { code: 'unauthenticated', message: 'x' } }, 
 describe('altcha solver', () => {
   it('finds the number and builds the payload', async () => {
     const payload = JSON.parse(atob(await solveAltcha(await challenge(37))))
-    expect(payload).toEqual({ algorithm: 'SHA-256', challenge: (await challenge(37)).challenge, number: 37, salt: 'abc123?expires=9999999999', signature: 'sig' })
+    expect(payload).toEqual({ algorithm: 'SHA-256', challenge: (await challenge(37)).challenge, number: 37, salt: 'abc123?expires=9999999999&', signature: 'sig' })
   })
   it('refuses other algorithms and impossible challenges', async () => {
     await expect(solveAltcha({ ...(await challenge(1)), algorithm: 'SHA-1' })).rejects.toThrow()
