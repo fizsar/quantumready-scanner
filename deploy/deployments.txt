@@ -1,0 +1,15 @@
+# Deployments to production, oldest first: UTC date (and time, if known) and
+# the image tag. deploy/deploy.sh appends a line after each successful deploy:
+# commit it. The last line is the tag in production and the one before it the
+# rollback tag; deploy/ghcr_cleanup.py never deletes them, nor anything
+# deployed in the last 30 days. Before this file, from CLAUDE.md.
+2026-10-13 sha-7fae0f1
+2026-10-15 sha-2f41b0b
+2026-10-18 sha-e7812ee
+2026-10-19T19:34Z sha-56a3ed0
+2026-10-23T21:14Z sha-52017a5
+2026-10-23T22:18Z sha-498a2ac
+2026-10-26T22:36Z sha-21d72ce
+2026-10-26T23:58Z sha-2a35b16
+2026-10-28T17:49Z sha-07bbc31
+2026-10-29T23:15Z sha-62eac88

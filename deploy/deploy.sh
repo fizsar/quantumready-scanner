@@ -12,7 +12,8 @@
 # Copies deploy/compose.prod.yaml *from that commit* to /opt/quantumready,
 # sets QR_TAG in the VPS .env, pulls, starts (migrations run first) and checks
 # health locally on the VPS and from outside. Rollback = run it again with the
-# previous tag, which is printed at the start of every deploy.
+# previous tag, which is printed at the start of every deploy. A deploy that
+# succeeds appends its tag to deploy/deployments.txt (commit it).
 #
 # Before anything changes it prints which services compose will create or
 # recreate (deploy/compose-plan.sh) and stops if that includes the database,
@@ -103,4 +104,8 @@ REMOTE
 
 public=$(curl -fsS --max-time 10 "$URL/api/health")
 echo "==> public ($URL): $public"
-echo "==> done: $TAG"
+# The record deploy/ghcr_cleanup.py keeps images by: the commit's tag, also
+# for latest.
+printf '%s sha-%s
+' "$(date -u +%Y-%m-%dT%H:%MZ)" "${commit:0:7}" >> deploy/deployments.txt
+echo "==> done: $TAG (recorded in deploy/deployments.txt: commit it)"

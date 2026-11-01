@@ -1,0 +1,54 @@
+name: GHCR cleanup
+
+# By hand only. Deletes old versions of the api and web images in GHCR
+# (deploy/ghcr_cleanup.py): keeps the tags in production and for rollback and
+# everything deployed in the last 30 days (deploy/deployments.txt on the ref
+# it runs on), the 5 newest builds of main and of showcase, latest, any extra
+# tag given and every untagged version. Dry run by default: it lists what it
+# would delete and how much it would free, in the job summary.
+#
+#   gh workflow run ghcr-cleanup.yml --ref main                      # dry run
+#   gh workflow run ghcr-cleanup.yml --ref main -f mode=delete       # deletes
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "dry-run lists only; delete deletes"
+        type: choice
+        options: [dry-run, delete]
+        default: dry-run
+      keep:
+        description: "Extra tags to keep, space-separated (e.g. sha-1234567)"
+        type: string
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: ghcr-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Cleanup (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # Full history of every branch: the newest builds of main and showcase.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Plan${{ inputs.mode == 'delete' && ' and delete' || ' (dry run)' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODE: ${{ inputs.mode }}
+          KEEP: ${{ inputs.keep }}
+        run: |
+          args=()
+          [ "$MODE" = delete ] && args+=(--apply)
+          read -ra keep <<< "$KEEP"
+          [ ${#keep[@]} -gt 0 ] && args+=(--keep "${keep[@]}")
+          python3 deploy/ghcr_cleanup.py "${args[@]}"
