@@ -58,7 +58,11 @@ func TestAccountsMigrationKeepsExistingScans(t *testing.T) {
 	want := map[string]struct {
 		intensity string
 		expires   bool
-	}{"full.example": {"full", false}, "old.example": {"basic", true}, "queued.example": {"basic", true}}
+	}{
+		// 00004 gave an expiry to basic scans only; 00019 (Apertura) to every
+		// public one: full scans of the showcase era go 30 days after creation.
+		"full.example": {"full", true}, "old.example": {"basic", true}, "queued.example": {"basic", true},
+	}
 	if len(got) != 3 {
 		t.Fatalf("rows = %v", got)
 	}

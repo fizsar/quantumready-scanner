@@ -117,6 +117,8 @@ func run(logger *slog.Logger) error {
 	// Domain verification: TXT records read from the authoritative servers.
 	checker := &worker.DomainChecker{Queue: store.NewStore(pool).Queries, DNS: &dnscheck.Checker{}, Logger: logger}
 	go checker.Run(ctx)
+	// Public scans are kept 30 days (/privacy): purged at start and daily.
+	go worker.PurgeLoop(ctx, "expired public scans", store.NewStore(pool).PurgeExpiredPublicScans, 24*time.Hour, logger)
 
 	stuck := make(chan []int, 1)
 	hb := &heartbeatWriter{path: hbPath, every: heartbeatEvery, stale: w.Lease(), slots: w.SlotBeats, now: time.Now, log: logger,

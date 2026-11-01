@@ -140,6 +140,8 @@ Definidos en `internal/org` (un test fija la matriz entera). La API decide con l
 | La reutilización pública sin el filtro de organización | no detectada: **RLS sola** (inquilino público) impide entregar un escaneo de organización |
 | Sin filtro y sin RLS | detectada: se entregaba el escaneo `basic` reciente de una organización |
 
+- **Retención** (hito Apertura, 01/11/2026): los escaneos públicos se guardan **30 días** y después se borran, con sus hallazgos. Lo hace el worker al arrancar y cada 24 h con `purge_expired_public_scans()` (00019: `SECURITY DEFINER`, mismo endurecimiento que `public_scan_blocked`, sin argumentos, `EXECUTE` solo para qr_worker). Solo borra escaneos públicos terminados (`done`/`failed`) con la caducidad vencida; los que no tienen caducidad (los `full` de la etapa showcase, que 00019 completa, o los que escribiera una versión anterior en una vuelta atrás) cuentan 30 días desde su creación. Nunca toca la cola ni los de una organización. Las copias de seguridad guardan lo borrado hasta 6 meses (/privacy). `TestPurgeExpiredPublicScans`, con mutaciones.
+- **Escaneos terminados congelados** para qr_worker (ADR-0007, 00020): su política de UPDATE solo alcanza los escaneos `queued` o `running`. `TestFinishedScansFrozenForWorker`.
 - **Cola** (hito 3.5e):
   - **Prioridad**: el worker toma antes los escaneos de organización que los públicos y, dentro de cada grupo, el más antiguo. El índice `scans_queued_idx` es `((organization_id IS NULL), created_at) WHERE status = 'queued'`, y `EXPLAIN` confirma que el planificador lo usa.
   - **Tope**: con `QR_PUBLIC_QUEUE_MAX` (100) escaneos públicos en cola, los nuevos reciben 429 `busy` sin gastar cupo; la reutilización sigue funcionando.
