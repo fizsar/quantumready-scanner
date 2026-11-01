@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"mime"
 	"net/http"
@@ -70,9 +69,7 @@ func (a *api) createDemo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req demoRequest
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxDemoBody))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&req); err != nil {
+	if err := decodeStrict(http.MaxBytesReader(w, r.Body, maxDemoBody), &req); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
 			writeError(w, r, http.StatusRequestEntityTooLarge, "body_too_large")

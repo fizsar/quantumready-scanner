@@ -2,15 +2,11 @@ name: TLS lab
 
 # Integration tests of the scanner against the deliberately weak servers of
 # test/tlslab, compared with the testssl.sh reference. Slow (image builds),
-# so only on demand and when the scanner or the lab change.
+# so on demand only: before deploying a commit that changes the scanner or
+# the lab (gh workflow run tlslab.yml --ref <branch>), or locally with
+# make tlslab-up && make tlslab-test, which costs no Actions minutes.
 on:
   workflow_dispatch:
-  push:
-    branches: [main, showcase]
-    paths:
-      - "internal/scanner/**"
-      - "test/tlslab/**"
-      - ".github/workflows/tlslab.yml"
 
 permissions:
   contents: read

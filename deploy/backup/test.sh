@@ -21,12 +21,13 @@ check() { # check DESCRIPTION COMMAND…
 	if "$@" >/dev/null; then ok "$d"; else bad "$d"; fi
 }
 
-# Lint with shellcheck if installed, else with its official image.
-sc=(shellcheck)
-command -v shellcheck >/dev/null || sc=(docker run --rm -v "$here/../..:/src:ro" -w /src koalaman/shellcheck:v0.10.0@sha256:2097951f02e735b613f4a34de20c40f937a6c8f18ecb170612c88c34517221fb)
+# Lint with the pinned shellcheck image, never an installed one: the same
+# version locally and in CI (a runner's own shellcheck may be another).
+sc=(docker run --rm -v "$here/../..:/src:ro" -w /src koalaman/shellcheck:v0.10.0@sha256:2097951f02e735b613f4a34de20c40f937a6c8f18ecb170612c88c34517221fb)
 (cd "$here/../.." && "${sc[@]}" -x deploy/backup/*.sh deploy/*.sh) && ok shellcheck || bad shellcheck
 
 # Under $HOME, not /tmp: it is bind-mounted into containers.
+mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}"
 fx=$(mktemp -d "${XDG_CACHE_HOME:-$HOME/.cache}/qr-backup-test.XXXXXX")
 cleanup() {
 	(cd "$fx" && docker compose down -v --remove-orphans >/dev/null 2>&1) || true

@@ -1,16 +1,29 @@
 name: CI
 
+# Minutes (GitHub Actions is billed for this private repository):
+# - pushes run CI only on main and showcase; any other branch is checked
+#   through its pull request, so a commit is not built twice;
+# - changes that only touch docs/ or Markdown files (screenshots included)
+#   run no CI, and so no Release either;
+# - a newer push to the same branch or PR cancels the run in progress: only
+#   the tip of a branch gets checked and released.
 on:
   push:
-    branches: ["**"]
+    branches: [main, showcase]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   go:
@@ -53,11 +66,10 @@ jobs:
                   and ((.Test | test("Postgres$")) or (.Package | test("internal/(store|worker)$"))))
                  | "\(.Action) \(.Package | sub(".*/quantumready-saas/"; "")) \(.Test)"' go-test.json \
             | tee -a "$GITHUB_STEP_SUMMARY"
-      # Short run on every push; longer runs locally with make fuzz.
-      - name: Fuzz the raw TLS parsers (10 s each)
-        run: make fuzz FUZZTIME=10s
       - name: Compose security policy
         run: make check-compose
+      - name: No binaries, no files over 1 MB
+        run: make check-files
       - name: Deploy helpers (no VPS)
         run: make test-deploy
       - name: sqlc generated code is up to date
@@ -83,6 +95,24 @@ jobs:
             done
           done
 
+  # Its own job, in parallel with Go: 10 targets of 10 s each were 2 of the
+  # Go job's 7 minutes. No database, no Docker. Only on pushes (main and
+  # showcase), not on pull requests: about 3 billed minutes less per PR run.
+  fuzz:
+    name: Fuzz
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # Short run on every push; longer runs locally with make fuzz.
+      - name: Fuzz the raw TLS parsers (10 s each)
+        run: make fuzz FUZZTIME=10s
+
   web:
     name: Web
     runs-on: ubuntu-latest
@@ -103,6 +133,18 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # The backup scripts that run on the VPS: shellcheck of every deploy script,
+  # then backup and restore drill against a throwaway PostgreSQL and a local
+  # restic repository (docker and python3 only; no B2, no VPS).
+  backup:
+    name: Backup scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: make test-backup
 
   docker:
     name: Docker (${{ matrix.image }})

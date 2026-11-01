@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { solveAltcha, type AltchaChallenge } from './altcha'
 import type { Domain, Me, Org } from './api'
-import { json, reportA, scanView, stubFetch } from './test/fixtures'
+import { json, reportA, scanView } from './test/fixtures'
+import { stubFetch } from './test/accounts'
 import { renderAt } from './test/render'
 
 async function sha256hex(s: string) {
@@ -13,7 +14,7 @@ async function sha256hex(s: string) {
 
 /** A challenge whose answer is n (the server picks it at random). */
 async function challenge(n: number): Promise<AltchaChallenge> {
-  const salt = 'abc123?expires=9999999999'
+  const salt = 'abc123?expires=9999999999&'
   return { algorithm: 'SHA-256', challenge: await sha256hex(salt + n), maxnumber: 50, salt, signature: 'sig' }
 }
 
@@ -22,7 +23,7 @@ const unauth = () => json({ error: { code: 'unauthenticated', message: 'x' } }, 
 describe('altcha solver', () => {
   it('finds the number and builds the payload', async () => {
     const payload = JSON.parse(atob(await solveAltcha(await challenge(37))))
-    expect(payload).toEqual({ algorithm: 'SHA-256', challenge: (await challenge(37)).challenge, number: 37, salt: 'abc123?expires=9999999999', signature: 'sig' })
+    expect(payload).toEqual({ algorithm: 'SHA-256', challenge: (await challenge(37)).challenge, number: 37, salt: 'abc123?expires=9999999999&', signature: 'sig' })
   })
   it('refuses other algorithms and impossible challenges', async () => {
     await expect(solveAltcha({ ...(await challenge(1)), algorithm: 'SHA-1' })).rejects.toThrow()
@@ -101,10 +102,13 @@ describe('about the scanner', () => {
     stubFetch(() => unauth())
     renderAt('/about-scans')
     expect(await screen.findByRole('heading', { level: 1, name: 'Cómo funciona el escáner' })).toBeTruthy()
-    for (const h of ['Qué hace', 'Desde dónde', 'Con qué frecuencia, como máximo', 'Cómo excluir tu dominio']) {
+    for (const h of ['Qué hace', 'Desde dónde', 'Con qué frecuencia, como máximo', 'Qué se guarda', 'Cómo excluir tu dominio']) {
       expect(screen.getByRole('heading', { level: 2, name: h })).toBeTruthy()
     }
     expect(screen.getByText(/149\.56\.13\.98, cuyo nombre inverso es quantumready\.fizsar\.com/)).toBeTruthy()
+    expect(screen.getByText(/durante 30 días \(y en las copias de seguridad cifradas, hasta 6 meses\)\. Nada de quién lo pidió/)).toBeTruthy()
+    expect(screen.getByText(/Solo nuestros propios dominios \(fizsar\.com y quantumready\.fizsar\.com\) reciben además el análisis completo/)).toBeTruthy()
+    expect(screen.getByText(/Escríbenos a soporte@fizsar\.com/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'security.txt' }).getAttribute('href')).toBe('/.well-known/security.txt')
     expect(screen.getAllByRole('link', { name: 'Cómo funciona el escáner' }).length).toBeGreaterThan(0) // footer
   })

@@ -1,0 +1,64 @@
+{
+ "scoring_version": "2026.2",
+ "score": 95,
+ "score_grade": "A",
+ "grade": "A",
+ "pqc": true,
+ "quantum_risk": "low",
+ "current_risk": "none",
+ "blocks": [
+  {
+   "id": "key_exchange",
+   "points": 50,
+   "max": 50
+  },
+  {
+   "id": "tls13",
+   "points": 15,
+   "max": 15
+  },
+  {
+   "id": "forward_secrecy",
+   "points": 10,
+   "max": 10
+  },
+  {
+   "id": "hybrid_variety",
+   "points": 0,
+   "max": 5
+  },
+  {
+   "id": "certificate",
+   "points": 20,
+   "max": 20,
+   "items": [
+    {
+     "id": "valid",
+     "points": 5,
+     "max": 5
+    },
+    {
+     "id": "key",
+     "points": 5,
+     "max": 5
+    },
+    {
+     "id": "signature",
+     "points": 5,
+     "max": 5
+    },
+    {
+     "id": "automation",
+     "points": 5,
+     "max": 5
+    }
+   ]
+  }
+ ],
+ "findings": null,
+ "not_evaluated": [
+  "tls12_server_cipher_preference",
+  "credential_suites",
+  "implementation_vulnerabilities"
+ ]
+}

@@ -182,7 +182,8 @@ func TestRealPathProductionToMain(t *testing.T) {
 		again = versions(res)
 		return nil
 	})
-	if want := []int64{4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18}; !slices.Equal(applied, want) {
+	// 19 and 20 (Apertura) and 21 (security review) come after production's newest (17): in order.
+	if want := []int64{4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 19, 20, 21}; !slices.Equal(applied, want) {
 		t.Errorf("main after M1 applied %v, want %v", applied, want)
 	}
 	if len(again) != 0 {

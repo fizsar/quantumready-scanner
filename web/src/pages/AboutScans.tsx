@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useAccountsEnabled } from '../features'
 import { useLang } from '../i18n'
 import { usePageMeta } from '../usePageMeta'
 
@@ -9,12 +10,15 @@ const SCANNER_PTR = 'quantumready.fizsar.com'
 /** /about-scans: what the scanner does, from where, how often, and how to opt out. */
 export function AboutScans() {
   const { t } = useLang()
+  const accounts = useAccountsEnabled()
   usePageMeta(t('meta.about'))
   const sections: [string, string[]][] = [
     [t('about.what.title'), [t('about.what.1'), t('about.what.2'), t('about.what.3')]],
     [t('about.from.title'), [t('about.from.1', { ip: SCANNER_IP, ptr: SCANNER_PTR }), t('about.from.2')]],
     [t('about.often.title'), [t('about.often.1'), t('about.often.2'), t('about.often.3')]],
-    [t('about.optout.title'), [t('about.optout.1'), t('about.optout.2')]],
+    [t('about.keep.title'), [t('about.keep.1')]],
+    // The owner's opt-out from /org needs an account: without accounts, only the email.
+    [t('about.optout.title'), accounts ? [t('about.optout.1'), t('about.optout.2')] : [t('about.optout.1')]],
   ]
   return (
     <section className="terminal" aria-labelledby="about-title">

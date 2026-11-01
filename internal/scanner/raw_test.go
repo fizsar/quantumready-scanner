@@ -2,8 +2,11 @@ package scanner
 
 import (
 	"crypto/tls"
+	"errors"
 	"slices"
 	"testing"
+
+	"github.com/fizsar/quantumready-saas/internal/scanner/rawtls"
 )
 
 func TestFullIntensityAgainstGo(t *testing.T) {
@@ -47,6 +50,198 @@ func TestFullIntensityAgainstGo(t *testing.T) {
 	}
 	if n := res.calls.Load(); n != 1 {
 		t.Errorf("%d DNS lookups, want 1 (raw probes must reuse the pinned address)", n)
+	}
+	if r.Certificate == nil || r.Certificate.Source != "" {
+		t.Errorf("certificate %+v: crypto/tls saw it, so it is not from the raw probes", r.Certificate)
+	}
+}
+
+// A TLS 1.2 server that refuses every ClientHello carrying
+// extended_master_secret, which crypto/tls always sends and the raw probes
+// never do: no crypto/tls handshake gets to the certificate (as with the
+// lab's EXPORT, DHE-only or secp224 servers), the raw probes read it in clear.
+func TestCertificateFromRawProbes(t *testing.T) {
+	pki := newTestPKI(t)
+	cert := pki.leaf(t, leafOpts{})
+	port := startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}, MaxVersion: tls.VersionTLS12,
+		GetConfigForClient: func(hi *tls.ClientHelloInfo) (*tls.Config, error) {
+			if slices.Contains(hi.Extensions, 23) {
+				return nil, errors.New("no crypto/tls clients here")
+			}
+			return nil, nil
+		}})
+
+	full := scan(t, newTestScanner(pki, Options{Intensity: IntensityFull}), port)
+	c := full.Certificate
+	if c == nil {
+		t.Fatal("no certificate: the raw probes saw it in clear")
+	}
+	if c.Source != CertSourceRaw || !c.Trusted || !c.HostnameMatch || c.KeyAlgorithm != "ECDSA" || c.OCSPStapled || c.SCTsHandshake != 0 || len(c.Chain) != 2 {
+		t.Errorf("certificate %+v: want the leaf and its CA, trusted, from the raw probes", c)
+	}
+	sel := full.CertificateSelection
+	if sel.WithMLDSA == nil || sel.WithMLDSA.PostQuantum || sel.WithMLDSA.SHA256 == "" {
+		t.Errorf("selection %+v: without TLS 1.3, the certificate seen is also what a client offering ML-DSA gets", sel.WithMLDSA)
+	}
+	if slices.Contains(full.NotEvaluated, NotEvalPQCertificate) {
+		t.Errorf("not evaluated %v: the certificate was seen", full.NotEvaluated)
+	}
+	for _, p := range full.ProbeLog.Probes {
+		if p.Client == clientCryptoTLS && p.Status == Supported {
+			t.Fatalf("a crypto/tls probe completed (%+v): the server must refuse them all", p)
+		}
+	}
+
+	// Intensity basic has no raw probes: not seen, as before.
+	basic := scan(t, newTestScanner(pki, Options{Intensity: IntensityBasic}), port)
+	if basic.Certificate != nil || !slices.Contains(basic.NotEvaluated, NotEvalPQCertificate) {
+		t.Errorf("basic: certificate %+v, not evaluated %v", basic.Certificate, basic.NotEvaluated)
+	}
+}
+
+// Chrome 156's offer (2.8.7): what a crypto/tls server picks for it, in TLS
+// 1.3 and 1.2, logged with the offer as sent.
+func TestChromeOffer(t *testing.T) {
+	pki := newTestPKI(t)
+	cert := pki.leaf(t, leafOpts{})
+	for _, tc := range []struct {
+		name, version, suite, group string
+		max                         uint16
+		curves                      []tls.CurveID
+		retry                       bool
+	}{
+		{"TLS 1.3", "TLS 1.3", "", "X25519MLKEM768", 0, nil, false},
+		{"TLS 1.2", "TLS 1.2", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "x25519", tls.VersionTLS12, nil, false},
+		{"HelloRetryRequest", "TLS 1.3", "", "secp256r1", 0, []tls.CurveID{tls.CurveP256}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			port := startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}, MaxVersion: tc.max, CurvePreferences: tc.curves})
+			r := scan(t, newTestScanner(pki, Options{Intensity: IntensityFull}), port)
+			c := r.ChromeOffer
+			if c == nil || c.Status != Supported || c.Version != tc.version || c.Group != tc.group || tc.suite != "" && c.CipherSuite != tc.suite || r.ChromeHelloRetry != tc.retry {
+				t.Fatalf("chrome offer %+v (retry %v)", c, r.ChromeHelloRetry)
+			}
+			if c.Group != r.Default.Group || c.Version != r.Default.Version {
+				t.Errorf("Chrome got %s/%s, the browser-like crypto/tls offer %s/%s: same server, same choice expected", c.Version, c.Group, r.Default.Version, r.Default.Group)
+			}
+			var logged []ProbeRecord
+			for _, p := range r.ProbeLog.Probes {
+				if p.Purpose == PurposeChrome {
+					logged = append(logged, p)
+				}
+			}
+			if len(logged) != 1 || logged[0].Client != clientRaw || logged[0].Offer == nil ||
+				!slices.Equal(r.ProbeLog.Offers[*logged[0].Offer].ALPN, []string{"h2", "http/1.1"}) {
+				t.Errorf("logged %+v", logged)
+			}
+		})
+	}
+	basic := scan(t, newTestScanner(pki, Options{Intensity: IntensityBasic}), startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}}))
+	if basic.ChromeOffer != nil {
+		t.Errorf("basic: chrome offer %+v (raw probes are intensity full only)", basic.ChromeOffer)
+	}
+}
+
+func TestSuiteOrderOf(t *testing.T) {
+	offer := []uint16{0x1301, 0x1302, 0x1303}
+	for _, tc := range []struct {
+		a, b uint16
+		want string
+	}{
+		{0x1301, 0x1301, SuiteOrderServer}, // the same both times
+		{0x1302, 0x1302, SuiteOrderServer},
+		{0x1301, 0x1303, SuiteOrderClient}, // the first of each offer
+		{0x1301, 0x1302, ""},               // neither
+		{0x1302, 0x1303, ""},
+		{0, 0x1303, ""}, // a probe failed
+		{0x1301, 0, ""},
+		{0, 0, ""}, // both: not "the same choice"
+	} {
+		if got := suiteOrderOf(offer, tc.a, tc.b); got != tc.want {
+			t.Errorf("picks %04x, %04x: %q, want %q", tc.a, tc.b, got, tc.want)
+		}
+	}
+	if got := suiteOrderOf([]uint16{0x1301}, 0x1301, 0x1301); got != "" {
+		t.Errorf("one suite: %q, nothing to tell", got)
+	}
+}
+
+// A crypto/tls server (three TLS 1.3 suites): two probes, the offer and its
+// reverse, logged; a TLS 1.2-only server gets none.
+func TestTLS13SuiteOrder(t *testing.T) {
+	pki := newTestPKI(t)
+	cert := pki.leaf(t, leafOpts{})
+	r := scan(t, newTestScanner(pki, Options{Intensity: IntensityFull}), startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}}))
+	o := r.Raw.TLS13SuiteOrder
+	if o == nil || len(o.Offer) != 3 || len(o.Picks) != 2 || o.Picks[0] == "" || o.Picks[1] == "" {
+		t.Fatalf("suite order %+v", o)
+	}
+	// Go follows the client when it puts ChaCha20 first and otherwise its
+	// own order (AES first with AES hardware): either way, a clear answer.
+	if want := suiteOrderOf(suiteIDs(t, o.Offer), suiteID(t, o.Picks[0]), suiteID(t, o.Picks[1])); o.Order == "" || o.Order != want {
+		t.Errorf("order %q for %+v", o.Order, o)
+	}
+	if slices.Contains(r.NotEvaluated, NotEvalTLS13SuiteOrder) {
+		t.Errorf("not evaluated %v", r.NotEvaluated)
+	}
+	offered := map[string][]uint16{} // subject → TLS 1.3 suites offered, as sent
+	for _, p := range r.ProbeLog.Probes {
+		if p.Purpose == PurposeTLS13SuiteOrder && p.Offer != nil {
+			offered[p.Subject] = slices.DeleteFunc(slices.Clone(r.ProbeLog.Offers[*p.Offer].Suites), func(id uint16) bool {
+				return id == rawtls.SCSVRenegotiation // Hello.Marshal adds it to every offer
+			})
+		}
+	}
+	first, second := offered[SubjectFirstOrder], slices.Clone(offered[SubjectReversedOrder])
+	slices.Reverse(second)
+	if len(offered) != 2 || !slices.Equal(first, suiteIDs(t, o.Offer)) || !slices.Equal(second, first) {
+		t.Errorf("offers logged %v: want the suites found, then the same reversed", offered)
+	}
+
+	r12 := scan(t, newTestScanner(pki, Options{Intensity: IntensityFull}), startTLS(t, &tls.Config{Certificates: []tls.Certificate{cert}, MaxVersion: tls.VersionTLS12}))
+	if r12.Raw.TLS13SuiteOrder != nil || slices.Contains(r12.NotEvaluated, NotEvalTLS13SuiteOrder) {
+		t.Errorf("TLS 1.2 only: %+v, %v", r12.Raw.TLS13SuiteOrder, r12.NotEvaluated)
+	}
+	// An undecided outcome is reported as not evaluated.
+	if !slices.Contains(notEvaluatedFull(&RawResult{TLS13SuiteOrder: &SuiteOrder{}}), NotEvalTLS13SuiteOrder) {
+		t.Error("an undecided order must be not evaluated")
+	}
+}
+
+func suiteID(t *testing.T, name string) uint16 {
+	t.Helper()
+	for _, s := range rawtls.Suites() {
+		if s.Name == name {
+			return s.ID
+		}
+	}
+	t.Fatalf("unknown suite %s", name)
+	return 0
+}
+
+func suiteIDs(t *testing.T, names []string) []uint16 {
+	var out []uint16
+	for _, n := range names {
+		out = append(out, suiteID(t, n))
+	}
+	return out
+}
+
+func TestNoteChainKeepsTheHighestVersion(t *testing.T) {
+	a, b, c := [][]byte{{1}}, [][]byte{{2}}, [][]byte{{3}}
+	for _, order := range [][]int{{0, 1, 2}, {2, 1, 0}, {1, 2, 0}} {
+		rs := &rawScan{}
+		seen := []struct {
+			chain [][]byte
+			v     uint16
+		}{{a, 0x0002}, {b, 0x0303}, {c, 0x0300}}
+		for _, i := range order {
+			rs.noteChain(seen[i].chain, seen[i].v)
+		}
+		rs.noteChain(nil, 0x0304) // a probe without a certificate changes nothing
+		if !slices.Equal(rs.chain[0], b[0]) || rs.chainVersion != 0x0303 {
+			t.Errorf("order %v: kept %v (0x%04x), want the TLS 1.2 chain", order, rs.chain, rs.chainVersion)
+		}
 	}
 }
 

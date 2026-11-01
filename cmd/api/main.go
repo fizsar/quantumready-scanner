@@ -56,6 +56,10 @@ func run(logger *slog.Logger) error {
 	if allow.Len() == 0 {
 		logger.Warn("SCAN_ALLOWLIST is empty: every scan request will be refused")
 	}
+	full, err := httpapi.ParseAllowlist(os.Getenv("SCAN_FULL_DOMAINS"))
+	if err != nil {
+		return fmt.Errorf("SCAN_FULL_DOMAINS: %w", err)
+	}
 	trusted, err := httpapi.ParsePrefixes(os.Getenv("TRUSTED_PROXIES"))
 	if err != nil {
 		return fmt.Errorf("TRUSTED_PROXIES: %w", err)
@@ -65,6 +69,10 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	origin, err := publicOrigin(os.Getenv("PUBLIC_ORIGIN"))
+	if err != nil {
+		return err
+	}
+	accountsOn, err := accountsConfig(os.Getenv, origin)
 	if err != nil {
 		return err
 	}
@@ -80,7 +88,7 @@ func run(logger *slog.Logger) error {
 		logger.Warn("PUBLIC_SCAN_OPEN: anyone can scan any domain (basic), with a proof of work")
 	}
 	if origin == "" {
-		logger.Warn("PUBLIC_ORIGIN is empty: accounts (/api/auth) are disabled")
+		logger.Warn("PUBLIC_ORIGIN is empty: no Origin check on POST requests")
 	}
 	demoOn, _, err := demoConfig(os.Getenv) // the proof of work shares main's verifier (proof)
 	if err != nil {
@@ -100,11 +108,19 @@ func run(logger *slog.Logger) error {
 	if err := store.UseRole(poolCfg, store.RoleApp); err != nil {
 		return err
 	}
+	// Never as a superuser or with BYPASSRLS: every connection is checked,
+	// and the API does not start on a privileged one (Apertura step 4).
+	store.RequireUnprivileged(poolCfg)
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return fmt.Errorf("configure database pool: %w", err)
 	}
 	defer pool.Close()
+	if reachable, err := store.CheckPoolAtStart(ctx, pool, 30*time.Second); err != nil {
+		return err
+	} else if !reachable {
+		logger.Warn("database unreachable at start: its role is checked on every connection")
+	}
 
 	st := store.NewStore(pool)
 	cfg := httpapi.Config{
@@ -116,6 +132,7 @@ func run(logger *slog.Logger) error {
 		DemoAltcha:     proof, // one ALTCHA key and one replay cache for scans and demos
 		DemoEnabled:    demoOn,
 		Allowlist:      allow,
+		FullScanHosts:  full,
 		TrustedProxies: trusted,
 		Limiter:        httpapi.NewLimiter(lim.perMinute, lim.perDay),
 		TargetCooldown: lim.cooldown,
@@ -127,7 +144,7 @@ func run(logger *slog.Logger) error {
 		Support:        os.Getenv("MAIL_SUPPORT"),
 		Logger:         logger,
 	}
-	if origin != "" {
+	if accountsOn {
 		cfg.Accounts, cfg.Orgs, cfg.Domains = st, st, st
 	}
 	// Closed beta: invited accounts cannot create organizations unless this is "true".
@@ -154,9 +171,10 @@ func run(logger *slog.Logger) error {
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,
-		"allowlist", allow.Len(), "trusted_proxies", len(trusted),
+		"allowlist", allow.Len(), "full_scan_domains", full.Len(), "trusted_proxies", len(trusted),
 		"rate_per_minute", lim.perMinute, "rate_per_day", lim.perDay, "target_cooldown", lim.cooldown.String(),
-		"demo_enabled", demoOn, "demo_proof_of_work", demoOn && proof != nil)
+		"demo_enabled", demoOn, "demo_proof_of_work", demoOn && proof != nil, "accounts_enabled", accountsOn,
+		"public_scan_open", openScans)
 
 	select {
 	case err := <-errCh:

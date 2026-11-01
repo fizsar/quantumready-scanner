@@ -12,7 +12,8 @@ cp -r "$tmp" "$tmp.orig" && trap 'rm -rf "$tmp" "$tmp.orig"' EXIT
 
 fails=0
 compose() { # check_compose.py on the copy's production compose
-	(cd "$tmp" && QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d \
+	(cd "$tmp" && QR_API_IMAGE=${API_IMAGE:-ghcr.io/fizsar/quantumready-saas-api@sha256:$(printf '0%.0s' {1..64})} \
+		QR_WEB_IMAGE=ghcr.io/fizsar/quantumready-saas-web@sha256:$(printf '0%.0s' {1..64}) QR_TAG=check POSTGRES_USER=u POSTGRES_PASSWORD=p POSTGRES_DB=d QR_APP_DB_PASSWORD=a QR_WORKER_DB_PASSWORD=w \
 		docker compose -f deploy/compose.prod.yaml --profile mail config --format json | python3 deploy/check_compose.py)
 }
 images() { python3 deploy/check_images.py "$tmp"; }
@@ -36,7 +37,9 @@ EOF
 }
 PG_DIGEST=$(grep -o 'postgres:17-alpine@sha256:[0-9a-f]*' deploy/compose.prod.yaml)
 
-expect pass "production compose: every image pinned (ours by sha- tag)" compose
+expect pass "production compose: every image pinned (ours by the recorded digest)" compose
+API_IMAGE=ghcr.io/fizsar/quantumready-saas-api:sha-1234567 expect fail "production compose: our image by tag" compose "api: image .* must be pinned by digest"
+API_IMAGE=docker.io/evil/api@sha256:$(printf '0%.0s' {1..64}) expect fail "production compose: another image by digest" compose "api: image .* must be ghcr.io/fizsar/quantumready-saas-api@"
 expect pass "repository: every image pinned, one PostgreSQL digest" images
 
 edit deploy/compose.prod.yaml "$PG_DIGEST" "postgres:17-alpine"
@@ -50,10 +53,10 @@ expect fail "repository: production bumped alone (Dependabot) -> the others must
 reset
 
 edit deploy/compose.prod.yaml "  web:
-    image: ghcr.io" "  extra:
+    image: \"\${QR_WEB_IMAGE" "  extra:
     image: redis:7
   web:
-    image: ghcr.io"
+    image: \"\${QR_WEB_IMAGE"
 expect fail "production compose: a new service without digest" compose "extra: image 'redis:7'"
 reset
 

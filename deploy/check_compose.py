@@ -60,6 +60,13 @@ if "worker" in services:
     env = services["worker"].get("environment", {})
     check("sslmode=disable" in env.get("DATABASE_URL", ""), "worker: DATABASE_URL must set sslmode=disable")
 
+# Least privilege (Apertura step 4): the API and the worker log in as their
+# own users, never as the owner (a superuser skips row-level security).
+for name, role in (("api", "qr_app"), ("worker", "qr_worker")):
+    if name in services:
+        url = services[name].get("environment", {}).get("DATABASE_URL", "")
+        check(url.startswith(f"postgres://{role}:"), f"{name}: DATABASE_URL must log in as {role}")
+
 if "mailer" in services:
     env = services["mailer"].get("environment", {})
     # Credentials only over TLS (the mailer refuses them anyway).
@@ -67,13 +74,17 @@ if "mailer" in services:
     check(services["mailer"].get("profiles") == ["mail"], "mailer: must be behind the mail profile until configured")
 # Images: pinned by digest, so a deploy never pulls something nobody chose
 # (on 23/10/2026 the moving postgres:17-alpine tag recreated the database
-# with 17.11). Our own images are exempt: release.yml publishes them with an
-# immutable tag per commit (sha-<commit>), set by QR_TAG.
+# with 17.11). Ours too (security review of 01/11/2026): a GHCR tag can be
+# pushed again, so the VPS runs the digest the Release recorded after Trivy
+# (QR_API_IMAGE, QR_WEB_IMAGE, set by deploy.sh).
 OWN = "ghcr.io/fizsar/quantumready-saas-"
 for name, svc in services.items():
     image = svc.get("image", "")
     pinned = re.search(r"@sha256:[0-9a-f]{64}$", image) is not None
-    check(pinned or image.startswith(OWN), f"{name}: image {image!r} must be pinned by digest (name:tag@sha256:...)")
+    check(pinned, f"{name}: image {image!r} must be pinned by digest (name[:tag]@sha256:...)")
+    if name != "db":
+        own = OWN + ("web" if name == "web" else "api") + "@"
+        check(image.startswith(own), f"{name}: image {image!r} must be {own}sha256:...")
 
 if errors:
     print("compose policy violations:\n  " + "\n  ".join(errors))

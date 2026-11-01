@@ -9,13 +9,15 @@
 FROM golang:1.27.3-alpine@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS build
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
+# Modules in a layer, not in a cache mount: the CI's layer cache (buildx,
+# type=gha) keeps layers but not cache mounts.
+RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY migrations ./migrations
 ARG VERSION=dev
 ARG COMMIT=unknown
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath \
       -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" \
       -o /out/ ./cmd/api ./cmd/migrate ./cmd/worker ./cmd/mailer ./cmd/qradmin

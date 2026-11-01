@@ -132,8 +132,8 @@ func (q *Queries) CountPublicQueued(ctx context.Context) (int64, error) {
 }
 
 const enqueueScan = `-- name: EnqueueScan :one
-INSERT INTO scans (host, port, organization_id, intensity, requested_by, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO scans (host, port, organization_id, intensity, requested_by)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at
 `
 
@@ -143,9 +143,11 @@ type EnqueueScanParams struct {
 	OrganizationID *uuid.UUID
 	Intensity      string
 	RequestedBy    *uuid.UUID
-	ExpiresAt      *time.Time
 }
 
+// Only the columns qr_app may insert (00021): status, created_at and the
+// expiry (30 days if public, 395 days for an organization) come from the
+// database.
 func (q *Queries) EnqueueScan(ctx context.Context, arg EnqueueScanParams) (Scan, error) {
 	row := q.db.QueryRow(ctx, enqueueScan,
 		arg.Host,
@@ -153,7 +155,6 @@ func (q *Queries) EnqueueScan(ctx context.Context, arg EnqueueScanParams) (Scan,
 		arg.OrganizationID,
 		arg.Intensity,
 		arg.RequestedBy,
-		arg.ExpiresAt,
 	)
 	var i Scan
 	err := row.Scan(
@@ -393,9 +394,10 @@ func (q *Queries) PublicQueuePosition(ctx context.Context, createdAt time.Time) 
 
 const recentPublicScan = `-- name: RecentPublicScan :one
 SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at FROM scans
-WHERE host = $1 AND port = $2 AND intensity = 'basic' AND organization_id IS NULL
-  AND ((status <> 'failed' AND created_at > now() - make_interval(secs => $3::float8))
-       OR (status = 'done' AND finished_at > now() - make_interval(secs => $4::float8)))
+WHERE host = $1 AND port = $2 AND intensity = $3 AND organization_id IS NULL
+  AND (scoring_version IS NULL OR scoring_version = $4::text)
+  AND ((status <> 'failed' AND created_at > now() - make_interval(secs => $5::float8))
+       OR (status = 'done' AND finished_at > now() - make_interval(secs => $6::float8)))
 ORDER BY created_at DESC
 LIMIT 1
 `
@@ -403,17 +405,23 @@ LIMIT 1
 type RecentPublicScanParams struct {
 	Host            string
 	Port            int32
+	Intensity       string
+	ScoringVersion  string
 	CooldownSeconds float64
 	DoneSeconds     float64
 }
 
-// A public basic scan to hand out instead of a new one: in flight (or done)
+// A public scan of @intensity (basic, or full for the operator's own
+// domains) to hand out instead of a new one: in flight (or done)
 // within the cooldown, or done within @done_seconds. Run with the public
-// tenant: RLS hides organizations' scans even without the filter below.
+// tenant: RLS hides organizations' scans even without the filter below. Only
+// one judged (or to be judged) with the current scoring model.
 func (q *Queries) RecentPublicScan(ctx context.Context, arg RecentPublicScanParams) (Scan, error) {
 	row := q.db.QueryRow(ctx, recentPublicScan,
 		arg.Host,
 		arg.Port,
+		arg.Intensity,
+		arg.ScoringVersion,
 		arg.CooldownSeconds,
 		arg.DoneSeconds,
 	)
@@ -452,7 +460,8 @@ const recentScanForTarget = `-- name: RecentScanForTarget :one
 SELECT id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at FROM scans
 WHERE host = $1 AND port = $2 AND status <> 'failed'
   AND intensity = $3 AND organization_id IS NOT DISTINCT FROM $4
-  AND created_at > now() - make_interval(secs => $5::float8)
+  AND (scoring_version IS NULL OR scoring_version = $5::text)
+  AND created_at > now() - make_interval(secs => $6::float8)
 ORDER BY created_at DESC
 LIMIT 1
 `
@@ -462,19 +471,23 @@ type RecentScanForTargetParams struct {
 	Port           int32
 	Intensity      string
 	OrganizationID *uuid.UUID
+	ScoringVersion string
 	WithinSeconds  float64
 }
 
 // The latest scan of a target created within the cooldown that has not
-// failed, with the same intensity and the same owner: a basic scan never
-// answers a full request, and an organization never gets another one's scan
-// (public scans have no organization).
+// failed, with the same intensity and the same owner, and judged (or to be
+// judged) with the current scoring model: a basic scan never answers a full
+// request, an organization never gets another one's scan (public scans have
+// no organization), and a scan judged with an earlier model is not handed out
+// again.
 func (q *Queries) RecentScanForTarget(ctx context.Context, arg RecentScanForTargetParams) (Scan, error) {
 	row := q.db.QueryRow(ctx, recentScanForTarget,
 		arg.Host,
 		arg.Port,
 		arg.Intensity,
 		arg.OrganizationID,
+		arg.ScoringVersion,
 		arg.WithinSeconds,
 	)
 	var i Scan

@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -78,10 +77,8 @@ func (a *api) usageEvent(w http.ResponseWriter, r *http.Request) {
 	if ok, _ := a.usageLimiter.Reserve(rateKey(clientAddr(r, a.cfg.TrustedProxies))); !ok {
 		return
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxEventBody))
-	dec.DisallowUnknownFields()
 	var ev usageEvent
-	if err := dec.Decode(&ev); err != nil {
+	if err := decodeStrict(http.MaxBytesReader(w, r.Body, maxEventBody), &ev); err != nil {
 		return
 	}
 	for _, c := range a.usageCounts(ev, r.Host) {

@@ -18,6 +18,8 @@ export interface Finding {
   axis_label: string
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'pass'
   severity_label: string
+  // Quantum axis: shor (key exchange, signatures) or grover (symmetric, informational).
+  threat?: 'shor' | 'grover'
   category: string
   title: string
   detail: string
@@ -44,6 +46,10 @@ export interface Report {
   tls_version?: string
   quantum_risk: Labeled
   current_risk: Labeled
+  /** Model 2026.3 on: the quantum readiness axis (score 0–100 and level). */
+  readiness?: { score: number; level: Labeled; blocks: Block[] } | null
+  /** Judged with an earlier model than the current one: it keeps that judgement. */
+  outdated_model?: boolean
   blocks: Block[]
   findings: Finding[]
   not_evaluated: Labeled[]
@@ -106,7 +112,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** open: any domain can be scanned; proof: a proof of work is required; demo: the demo request form is on. */
-export function getTargets(): Promise<{ hosts: string[]; port: number; open?: boolean; proof?: boolean; demo?: boolean }> {
+export function getTargets(): Promise<{ hosts: string[]; port: number; open?: boolean; proof?: boolean; demo?: boolean; accounts?: boolean }> {
   return request('/api/targets')
 }
 

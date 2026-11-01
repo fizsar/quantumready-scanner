@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -58,7 +59,51 @@ func rawExtras() map[string]*scanner.Result {
 		r.Raw.TLS13Groups = []scanner.RawGroup{{Name: "X25519Kyber768Draft00", ID: 0x6399, Kind: "kyber_draft"}}
 		r.Raw.DH = []scanner.DHParams{{Version: "TLS 1.2", Suite: "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256", PrimeBits: 3072}}
 	})
-	return map[string]*scanner.Result{"integrity_only": integrity, "modern_aead": modern, "kyber_and_mlkem": extra}
+	chacha := scanner.RawSuite{Version: "TLS 1.3", Name: "TLS_CHACHA20_POLY1305_SHA256", ID: 0x1303, AEAD: true, Mode: "aead", Bits: 256, ForwardSecrecy: true}
+	order := func(o, a, b string) *scanner.Result { // milestone 2.8.7
+		return apply(func(r *scanner.Result) {
+			tls13(r, aes, chacha)
+			r.Raw.TLS13SuiteOrder = &scanner.SuiteOrder{Order: o, Offer: []string{aes.Name, chacha.Name}, Picks: []string{a, b}}
+		})
+	}
+	return map[string]*scanner.Result{"integrity_only": integrity, "modern_aead": modern, "kyber_and_mlkem": extra,
+		"order_server":  order(scanner.SuiteOrderServer, aes.Name, aes.Name),
+		"order_client":  order(scanner.SuiteOrderClient, aes.Name, chacha.Name),
+		"order_unknown": order("", aes.Name, "")}
+}
+
+// The TLS 1.3 suite order (2.8.7) is evaluated and informational: either
+// answer leaves score, grade and readiness as they were; an undecided one or
+// a scan without it (stored before) adds nothing.
+func TestTLS13SuiteOrder(t *testing.T) {
+	x := rawExtras()
+	base := Evaluate(apply(func(r *scanner.Result) {
+		r.Intensity = scanner.IntensityFull
+		r.Raw = &scanner.RawResult{SuitesComplete: true, TLS13SuitesComplete: true, TLS13GroupsComplete: true, TLS12CurvesComplete: true,
+			SSLv2: scanner.RawProtocol{Status: scanner.NotSupported}, SSLv3: scanner.RawProtocol{Status: scanner.NotSupported},
+			TLS13Suites: x["order_server"].Raw.TLS13Suites}
+	}))
+	for name, want := range map[string]string{"order_server": "TLS13_SUITE_ORDER_SERVER", "order_client": "TLS13_SUITE_ORDER_CLIENT", "order_unknown": ""} {
+		res := Evaluate(x[name])
+		var got []Finding
+		for _, f := range res.Findings {
+			if strings.HasPrefix(f.Code, "TLS13_SUITE_ORDER") {
+				got = append(got, f)
+			}
+		}
+		switch {
+		case want == "" && len(got) != 0, want != "" && (len(got) != 1 || got[0].Code != want || got[0].Severity != Info || got[0].Axis != AxisCurrent):
+			t.Errorf("%s: %+v, want %q (informational)", name, got, want)
+		}
+		if res.Score != base.Score || res.Grade != base.Grade || res.Readiness.Score != base.Readiness.Score || len(res.Findings) != len(base.Findings)+len(got) {
+			t.Errorf("%s changed the judgement: %d %s %d", name, res.Score, res.Grade, res.Readiness.Score)
+		}
+	}
+	if got := Evaluate(x["order_client"]).Findings; !slices.ContainsFunc(got, func(f Finding) bool {
+		return f.Code == "TLS13_SUITE_ORDER_CLIENT" && f.Params["first"] == "TLS_AES_128_GCM_SHA256" && f.Params["second"] == "TLS_CHACHA20_POLY1305_SHA256"
+	}) {
+		t.Errorf("client order params: %+v", got)
+	}
 }
 
 func TestLabServers(t *testing.T) {
@@ -68,19 +113,21 @@ func TestLabServers(t *testing.T) {
 		cap     string   // cap grade, "" for none
 		capBy   []string // codes imposing it
 		include []string // findings that must be there
+		ready   string   // quantum readiness: "<score> <level>"
 	}
 	cases := map[string]want{
-		"ssl2":    {20, "F", "F", []string{"PROTO_SSL2"}, []string{"PROTO_SSL2", "KEX_NO_HYBRID", "TLS13_MISSING"}},
-		"ssl3":    {20, "F", "F", []string{"SUITE_EXPORT", "SUITE_DES"}, []string{"PROTO_SSL3", "SUITE_EXPORT", "SUITE_DES", "SUITE_RC4", "SUITE_3DES", "DH_SMALL", "SCAN_PARTIAL"}},
-		"export":  {20, "F", "F", []string{"SUITE_NULL", "SUITE_EXPORT", "SUITE_ANON", "SUITE_DES", "DH_WEAK"}, []string{"SUITE_NULL", "SUITE_EXPORT", "SUITE_ANON", "SUITE_DES", "DH_WEAK", "PROTO_LEGACY_TLS", "FS_PARTIAL"}},
-		"dhe1024": {40, "D", "C", []string{"SUITE_3DES", "DH_SMALL"}, []string{"DH_SMALL", "SUITE_3DES", "SUITE_CBC", "FS_ALL"}},
-		"tls10":   {40, "D", "C", []string{"FS_NONE", "SUITE_RC4", "SUITE_3DES"}, []string{"FS_NONE", "SUITE_RC4", "SUITE_3DES", "PROTO_LEGACY_TLS", "SUITE_CBC"}},
-		"secp224": {40, "D", "C", []string{"SUITE_RC4", "SUITE_3DES"}, []string{"GROUP_WEAK_CURVES", "SUITE_RC4", "SUITE_3DES"}},
-		"tls12":   {40, "D", "B", []string{"SUITE_CBC"}, []string{"DH_OK", "SUITE_CCM8", "SUITE_CBC", "GROUPS_EXTRA", "FS_PARTIAL"}},
-		"tls13":   {100, "A", "", nil, []string{"KEX_HYBRID_PREFERRED", "KEX_MULTIPLE_PQC", "KEX_PURE_MLKEM", "SUITE_CCM8", "GROUPS_EXTRA"}},
-		"kyber":   {45, "D", "", nil, []string{"KEX_NO_HYBRID", "KEX_EXPERIMENTAL_PQC_ONLY", "TLS13_SUITES_AEAD", "FS_ALL"}},
-		// Well configured today, not quantum-ready: nothing to cap, no PQC.
-		"modern": {45, "D", "", nil, []string{"KEX_NO_HYBRID", "TLS13_SUPPORTED", "TLS13_SUITES_AEAD", "FS_ALL", "CERT_VALID"}},
+		"ssl2":    {45, "F", "F", []string{"PROTO_SSL2"}, []string{"PROTO_SSL2", "KEX_NO_HYBRID", "TLS13_MISSING"}, "15 not_ready"},
+		"ssl3":    {45, "F", "F", []string{"SUITE_EXPORT", "SUITE_DES"}, []string{"PROTO_SSL3", "SUITE_EXPORT", "SUITE_DES", "SUITE_RC4", "SUITE_3DES", "DH_SMALL", "SCAN_PARTIAL"}, "15 not_ready"},
+		"export":  {45, "F", "F", []string{"SUITE_NULL", "SUITE_EXPORT", "SUITE_ANON", "SUITE_DES", "DH_WEAK"}, []string{"SUITE_NULL", "SUITE_EXPORT", "SUITE_ANON", "SUITE_DES", "DH_WEAK", "PROTO_LEGACY_TLS", "FS_PARTIAL"}, "15 not_ready"},
+		"dhe1024": {70, "C", "C", []string{"SUITE_3DES", "DH_SMALL"}, []string{"DH_SMALL", "SUITE_3DES", "SUITE_CBC", "FS_ALL"}, "15 not_ready"},
+		"tls10":   {45, "D", "C", []string{"FS_NONE", "SUITE_RC4", "SUITE_3DES"}, []string{"FS_NONE", "SUITE_RC4", "SUITE_3DES", "PROTO_LEGACY_TLS", "SUITE_CBC"}, "15 not_ready"},
+		"secp224": {70, "C", "C", []string{"SUITE_RC4", "SUITE_3DES"}, []string{"GROUP_WEAK_CURVES", "SUITE_RC4", "SUITE_3DES"}, "15 not_ready"},
+		"tls12":   {45, "D", "B", []string{"SUITE_CBC"}, []string{"DH_OK", "SUITE_CCM8", "SUITE_CBC", "GROUPS_EXTRA", "FS_PARTIAL"}, "15 not_ready"},
+		"tls13":   {100, "A", "", nil, []string{"KEX_HYBRID_PREFERRED", "KEX_MULTIPLE_PQC", "KEX_PURE_MLKEM", "SUITE_CCM8", "GROUPS_EXTRA"}, "85 ready"},
+		"kyber":   {100, "A", "", nil, []string{"KEX_NO_HYBRID", "KEX_EXPERIMENTAL_PQC_ONLY", "TLS13_SUITES_AEAD", "FS_ALL"}, "10 not_ready"},
+		// Well configured today, not quantum-ready: A today, not ready. Kyber
+		// stays below it in readiness (the obsolete codepoint costs 15).
+		"modern": {100, "A", "", nil, []string{"KEX_NO_HYBRID", "TLS13_SUPPORTED", "TLS13_SUITES_AEAD", "FS_ALL", "CERT_VALID"}, "25 not_ready"},
 	}
 	for name, r := range labResults(t) {
 		res := Evaluate(r)
@@ -93,6 +140,9 @@ func TestLabServers(t *testing.T) {
 		if !ok {
 			t.Errorf("no expectation for %s", name)
 			continue
+		}
+		if got := fmt.Sprintf("%d %s", res.Readiness.Score, res.Readiness.Level); got != w.ready {
+			t.Errorf("%s: readiness %s, want %s", name, got, w.ready)
 		}
 		slices.Sort(capBy)
 		slices.Sort(w.capBy)

@@ -2,7 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Domain, Me, Org, ScanSummary } from './api'
-import { json, scanView, stubFetch } from './test/fixtures'
+import { json, scanView } from './test/fixtures'
+import { stubFetch } from './test/accounts'
 import { renderAt } from './test/render'
 
 const me: Me = {

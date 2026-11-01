@@ -85,7 +85,83 @@ Detalle por aspecto: `test/tlslab/results/COMPARISON.md` (se regenera con `make 
 - **Curvas ECDHE que solo existen en SSLv3** (`ssl3`: secp256r1). Un cliente SSLv3 no envía `supported_groups`, así que no las sondeamos; el resultado lo marca como **no evaluado** (`legacy_groups`), no como "no soportado". Sin efecto en la nota: SSLv3 ya limita a C.
 - **Suites por versión por debajo de TLS 1.2**: para ahorrar conexiones, en TLS 1.1, 1.0 y SSLv3 solo buscamos las suites que no aparecieron en una versión superior (sí detectamos qué versiones están activas). El conjunto total de suites coincide con el de testssl.sh en todos los servidores; lo que no listamos es la repetición de la misma suite en varias versiones.
 - **Orden de preferencia del servidor**: sigue "no evaluado" (decisión del plan del 2.7).
+- **Certificado de los servidores con los que `crypto/tls` no completa ningún handshake** (`ssl2`, `ssl3`, `export`, `dhe1024`, `secp224`): hasta el 2.8.7 no lo leíamos (`CERT_MISSING`); desde el 2.8.7 sale de las sondas en crudo y coincide con testssl.sh (ver «Hito 2.8.7»).
 - **Vulnerabilidades de implementación** (Heartbleed, ROBOT…): fuera del alcance; tampoco se pidieron a testssl.sh.
+
+### Hito 2.8.5: certificados post-cuánticos (ML-DSA)
+
+Dos servidores más en el laboratorio, con OpenSSL 3.5.9 y certificados ML-DSA-65 (FIPS 204) generados al construir la imagen:
+
+| Servidor | Versiones | Certificados | Ofreciendo ML-DSA (como Chrome) | Sin ML-DSA (como Firefox) | testssl.sh 3.2 |
+|---|---|---|---|---|---|
+| `mldsa-dual` | TLS 1.2, 1.3 | ML-DSA-65 y ECDSA P-256, elegidos según `signature_algorithms` | ML-DSA-65 (firma del handshake `mldsa65`) | ECDSA (firma `ecdsa_secp256r1_sha256`) | ve los 2 certificados (ECDSA y ML-DSA-65) y ML-DSA-65 entre las firmas de TLS 1.3: igual |
+| `mldsa-only` | solo TLS 1.3 | solo ML-DSA-65 | ML-DSA-65 | el servidor rechaza la conexión (alerta 40, `handshake_failure`) | ve 1 certificado ML-DSA-65: igual |
+
+Protocolos, suites y grupos también coinciden con testssl.sh en los dos. El certificado que ve un cliente sin ML-DSA lo lee una sonda en crudo de TLS 1.3 que descifra la respuesta del servidor (deriva las claves del handshake de su propio key share y se detiene tras el CertificateVerify, sin enviar nunca Finished): `crypto/tls` de Go 1.27 ofrece ML-DSA siempre y no deja quitarlo. Las mismas comprobaciones, con servidores de Go 1.27 (que también sirve certificados ML-DSA), están en los tests de `internal/scanner` y `internal/scanner/rawtls`, y con certificados SLH-DSA generados por OpenSSL en `internal/scanner/testdata/pqcerts`.
+
+Nota con el modelo 2026.2 (`internal/scoring`, `TestLabPostQuantumCertificates`): tal como se escanean, 85 · F los dos (el certificado autofirmado limita a F, como en todo el laboratorio); con el certificado hecho válido, `mldsa-dual` 95 · B (las suites CBC de TLS 1.2 de OpenSSL) y `mldsa-only` 95 · A, exactamente la misma nota que con un certificado ECDSA: el certificado post-cuántico no suma (`CERT_PQ_SIGNATURE`, informativo). `mldsa-only` tiene además `CERT_PQ_NO_CLASSICAL_FALLBACK` (gravedad media, sin tope).
+
+### Hito 2.8.6: notas con el modelo 2026.3
+
+Las mismas sondas, el modelo nuevo: dos ejes (`docs/scoring.md`). Laboratorio con el certificado hecho válido, como en los tests (`internal/scoring`: `TestLabServers`, `TestLabPostQuantumCertificates`); fizsar.com, su escaneo real.
+
+| Servidor | 2026.2 | 2026.3: seguridad hoy | 2026.3: preparación cuántica |
+|---|---|---|---|
+| `fizsar.com` | A · 95 | A · 100 | 75 · Preparado |
+| `tls13` | A · 100 | A · 100 | 85 · Preparado |
+| `modern` | D · 45 | A · 100 | 25 · No preparado |
+| `kyber` | D · 45 | A · 100 | 10 · No preparado |
+| `tls12` | D · 40 | D · 45 (tope B) | 15 · No preparado |
+| `dhe1024` | D · 40 | C · 70 (tope C) | 15 · No preparado |
+| `secp224` | D · 40 | C · 70 (tope C) | 15 · No preparado |
+| `tls10` | D · 40 | D · 45 (tope C) | 15 · No preparado |
+| `ssl2` | F · 20 | F · 45 (tope F) | 15 · No preparado |
+| `ssl3` | F · 20 | F · 45 (tope F) | 15 · No preparado |
+| `export` | F · 20 | F · 45 (tope F) | 15 · No preparado |
+| `mldsa-dual` | B · 95 | B · 100 (tope B) | 90 · Preparado |
+| `mldsa-only` | A · 95 | A · 100 | 90 · Preparado |
+
+`kyber` queda por debajo de `modern` en preparación (10 frente a 25): aceptar el borrador obsoleto de Kyber resta 15. `mldsa-only` no pierde puntos por no tener certificado clásico de respaldo: es un hallazgo medio visible (`CERT_PQ_NO_CLASSICAL_FALLBACK`). En /examples, con el certificado simulado sin renovación automatizada: fizsar.com A · 100 / 75 Preparado, `modern` A · 90 / 10, `kyber` A · 90 / 0 y `export` F · 35 / 0 (`TestLabFixtures`).
+
+### Hito 2.8.7: certificado desde las sondas en crudo
+
+En TLS 1.0–1.2, SSLv3 y SSLv2 el certificado viaja en claro. Si ningún handshake de `crypto/tls` llega a él, el escáner lo lee de las sondas en crudo (sin completar nunca la conexión) y lo analiza igual: validez, cadena, nombre, clave, firma y renovación (`certificate.source: "raw"`; sin grapado OCSP ni SCT del handshake, que no se leen). La comparación con testssl.sh del laboratorio (`make tlslab-test`) cubre ahora, además del tipo de clave, el tamaño, la firma, la caducidad y la cadena: **coinciden en los 12 servidores**. Única diferencia: la caducidad de `kyber`, cuyo certificado genera el servidor (Go) en cada arranque.
+
+Notas de los escaneos reales del laboratorio (certificado autofirmado, así que todo es F), modelo 2026.3, antes y después:
+
+| Servidor | Antes | Después | Certificado |
+|---|---|---|---|
+| `ssl2` | F · 0 / 0 | F · 20 / 0 | antes no visto (`CERT_MISSING`); ahora RSA 2048, autofirmado: suman clave y firma (20) y el tope F sigue |
+| `ssl3` | F · 0 / 0 | F · 20 / 0 | ídem |
+| `export` | F · 0 / 0 | F · 20 / 0 | ídem |
+| `dhe1024` | F · 25 / 0 | F · 45 / 0 | ídem |
+| `secp224` | F · 25 / 0 | F · 45 / 0 | ídem |
+| `kyber` | F · 75 / 0 | F · 75 / 0 | `CERT_UNTRUSTED` → `CERT_SELF_SIGNED`: el certificado es autofirmado sin la marca de CA, y antes solo contaba como autofirmado si la tenía |
+| los otros 6 | — | sin cambios | — |
+
+Las conexiones por escaneo no cambian (el certificado llega en sondas que ya se hacían). La preparación cuántica tampoco: sin TLS 1.3 no hay certificados ML-DSA, así que el certificado visto es también el que recibe un cliente que ofrece ML-DSA y `pq_certificate` pasa a evaluado (0). /examples no cambia: sus fixtures son los escaneos del 14/10/2026 con un certificado simulado.
+
+### Hito 2.8.7: oferta de Chrome 156 byte a byte
+
+Lo que elige cada servidor para la oferta tipo navegador de `crypto/tls` y para el ClientHello de Chrome 156 reconstruido byte a byte (sonda en crudo; `make tlslab-test` y un escaneo real de fizsar.com del 28/10/2026):
+
+| Servidor | `crypto/tls` (oferta tipo navegador) | Chrome 156 |
+|---|---|---|
+| `fizsar.com` | TLS 1.3 · AES-128-GCM · X25519MLKEM768 | igual |
+| `tls13`, `mldsa-dual`, `mldsa-only` | TLS 1.3 · AES-128-GCM · X25519MLKEM768 | igual |
+| `modern`, `kyber` | TLS 1.3 · AES-128-GCM · x25519 | igual |
+| `tls12` | TLS 1.2 · ECDHE-RSA-AES128-GCM · secp256r1 | igual |
+| `ssl2`, `ssl3`, `export`, `dhe1024`, `secp224`, `tls10` | sin conexión | sin conexión (Chrome solo ofrece TLS 1.2 y 1.3) |
+
+Ningún servidor elige distinto: la sonda queda como contraste y la nota sigue saliendo de la oferta de `crypto/tls`. Una conexión más por escaneo (intensidad `full`).
+
+### Hito 2.8.7: orden de suites de TLS 1.3
+
+Los cinco servidores del laboratorio con varias suites de TLS 1.3 (`tls13`, `modern`, `kyber`, `mldsa-dual`, `mldsa-only`) y fizsar.com **siguen el orden del cliente**: con la oferta invertida eligen su primera suite (`tls13` llega a elegir `TLS_AES_128_CCM_8_SHA256` si va primera). testssl.sh dice lo mismo de los cinco («not a server cipher order for TLS 1.3 configured»); `make tlslab-test` lo compara. En el informe es un hallazgo informativo sin puntos (`TLS13_SUITE_ORDER_CLIENT` o `_SERVER`).
+
+Conexiones por escaneo (intensidad `full`), antes y después del 2.8.7: fizsar.com 30 → 33 (Chrome 156 y las dos de orden; 15 de ellas en crudo); `export` 53 → 54 (Chrome 156; sin TLS 1.3 no hay sondas de orden; 39 en crudo, presupuesto de 48). El certificado de las sondas en crudo no cuesta conexiones.
+
+Los escaneos del laboratorio y de fizsar.com hechos con el escáner del 2.8.7 están en `internal/scoring/testdata/lab_v3`; `TestLabV3AgainstBefore` comprueba que, frente a los anteriores y con el mismo modelo, la nota y los hallazgos cambian solo donde dicen las tablas de arriba.
 
 ### Mediciones y tiempo máximo por escaneo
 

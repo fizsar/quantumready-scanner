@@ -37,7 +37,7 @@ func (f *fixtureStore) PublicQueueLength(context.Context) (int64, error) { retur
 func (f *fixtureStore) PublicQueuePosition(context.Context, time.Time) (int64, error) {
 	return 0, nil
 }
-func (f *fixtureStore) RecentPublicScan(context.Context, string, int32, time.Duration, time.Duration) (store.Scan, error) {
+func (f *fixtureStore) RecentPublicScan(context.Context, string, int32, string, time.Duration, time.Duration, string) (store.Scan, error) {
 	panic("not used")
 }
 func (f *fixtureStore) PublicScanBlocked(context.Context, string) (bool, error) {
@@ -178,11 +178,14 @@ func storedScan(server, host string, r *scanner.Result) (store.Scan, []store.Fin
 // scored with the current model. A model change that moves a score fails here
 // (pinned below) and leaves the files to regenerate with QR_WRITE_WEB_FIXTURES=1.
 func TestLabFixtures(t *testing.T) {
-	// Grade and score shown on /examples; its texts explain these numbers.
+	// Both axes as shown on /examples (model 2026.3); its texts explain
+	// these numbers. The lab certificates show no automated renewal.
 	pinned := map[string]struct {
-		grade string
-		score int
-	}{"fizsar": {"A", 95}, "modern": {"D", 40}, "kyber": {"D", 40}, "export": {"F", 15}}
+		grade     string
+		score     int
+		readiness int
+		level     string
+	}{"fizsar": {"A", 100, 75, "ready"}, "modern": {"A", 90, 10, "not_ready"}, "kyber": {"A", 90, 0, "not_ready"}, "export": {"F", 35, 0, "not_ready"}}
 	st := &fixtureStore{scans: map[uuid.UUID]store.Scan{}, findings: map[uuid.UUID][]store.Finding{}}
 	servers := map[string]string{"export": "export.tlslab.test", "kyber": "kyber.tlslab.test", "modern": "modern.tlslab.test"}
 	ids := map[string]uuid.UUID{}
@@ -248,9 +251,10 @@ func TestLabFixtures(t *testing.T) {
 			if v.Report.ScoringVersion != scoring.Version || v.Lang != lang {
 				t.Errorf("%s/%s: version %s, lang %s", server, lang, v.Report.ScoringVersion, v.Lang)
 			}
-			if p := pinned[server]; v.Report.Grade != p.grade || v.Report.Score != p.score {
-				t.Errorf("%s/%s: %s · %d with the current model, /examples explains %s · %d", server, lang,
-					v.Report.Grade, v.Report.Score, p.grade, p.score)
+			if p := pinned[server]; v.Report.Grade != p.grade || v.Report.Score != p.score || v.Report.Readiness == nil ||
+				v.Report.Readiness.Score != p.readiness || v.Report.Readiness.Level.Code != p.level {
+				t.Errorf("%s/%s: %s · %d, readiness %+v with the current model; /examples explains %s · %d, %d %s", server, lang,
+					v.Report.Grade, v.Report.Score, v.Report.Readiness, p.grade, p.score, p.readiness, p.level)
 			}
 			var pretty json.RawMessage = rec.Body.Bytes()
 			out, _ := json.MarshalIndent(pretty, "", "  ")

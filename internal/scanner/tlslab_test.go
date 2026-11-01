@@ -25,12 +25,26 @@ import (
 	"github.com/fizsar/quantumready-saas/internal/scanner/rawtls"
 )
 
-var labServers = []string{"ssl2", "ssl3", "export", "dhe1024", "tls10", "secp224", "tls12", "tls13", "modern", "kyber"}
+var labServers = []string{"ssl2", "ssl3", "export", "dhe1024", "tls10", "secp224", "tls12", "tls13", "modern", "kyber", "mldsa-dual", "mldsa-only"}
+
+// labCertificates is what the post-quantum certificate servers (milestone
+// 2.8.5) must present: to a client offering ML-DSA and to one that does not.
+var labCertificates = map[string]struct {
+	with, without string // key algorithm; "" without a certificate
+	withoutStatus Status
+}{
+	"mldsa-dual": {"ML-DSA-65", "ECDSA", Supported},
+	"mldsa-only": {"ML-DSA-65", "", NotSupported},
+}
 
 // knownDifferences are expected mismatches with testssl.sh, explained in
 // docs/validation.md. Key: server/aspect.
 var knownDifferences = map[string]string{
 	"ssl3/grupos": "curvas ECDHE que solo existen en SSLv3: no se sondean (un cliente SSLv3 no envía supported_groups); se marca como no evaluado y SSLv3 ya limita la nota a C",
+	// Until 2.8.7, ssl2, ssl3, export, dhe1024 and secp224 had
+	// "certificados (clave)" here: no crypto/tls handshake completes with
+	// them and the raw probes did not read the certificate. Now they do.
+	"kyber/certificado (detalle)": "el servidor kyber (Go) genera su certificado al arrancar, válido un año: la caducidad es la de cada arranque, no la de la referencia",
 }
 
 // labNetwork is the address policy of these tests: the lab subnet only.
@@ -68,6 +82,15 @@ type view struct {
 	TLS13Suites []string `json:"tls13_suites"`
 	DHBits      []string `json:"dh_bits"`
 	Groups      []string `json:"groups"`
+	// CertKeys are the key algorithms of the certificates seen (ECDSA, RSA,
+	// ML-DSA-65…): with and without ML-DSA in the offer.
+	CertKeys []string `json:"cert_keys"`
+	// CertDetails describe the server's certificate (key and size,
+	// signature, expiry date, chain): only when testssl.sh saw one alone.
+	CertDetails []string `json:"cert_details"`
+	// TLS13Order is whose TLS 1.3 suite order the server follows:
+	// "servidor" or "cliente" (2.8.7).
+	TLS13Order []string `json:"tls13_order"`
 }
 
 func sortedSet(m map[string]bool) []string {
@@ -129,9 +152,51 @@ func ourView(r *Result) view {
 			groups[g.Name] = true
 		}
 	}
-	v.Protocols, v.Suites, v.SSLv3Suites, v.TLS13Suites, v.DHBits, v.Groups =
-		sortedSet(protos), sortedSet(suites), sortedSet(ssl3), sortedSet(tls13), sortedSet(dh), sortedSet(groups)
+	certs := map[string]bool{}
+	if sel := r.CertificateSelection; sel != nil {
+		for _, c := range []*PresentedCert{sel.WithMLDSA, sel.WithoutMLDSA} {
+			if c != nil {
+				certs[c.KeyAlgorithm] = true
+			}
+		}
+	}
+	if raw := r.Raw; raw != nil && raw.TLS13SuiteOrder != nil {
+		v.TLS13Order = []string{map[string]string{SuiteOrderServer: "servidor", SuiteOrderClient: "cliente"}[raw.TLS13SuiteOrder.Order]}
+	}
+	if c := r.Certificate; c != nil {
+		chain := "no de confianza"
+		switch {
+		case c.Trusted:
+			chain = "de confianza"
+		case c.SelfSigned:
+			chain = "autofirmado"
+		}
+		key := fmt.Sprintf("clave %s %d", c.KeyAlgorithm, c.KeySize)
+		if c.KeySize == 0 { // ML-DSA, SLH-DSA: the name says the size
+			key = "clave " + c.KeyAlgorithm
+		}
+		v.CertDetails = []string{key, "firma " + c.SignatureAlgorithm,
+			"caduca " + c.NotAfter.UTC().Format("2006-01-02"), "cadena " + chain}
+		slices.Sort(v.CertDetails)
+	}
+	v.Protocols, v.Suites, v.SSLv3Suites, v.TLS13Suites, v.DHBits, v.Groups, v.CertKeys =
+		sortedSet(protos), sortedSet(suites), sortedSet(ssl3), sortedSet(tls13), sortedSet(dh), sortedSet(groups), sortedSet(certs)
 	return v
+}
+
+// testsslKey maps testssl.sh's cert_keySize ("EC 256 bits (curve P-256)",
+// "RSA 2048 bits", "ML-DSA ML-DSA-65") to our key algorithm names.
+func testsslKey(finding string) string {
+	f := strings.Fields(finding)
+	switch {
+	case len(f) == 0:
+		return ""
+	case f[0] == "EC":
+		return "ECDSA"
+	case f[0] == "ML-DSA" && len(f) > 1:
+		return f[1]
+	}
+	return f[0]
 }
 
 var (
@@ -165,7 +230,40 @@ func testsslView(t *testing.T, server string) view {
 		}
 	}
 	protos, suites, ssl3, ssl2, tls13, dh, groups := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
+	certs, details, order := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, e := range entries {
+		// "NOT a cipher order configured" (cipher_order-tls1_3), or "not a
+		// server cipher order for TLS 1.3 configured" (cipher_order, TLS 1.3 only).
+		if e.ID == "cipher_order-tls1_3" || e.ID == "cipher_order" && strings.Contains(e.Finding, "TLS 1.3") {
+			if strings.Contains(strings.ToLower(e.Finding), "not a") {
+				order["cliente"] = true
+			} else {
+				order["servidor"] = true
+			}
+		}
+		if strings.HasPrefix(e.ID, "cert_keySize") {
+			certs[testsslKey(e.Finding)] = true
+		}
+		// One certificate only: its fields come without " <hostCert#n>".
+		switch f := strings.Fields(e.Finding); {
+		case e.ID == "cert_keySize" && len(f) > 1 && f[0] == "ML-DSA":
+			details["clave "+f[1]] = true
+		case e.ID == "cert_keySize" && len(f) > 1:
+			details[fmt.Sprintf("clave %s %s", testsslKey(e.Finding), f[1])] = true
+		case e.ID == "cert_signatureAlgorithm" && len(f) == 3 && f[1] == "with":
+			details["firma "+f[0]+"-"+f[2]] = true // "SHA256 with RSA" → SHA256-RSA, as crypto/x509 names it
+		case e.ID == "cert_notAfter" && len(f) > 0:
+			details["caduca "+f[0]] = true
+		case e.ID == "cert_chain_of_trust":
+			switch {
+			case strings.HasPrefix(e.Finding, "passed"):
+				details["cadena de confianza"] = true
+			case strings.Contains(e.Finding, "self signed"):
+				details["cadena autofirmado"] = true
+			default:
+				details["cadena no de confianza"] = true
+			}
+		}
 		// "offered …", or "vulnerable with 4 ciphers" for SSLv2; not "TLSv1.1 is not
 		// offered, and downgraded…" nor "connection failed rather than downgrading…".
 		if name, ok := testsslProtos[e.ID]; ok && (strings.HasPrefix(e.Finding, "offered") || strings.HasPrefix(e.Finding, "vulnerable")) {
@@ -207,7 +305,7 @@ func testsslView(t *testing.T, server string) view {
 		}
 	}
 	return view{Protocols: sortedSet(protos), Suites: sortedSet(suites), SSLv3Suites: sortedSet(ssl3), SSLv2: sortedSet(ssl2),
-		TLS13Suites: sortedSet(tls13), DHBits: sortedSet(dh), Groups: sortedSet(groups)}
+		TLS13Suites: sortedSet(tls13), DHBits: sortedSet(dh), Groups: sortedSet(groups), CertKeys: sortedSet(certs), CertDetails: sortedSet(details), TLS13Order: sortedSet(order)}
 }
 
 func groupID(name string) uint16 {
@@ -269,6 +367,16 @@ func TestLab(t *testing.T) {
 				map[bool]string{true: " (presupuesto agotado)", false: ""}[raw.BudgetExhausted],
 				dur(full), dur(slowFull), conns(basic), dur(basic), dur(slowBasic))
 
+			if want, ok := labCertificates[server]; ok {
+				sel := full.Result.CertificateSelection
+				without := ""
+				if sel.WithoutMLDSA != nil {
+					without = sel.WithoutMLDSA.KeyAlgorithm
+				}
+				if sel.WithMLDSA == nil || sel.WithMLDSA.KeyAlgorithm != want.with || without != want.without || sel.WithoutStatus != want.withoutStatus {
+					t.Errorf("certificates: with ML-DSA %+v, without %+v (%s); want %s, %q (%s)", sel.WithMLDSA, sel.WithoutMLDSA, sel.WithoutStatus, want.with, want.without, want.withoutStatus)
+				}
+			}
 			ours, ref := ourView(full.Result), testsslView(t, server)
 			for _, a := range []struct {
 				name     string
@@ -281,6 +389,9 @@ func TestLab(t *testing.T) {
 				{"suites TLS 1.3", ref.TLS13Suites, ours.TLS13Suites},
 				{"DH (bits)", ref.DHBits, ours.DHBits},
 				{"grupos", ref.Groups, ours.Groups},
+				{"certificados (clave)", ref.CertKeys, ours.CertKeys},
+				{"certificado (detalle)", ref.CertDetails, ours.CertDetails},
+				{"orden de suites TLS 1.3", ref.TLS13Order, ours.TLS13Order},
 			} {
 				onlyRef, onlyOurs := diff(a.ref, a.our)
 				verdict := "="

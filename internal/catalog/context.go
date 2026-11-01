@@ -32,7 +32,8 @@ var validitySchedule = []struct {
 //   - {validity_schedule}: the SC-081 schedule, what is past in the past
 //     tense and what is still ahead in the future, as of the scan's date;
 //   - {renewal_advice}: keep automated renewal, or automate it, depending on
-//     whether the scan found automated renewal (CERT_AUTOMATED_*).
+//     whether the scan found automated renewal (CERT_AUTOMATED_*);
+//   - {pq_selection}: see pqSelection.
 func (c Context) params(p map[string]string, lang string) map[string]string {
 	out := maps.Clone(p)
 	if out == nil {
@@ -45,7 +46,16 @@ func (c Context) params(p map[string]string, lang string) map[string]string {
 	out["validity_schedule"] = scheduleText(at, lang)
 	automated := slices.ContainsFunc(c.Codes, func(code string) bool { return strings.HasPrefix(code, "CERT_AUTOMATED_") })
 	out["renewal_advice"] = renewalAdvice[lang][automated]
+	out["pq_selection"] = pqSelection[lang][out["pq_offered"] == "1"]
 	return out
+}
+
+// pqSelection: {pq_selection} says, when the scan offered ML-DSA signatures
+// (milestone 2.8.5, param pq_offered), that the server chose its classical
+// certificate anyway; scans from before say nothing.
+var pqSelection = map[string]map[bool]string{
+	"es": {true: " El escáner le ofreció firmas ML-DSA, como hace Chrome, y el servidor eligió este certificado clásico.", false: ""},
+	"en": {true: " The scanner offered it ML-DSA signatures, as Chrome does, and the server chose this classical certificate.", false: ""},
 }
 
 var renewalAdvice = map[string]map[bool]string{

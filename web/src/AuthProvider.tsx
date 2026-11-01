@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ApiError, getMe, logout as apiLogout, type Me } from './api'
 import { AuthContext, type AuthState } from './auth'
+import { accountsEnabled } from './features'
 import { useLang } from './i18n'
 
 /** Holds the session: asks the API once (GET /api/auth/me), then follows login and logout. */
@@ -10,9 +11,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
-    getMe(lang)
+    // With accounts off (ACCOUNTS_ENABLED, production) there is no session
+    // to ask for: anonymous, without a request to /api/auth.
+    accountsEnabled()
+      .then((on) => (on ? getMe(lang) : Promise.reject(new Error('accounts disabled'))))
       .then((me) => !cancelled && setState({ status: 'user', me }))
-      // 401 (no session), 404 (accounts disabled) or offline: anonymous.
+      // 401 (no session), accounts disabled or offline: anonymous.
       .catch(() => !cancelled && setState({ status: 'anon' }))
     return () => {
       cancelled = true

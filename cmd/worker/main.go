@@ -68,6 +68,8 @@ func run(logger *slog.Logger) error {
 	if err := store.UseRole(cfg, store.RoleWorker); err != nil {
 		return err
 	}
+	// Never as a superuser or with BYPASSRLS (Apertura step 4).
+	store.RequireUnprivileged(cfg)
 	concurrency, err := envInt("WORKER_CONCURRENCY", 2)
 	if err != nil {
 		return err
@@ -87,6 +89,12 @@ func run(logger *slog.Logger) error {
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("database pool: %w", err)
+	}
+	if reachable, err := store.CheckPoolAtStart(ctx, pool, 30*time.Second); err != nil {
+		pool.Close()
+		return err
+	} else if !reachable {
+		logger.Warn("database unreachable at start: its role is checked on every connection")
 	}
 	// Close the pool on the way out, but never hang on it: a stuck slot may
 	// still hold a connection when the worker gives up on it.
@@ -117,6 +125,8 @@ func run(logger *slog.Logger) error {
 	// Domain verification: TXT records read from the authoritative servers.
 	checker := &worker.DomainChecker{Queue: store.NewStore(pool).Queries, DNS: &dnscheck.Checker{}, Logger: logger}
 	go checker.Run(ctx)
+	// Public scans are kept 30 days (/privacy): purged at start and daily.
+	go worker.PurgeLoop(ctx, "expired public scans", store.NewStore(pool).PurgeExpiredPublicScans, 24*time.Hour, logger)
 
 	stuck := make(chan []int, 1)
 	hb := &heartbeatWriter{path: hbPath, every: heartbeatEvery, stale: w.Lease(), slots: w.SlotBeats, now: time.Now, log: logger,

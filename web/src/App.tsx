@@ -4,7 +4,7 @@ import type { Lang } from './api'
 import { useAuth } from './auth'
 import { useLang } from './i18n'
 import { useShowcaseT } from './i18n.showcase'
-import { useDemoEnabled } from './features'
+import { useAccountsEnabled, useDemoEnabled } from './features'
 import { pageView, track } from './metrics'
 import { AboutScans } from './pages/AboutScans'
 import { AccountPage, ForgotPage, LoginPage, RegisterPage, ResetPage, VerifyPage } from './pages/AccountPages'
@@ -50,16 +50,16 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/scans/:id" element={<ScanPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/verify" element={<VerifyPage />} />
-          <Route path="/forgot" element={<ForgotPage />} />
-          <Route path="/reset" element={<ResetPage />} />
-          <Route path="/account" element={<AccountPage />} />
+          <Route path="/login" element={<AccountsRoute page={<LoginPage />} />} />
+          <Route path="/register" element={<AccountsRoute page={<RegisterPage />} />} />
+          <Route path="/verify" element={<AccountsRoute page={<VerifyPage />} />} />
+          <Route path="/forgot" element={<AccountsRoute page={<ForgotPage />} />} />
+          <Route path="/reset" element={<AccountsRoute page={<ResetPage />} />} />
+          <Route path="/account" element={<AccountsRoute page={<AccountPage />} />} />
           <Route path="/about-scans" element={<AboutScans />} />
-          <Route path="/org" element={<OrgPage />} />
-          <Route path="/org/scans/:id" element={<ScanPage org />} />
-          <Route path="/invite" element={<InvitePage />} />
+          <Route path="/org" element={<AccountsRoute page={<OrgPage />} />} />
+          <Route path="/org/scans/:id" element={<AccountsRoute page={<ScanPage org />} />} />
+          <Route path="/invite" element={<AccountsRoute page={<InvitePage />} />} />
           <Route path="/architecture" element={<Architecture />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/demo" element={<DemoRoute />} />
@@ -80,7 +80,8 @@ export default function App() {
 function AccountLink() {
   const { t } = useLang()
   const { state } = useAuth()
-  if (state.status === 'loading') return null
+  const accounts = useAccountsEnabled()
+  if (accounts !== true || state.status === 'loading') return null
   return state.status === 'user' ? (
     <>
       <Link to="/org" className="nav-link">
@@ -137,6 +138,17 @@ function LangSwitch() {
       {opt('en', 'EN')}
     </div>
   )
+}
+
+/**
+ * The pages of accounts, organizations and invitations exist only while the
+ * server has accounts on (ACCOUNTS_ENABLED; off in production): otherwise
+ * they are the 404.
+ */
+function AccountsRoute({ page }: { page: React.ReactElement }) {
+  const on = useAccountsEnabled()
+  if (on === null) return null
+  return on ? page : <NotFound />
 }
 
 /** /demo exists only while the server has the form on (DEMO_ENABLED). */

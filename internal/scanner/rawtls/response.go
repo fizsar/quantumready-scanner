@@ -53,20 +53,29 @@ type Alert struct {
 	Description uint8
 }
 
+// alertNames is the IANA TLS Alert Description registry.
 var alertNames = map[uint8]string{
-	0: "close_notify", 10: "unexpected_message", 20: "bad_record_mac", 40: "handshake_failure",
-	42: "bad_certificate", 47: "illegal_parameter", 50: "decode_error", 51: "decrypt_error",
-	70: "protocol_version", 71: "insufficient_security", 80: "internal_error",
-	86: "inappropriate_fallback", 90: "user_canceled", 109: "missing_extension",
-	110: "unsupported_extension", 112: "unrecognized_name",
+	0: "close_notify", 10: "unexpected_message", 20: "bad_record_mac", 21: "decryption_failed",
+	22: "record_overflow", 30: "decompression_failure", 40: "handshake_failure", 41: "no_certificate",
+	42: "bad_certificate", 43: "unsupported_certificate", 44: "certificate_revoked", 45: "certificate_expired",
+	46: "certificate_unknown", 47: "illegal_parameter", 48: "unknown_ca", 49: "access_denied",
+	50: "decode_error", 51: "decrypt_error", 52: "too_many_cids_requested", 60: "export_restriction",
+	70: "protocol_version", 71: "insufficient_security", 80: "internal_error", 86: "inappropriate_fallback",
+	90: "user_canceled", 100: "no_renegotiation", 109: "missing_extension", 110: "unsupported_extension",
+	111: "certificate_unobtainable", 112: "unrecognized_name", 113: "bad_certificate_status_response",
+	114: "bad_certificate_hash_value", 115: "unknown_psk_identity", 116: "certificate_required",
+	117: "general_error", 120: "no_application_protocol", 121: "ech_required",
 }
 
-func (a Alert) String() string {
-	if n, ok := alertNames[a.Description]; ok {
+// AlertName is the IANA name of an alert description ("alert(n)" if unassigned).
+func AlertName(description uint8) string {
+	if n, ok := alertNames[description]; ok {
 		return n
 	}
-	return fmt.Sprintf("alert(%d)", a.Description)
+	return fmt.Sprintf("alert(%d)", description)
 }
+
+func (a Alert) String() string { return AlertName(a.Description) }
 
 // ServerHello is a parsed ServerHello or HelloRetryRequest.
 type ServerHello struct {
@@ -84,6 +93,8 @@ type ServerHello struct {
 	HelloRetry bool
 	// KeyShareGroup is the TLS 1.3 key_share group (or the HRR selected_group).
 	KeyShareGroup uint16
+	// KeyShareData is the server's key share (TLS 1.3 ServerHello).
+	KeyShareData []byte
 	// DowngradeSentinel is set when a TLS 1.3 server negotiated a lower
 	// version and said so in Random (RFC 8446, section 4.1.3).
 	DowngradeSentinel bool
@@ -147,6 +158,7 @@ func ParseServerHello(body []byte) (*ServerHello, error) {
 					if !data.ReadUint16LengthPrefixed(&key) || key.Empty() {
 						return nil, malformed("bad key_share")
 					}
+					sh.KeyShareData = slices.Clone([]byte(key))
 				}
 				if !data.Empty() {
 					return nil, malformed("bad key_share")
@@ -251,7 +263,17 @@ type recordReader struct {
 	lr   *limitedReader
 	hs   []byte // handshake bytes not yet returned
 	seen int    // handshake messages returned
+	// observe (ParseServerFlight) ends the stream with errEncrypted where
+	// encryption starts: an application_data record, or a ChangeCipherSpec
+	// once ccsEnds is set (TLS 1.0–1.2, where it precedes the encrypted
+	// Finished). Exchange never reads that far.
+	observe, ccsEnds bool
 }
+
+// errEncrypted marks the end of what an observer can read in clear.
+var errEncrypted = errors.New("rawtls: encrypted records follow")
+
+const recordApplicationData uint8 = 23
 
 func newRecordReader(r io.Reader, limit int) *recordReader {
 	if limit <= 0 {
@@ -283,6 +305,9 @@ func (rr *recordReader) next() (typ uint8, body []byte, alert *Alert, err error)
 			return 0, nil, nil, err
 		}
 		ctype, length := hdr[0], int(hdr[3])<<8|int(hdr[4])
+		if rr.observe && len(rr.hs) == 0 && (ctype == recordApplicationData || ctype == recordChangeCipherSpec && rr.ccsEnds) {
+			return 0, nil, nil, errEncrypted
+		}
 		if ctype != recordHandshake && ctype != recordAlert && ctype != recordChangeCipherSpec {
 			return 0, nil, nil, malformed("record type %d", ctype)
 		}
@@ -331,6 +356,11 @@ type Response struct {
 	Alert       *Alert
 	ServerHello *ServerHello
 	KeyExchange *KeyExchange
+	// Certificates is the chain of the Certificate message (TLS 1.0–1.2 and
+	// SSLv3, where it travels in clear), leaf first, as sent (DER). Only read
+	// with ReadKeyExchange; nil if the server sent none or it did not parse
+	// (the probe's question is the suite or the key exchange, not this).
+	Certificates [][]byte
 }
 
 // Exchange writes the ClientHello h to conn and reads the answer. The caller
@@ -381,8 +411,13 @@ func readResponse(r io.Reader, h *Hello, opts Options) (*Response, error) {
 			return resp, nil
 		}
 		switch typ {
-		case typeCertificate, typeCertificateStatus:
-			continue // not needed here: crypto/tls probes capture the chain
+		case typeCertificate:
+			if chain, err := ParseCertificate(body); err == nil && len(chain) > 0 {
+				resp.Certificates = chain
+			}
+			continue
+		case typeCertificateStatus:
+			continue
 		case typeServerKeyExchange:
 			resp.KeyExchange, err = ParseServerKeyExchange(body, suite)
 			return resp, err
@@ -391,6 +426,25 @@ func readResponse(r io.Reader, h *Hello, opts Options) (*Response, error) {
 		}
 		return resp, malformed("unexpected handshake message %d", typ)
 	}
+}
+
+// ParseCertificate parses the body of a TLS 1.0–1.2 (or SSLv3) Certificate
+// message (RFC 5246, 7.4.2) and returns the certificates, leaf first.
+func ParseCertificate(body []byte) ([][]byte, error) {
+	s := cryptobyte.String(body)
+	var list cryptobyte.String
+	if !s.ReadUint24LengthPrefixed(&list) || !s.Empty() {
+		return nil, malformed("bad Certificate message")
+	}
+	var chain [][]byte
+	for !list.Empty() {
+		var cert cryptobyte.String
+		if !list.ReadUint24LengthPrefixed(&cert) || cert.Empty() {
+			return nil, malformed("bad certificate in the list")
+		}
+		chain = append(chain, slices.Clone([]byte(cert)))
+	}
+	return chain, nil
 }
 
 // checkServerHello rejects anything the hello did not offer.
