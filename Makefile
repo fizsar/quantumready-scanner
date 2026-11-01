@@ -39,9 +39,12 @@ test: web/node_modules ## Run Go tests (integration tests too if the dev databas
 
 FUZZTIME ?= 1m
 FUZZ_TARGETS := FuzzReadResponse FuzzParseServerHello FuzzParseServerKeyExchange FuzzReadSSLv2Response FuzzParseClientHello FuzzParseServerFlight FuzzParseTLS13Certificate FuzzReadCertificateFlight FuzzDecryptedFlight
-fuzz: ## Fuzz the raw TLS parsers (FUZZTIME per target, default 1m)
-	@for t in $(FUZZ_TARGETS); do \
-		echo "== $$t"; go test -run='^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) ./internal/scanner/rawtls || exit 1; \
+# package:target pairs outside rawtls.
+FUZZ_OTHER := internal/altcha:FuzzVerify
+fuzz: ## Fuzz the raw TLS parsers and the ALTCHA verifier (FUZZTIME per target, default 1m)
+	@for t in $(FUZZ_TARGETS) $(FUZZ_OTHER); do \
+		pkg=./internal/scanner/rawtls; case $$t in *:*) pkg=./$${t%%:*}; t=$${t#*:};; esac; \
+		echo "== $$t"; go test -run='^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) $$pkg || exit 1; \
 	done
 
 lint: web/node_modules ## golangci-lint (incl. go vet, gofmt, goimports), oxlint and tsc
