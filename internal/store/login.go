@@ -61,15 +61,18 @@ type rowQuerier interface {
 }
 
 // CheckUnprivileged returns ErrPrivilegedRole if the login role of the
-// session (session_user) or the role it acts as (current_user) is a
-// superuser or has BYPASSRLS. Both: after SET ROLE, current_user is the
-// service role, but a superuser login could still RESET ROLE.
+// session (session_user), the role it acts as (current_user) or any role the
+// login is a member of is a superuser or has BYPASSRLS. After SET ROLE,
+// current_user is the service role, but a superuser login could still RESET
+// ROLE, and a member of a privileged role could SET ROLE to it at any time
+// (pg_has_role MEMBER: direct or indirect, whatever INHERIT or SET say).
 func CheckUnprivileged(ctx context.Context, q rowQuerier) error {
 	var sessionUser, currentUser string
 	var privileged bool
 	err := q.QueryRow(ctx, `
-		SELECT session_user::text, current_user::text, bool_or(r.rolsuper OR r.rolbypassrls)
-		FROM pg_roles r WHERE r.rolname IN (session_user, current_user)`).Scan(&sessionUser, &currentUser, &privileged)
+		SELECT session_user::text, current_user::text, coalesce(bool_or(r.rolsuper OR r.rolbypassrls), false)
+		FROM pg_roles r
+		WHERE r.rolname = current_user OR pg_has_role(session_user, r.oid, 'MEMBER')`).Scan(&sessionUser, &currentUser, &privileged)
 	if err != nil {
 		return fmt.Errorf("check database role: %w", err)
 	}
