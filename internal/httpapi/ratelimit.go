@@ -8,14 +8,27 @@ import (
 // Limiter is an in-memory sliding-window rate limiter keyed by client (IP
 // or IPv6 /64). Nothing is persisted: a restart resets the counters, which
 // is acceptable for a single API instance and keeps IP addresses out of the
-// database.
+// database. It holds at most MaxLimiterKeys clients: memory stays bounded
+// however many addresses (IPv6 /64s, a botnet) come.
 type Limiter struct {
 	mu      sync.Mutex
 	windows []window
 	hits    map[string][]time.Time // per key, oldest first, within the longest window
 	now     func() time.Time
 	swept   time.Time
+	// fullSwept: when the last sweep forced by a full map ran (at most once
+	// a second, so a flood of new clients does not cost a scan of the map each).
+	fullSwept time.Time
 }
+
+// MaxLimiterKeys is how many clients one Limiter keeps (about 130 bytes
+// each with a single hit: some 15 MB). When it is full, a new client is
+// refused (429, retry in fullRetry) until keys expire; known clients are not
+// affected. Security review of 01/11/2026.
+const MaxLimiterKeys = 100_000
+
+// fullRetry is the Retry-After of a client refused because the limiter is full.
+const fullRetry = time.Minute
 
 type window struct {
 	span time.Duration
@@ -54,6 +67,9 @@ func (l *Limiter) Check(key string) (ok bool, retryAfter time.Duration) {
 func (l *Limiter) Add(key string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if _, known := l.hits[key]; !known && len(l.hits) >= MaxLimiterKeys {
+		return // full: Check has already refused new keys (429)
+	}
 	l.hits[key] = append(l.hits[key], l.now())
 }
 
@@ -71,6 +87,16 @@ func (l *Limiter) take(key string, record bool) (bool, time.Duration) {
 	l.sweep(now)
 
 	longest := l.windows[len(l.windows)-1].span
+	if _, known := l.hits[key]; !known && len(l.hits) >= MaxLimiterKeys {
+		if now.Sub(l.fullSwept) >= time.Second || now.Before(l.fullSwept) {
+			l.fullSwept = now
+			l.swept = time.Time{}
+			l.sweep(now)
+		}
+		if len(l.hits) >= MaxLimiterKeys {
+			return false, fullRetry
+		}
+	}
 	h := prune(l.hits[key], now.Add(-longest))
 	for _, w := range l.windows {
 		from := now.Add(-w.span)
