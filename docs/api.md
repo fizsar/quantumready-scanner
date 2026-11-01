@@ -10,7 +10,7 @@ Los dominios que se pueden escanear (la allowlist), para que el frontend no teng
 
 ## `POST /api/scans`
 
-Pide un escaneo. Cuerpo (máx. 1 KiB, `Content-Type: application/json`, campos desconocidos rechazados):
+Pide un escaneo. Cuerpo (máx. 1 KiB, `Content-Type: application/json`, campos desconocidos rechazados, un solo valor JSON: cualquier cosa detrás → `invalid_json`):
 
 ```json
 {"host": "https://FizSar.com/ruta"}
