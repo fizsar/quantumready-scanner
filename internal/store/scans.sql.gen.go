@@ -132,8 +132,8 @@ func (q *Queries) CountPublicQueued(ctx context.Context) (int64, error) {
 }
 
 const enqueueScan = `-- name: EnqueueScan :one
-INSERT INTO scans (host, port, organization_id, intensity, requested_by, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO scans (host, port, organization_id, intensity, requested_by)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, organization_id, host, port, status, attempts, max_attempts, lease_token, lease_until, created_at, started_at, finished_at, error, result, scanner_schema, scoring, scoring_version, score, grade, pqc, retries, not_before, intensity, requested_by, expires_at
 `
 
@@ -143,9 +143,11 @@ type EnqueueScanParams struct {
 	OrganizationID *uuid.UUID
 	Intensity      string
 	RequestedBy    *uuid.UUID
-	ExpiresAt      *time.Time
 }
 
+// Only the columns qr_app may insert (00021): status, created_at and the
+// expiry (30 days if public, 395 days for an organization) come from the
+// database.
 func (q *Queries) EnqueueScan(ctx context.Context, arg EnqueueScanParams) (Scan, error) {
 	row := q.db.QueryRow(ctx, enqueueScan,
 		arg.Host,
@@ -153,7 +155,6 @@ func (q *Queries) EnqueueScan(ctx context.Context, arg EnqueueScanParams) (Scan,
 		arg.OrganizationID,
 		arg.Intensity,
 		arg.RequestedBy,
-		arg.ExpiresAt,
 	)
 	var i Scan
 	err := row.Scan(
