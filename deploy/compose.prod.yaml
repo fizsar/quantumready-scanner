@@ -5,7 +5,9 @@
 # quantumready-web:8080. The 127.0.0.1:8080/8081 ports are only for local
 # checks (deploy script, curl on the host).
 #
-# Images come from GHCR; QR_TAG (in .env) selects the release, e.g. sha-14226c7.
+# Images come from GHCR by digest: QR_API_IMAGE and QR_WEB_IMAGE (in .env,
+# image@sha256:..., set by deploy.sh from the digests the Release recorded
+# after its Trivy gate). QR_TAG names the release, e.g. sha-14226c7.
 # Secrets come from .env (see .env.example). Locally, `make prod-up` adds
 # compose.build.yaml to build the images instead of pulling them.
 #
@@ -20,7 +22,7 @@ x-hardening: &hardening
     driver: json-file
     options: { max-size: "10m", max-file: "3" }
 
-x-api-image: &api-image ghcr.io/fizsar/quantumready-saas-api:${QR_TAG:?set QR_TAG in .env}
+x-api-image: &api-image "${QR_API_IMAGE:?set by deploy.sh to ghcr.io/fizsar/quantumready-saas-api@sha256:...}"
 
 # The owner (POSTGRES_USER, a superuser) only for migrate; the API and the
 # worker log in as their own users, qr_app and qr_worker (Apertura step 4):
@@ -214,7 +216,7 @@ services:
     memswap_limit: 64M
 
   web:
-    image: ghcr.io/fizsar/quantumready-saas-web:${QR_TAG:?set QR_TAG in .env}
+    image: "${QR_WEB_IMAGE:?set by deploy.sh to ghcr.io/fizsar/quantumready-saas-web@sha256:...}"
     <<: *hardening
     restart: unless-stopped
     tmpfs:
