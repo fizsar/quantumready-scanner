@@ -1,6 +1,6 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Lang } from './api'
 import App from './App'
 import { uthAnchor } from './exampleAnchors'
@@ -33,18 +33,35 @@ const shown = { fizsar: ['A', 100, 75, 'ready'], modern: ['A', 90, 10, 'not_read
 const labLabel = { es: 'Servidor de laboratorio aislado; no es un sitio real', en: 'Isolated lab server; not a real website' }
 
 describe('/examples', () => {
+  // /examples is a lazy route (App.tsx). Its first import is cold: vitest
+  // transforms the page, its CSS and what only it uses, which takes longer the
+  // busier the machine is. Done here, it is not timed against the first test
+  // (5 s) nor against findByRole's 1 s wait for the heading; the tests then
+  // time the rendering only.
+  beforeAll(async () => {
+    await import('./pages/Examples')
+  })
+
   it('has the four examples, best grade first', () => {
     expect(EXAMPLES.map((e) => e.key)).toEqual(['fizsar', 'modern', 'kyber', 'export'])
     expect(EXAMPLES.map((e) => e.lab)).toEqual([false, true, true, true])
   })
 
   for (const lang of ['es', 'en'] as const) {
-    it(`renders every example with its grade (${lang})`, async () => {
+    it(`renders the page with its title (${lang})`, async () => {
       renderAt('/examples', lang)
       expect(await screen.findByRole('heading', { level: 1, name: showcaseDict[lang]['examples.title'] })).toBeTruthy()
       // Set in an effect: on a slow runner it can land after the heading.
       await waitFor(() => expect(document.title).toBe(showcaseDict[lang]['examples.meta.title']))
-      for (const { key, lab, scans } of EXAMPLES) {
+      expect(EXAMPLES.map(({ key }) => document.getElementById(key)?.tagName)).toEqual(['SECTION', 'SECTION', 'SECTION', 'SECTION'])
+    })
+
+    // One test per example: each checks one report of the four on the page,
+    // so none does the work of all of them within one test's time.
+    for (const { key, lab, scans } of EXAMPLES) {
+      it(`renders ${key} with its grade (${lang})`, async () => {
+        renderAt('/examples', lang)
+        await screen.findByRole('heading', { level: 1, name: showcaseDict[lang]['examples.title'] })
         const scan = scans[lang]
         const [grade, score, ready, level] = shown[key]
         const r = scan.report!
@@ -67,8 +84,8 @@ describe('/examples', () => {
         if (lab) expect(section.textContent, key).not.toMatch(/Let.s Encrypt/)
         // Each panel has its own anchor.
         expect(section.querySelector(`#${uthAnchor(key)}`), key).not.toBeNull()
-      }
-    })
+      })
+    }
   }
 
   // kyber finished at 22:04:37 UTC and fizsar.com at 11:47:58 UTC: near
@@ -121,13 +138,20 @@ describe('/examples', () => {
     for (const h of hrefs.filter((h) => h.startsWith('#'))) expect(document.getElementById(h.slice(1)), h).not.toBeNull()
     expect(hrefs).toEqual(expect.arrayContaining(['#fizsar', '#modern', '#kyber', '#export', '#fizsar-under-the-hood', '#modern-under-the-hood']))
     for (const h of hrefs.filter((h) => !h.startsWith('/') && !h.startsWith('#'))) expect(h, h).toMatch(/^(https:\/\/fizsar\.com\/?|mailto:soporte@fizsar\.com)$/)
-    for (const h of [...new Set(hrefs.filter((h) => h.startsWith('/')))]) {
-      cleanup()
-      renderAt(h, 'es')
-      const h1 = await screen.findByRole('heading', { level: 1 }, { timeout: 5000 }) // /examples loads lazily
-      expect(h1.textContent, h).not.toBe('Esta página no existe')
-    }
+    // The pages it links to: each is checked by its own test below.
+    expect([...new Set(hrefs.filter((h) => h.startsWith('/')))].sort()).toEqual([...linkedPages].sort())
   })
+
+  // One test per linked page (rendering all of them in one test took most of
+  // its 5 s on a busy machine). /examples is already imported (beforeAll).
+  const linkedPages = ['/', '/about-scans', '/examples', '/architecture', '/privacy']
+  for (const h of linkedPages) {
+    it(`links to ${h}, a page that exists`, async () => {
+      renderAt(h, 'es')
+      const h1 = await screen.findByRole('heading', { level: 1 })
+      expect(h1.textContent, h).not.toBe('Esta página no existe')
+    })
+  }
 
   for (const lang of ['es', 'en'] as const) {
     it(`says nothing it must not (${lang})`, async () => {
