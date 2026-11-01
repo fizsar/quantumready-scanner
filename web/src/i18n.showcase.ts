@@ -241,18 +241,18 @@ const es = {
 
   'footer.privacy': 'Privacidad',
   'privacy.meta.title': 'Privacidad · QuantumReady',
-  'privacy.meta.description':
-    'Qué datos trata QuantumReady: recuentos diarios en su propio servidor, sin cookies, sin guardar IPs y sin identificadores, y dónde están.',
+    'privacy.meta.description':
+      'Qué datos trata QuantumReady: los dominios analizados y su resultado técnico, 30 días; recuentos diarios en su propio servidor, sin cookies, sin guardar IPs y sin identificadores; y dónde están.',
   'privacy.title': 'Privacidad',
-  'privacy.lead':
-    'Lo que hace hoy esta web con los datos de quien la visita. La política de privacidad completa llegará con la beta.',
+    'privacy.lead':
+      'Lo que hace esta web con los datos de quien la visita y de los dominios que se analizan. No hay registro ni cuentas: el escáner se usa sin dar ningún dato.',
   'privacy.counted.title': 'Qué contamos',
   'privacy.counted.lead': 'Para saber si la web le sirve a alguien, sumamos uno a contadores diarios:',
   'privacy.counted.pages': 'Visitas por página. Los informes de escaneo cuentan todos juntos como «informe», nunca cuál.',
   'privacy.counted.source':
     'Desde qué sitio llegas: solo su dominio (por ejemplo, linkedin.com) y solo en la primera página de la visita, nunca la dirección completa.',
-  'privacy.counted.events':
-    'Algunos usos: escanear un dominio de demostración (cuál), abrir «Bajo el capó», descargar el JSON y cambiar de idioma.',
+    'privacy.counted.events':
+      'Algunos usos: escanear uno de los dominios de demostración (cuál; los escaneos de cualquier otro dominio no se cuentan), abrir «Bajo el capó», descargar el JSON y cambiar de idioma.',
   'privacy.counted.demo': 'Pedir una demo: solo desde qué botón, nunca lo que escribes.',
   'privacy.counted.how':
     'Cada recuento es un número por día. No se guarda quién, ni a qué hora, ni nada que relacione un recuento con otro.',
@@ -264,14 +264,18 @@ const es = {
   'privacy.gpc.title': 'Control Global de Privacidad (GPC)',
   'privacy.gpc.p':
     'Si tu navegador envía la señal Global Privacy Control, la web no envía ningún recuento. Tampoco se cuentan los navegadores automatizados ni los robots conocidos.',
-  'privacy.blocked.title': 'Dominios que todavía no se pueden escanear',
-  'privacy.blocked.p1':
-    'Por ahora solo se analizan los dominios de demostración. Si se pide escanear otro, el servidor rechaza la petición y suma uno al recuento de ese dominio en ese día: solo el dominio (por ejemplo, example.com), sin nada de quién lo pidió. Así sabemos qué interés hay en abrir el escáner.',
+    'privacy.blocked.title':
+      'Si el escáner se cierra',
+    'privacy.blocked.p1':
+      'Mientras el escáner solo admita los dominios de demostración, si se pide escanear otro, el servidor rechaza la petición y suma uno al recuento de ese dominio en ese día: solo el dominio (por ejemplo, example.com), sin nada de quién lo pidió. Con el escáner abierto a cualquier dominio no hay peticiones rechazadas por este motivo y no se cuenta nada.',
   'privacy.blocked.p2':
     'Estos recuentos se borran a los 30 días y no entran en las copias de seguridad. Como se hacen en el servidor al rechazar la petición, se cuentan también con GPC.',
-  'privacy.scans.title': 'Informes de escaneo',
-  'privacy.scans.p':
-    'Cada escaneo guarda el dominio analizado y su resultado técnico, para mostrar el informe en su enlace. No guarda nada de quién lo lanzó.',
+    'privacy.scans.title':
+      'Escaneos e informes',
+    'privacy.scans.p':
+      'Cada escaneo guarda el dominio analizado, la fecha y su resultado técnico (lo que respondió su servidor al saludo TLS y su certificado, que es público), para mostrar el informe en su enlace. No guarda nada de quién lo lanzó: ni su IP ni ninguna cuenta. Se borra a los 30 días; también está en las copias de seguridad cifradas, que se conservan hasta 6 meses, y desaparece de ellas en ese plazo.',
+    'privacy.scans.how':
+      'Los análisis salen de nuestro servidor (quantumready.fizsar.com) y solo negocian TLS: no piden páginas ni prueban nada. Su IP, los límites y cómo excluir un dominio, en «Cómo funciona el escáner» (/about-scans).',
   'privacy.demo.title': 'Si pides una demo',
   'privacy.demo.what':
     'Guardamos lo que escribes en el formulario: nombre, email, empresa, el dominio que quieres analizar y el mensaje, si lo pones, junto con el idioma, la fecha y la versión de esta página que aceptaste. Solo lo usamos para responderte y preparar la demo.',
@@ -286,7 +290,8 @@ const es = {
     'El servidor está en OVH, en Beauharnois (Canadá). Canadá tiene una decisión de adecuación de la Comisión Europea, que reconoce que protege los datos personales a un nivel equivalente al de la UE. Las copias de seguridad, cifradas, se guardan en la UE.',
   'privacy.contact.title': 'Contacto',
   'privacy.contact.p': 'Dudas o peticiones sobre privacidad:',
-  'privacy.version': 'Versión del 20 de octubre de 2026.',
+    'privacy.version':
+      'Versión del 1 de noviembre de 2026.',
 
   'demo.button': 'Solicitar demo gratis',
   'demo.cta': '¿Quieres ver cómo está tu dominio?',
@@ -598,18 +603,18 @@ const en: Record<ShowcaseKey, string> = {
 
   'footer.privacy': 'Privacy',
   'privacy.meta.title': 'Privacy · QuantumReady',
-  'privacy.meta.description':
-    'What data QuantumReady handles: daily counts on its own server, with no cookies, no stored IPs and no identifiers, and where it is.',
+    'privacy.meta.description':
+      'What data QuantumReady handles: the analyzed domains and their technical result, 30 days; daily counts on its own server, with no cookies, no stored IPs and no identifiers; and where it is.',
   'privacy.title': 'Privacy',
-  'privacy.lead':
-    'What this site does today with the data of its visitors. The full privacy policy will come with the beta.',
+    'privacy.lead':
+      'What this site does with the data of its visitors and of the domains it analyzes. There is no sign-up and there are no accounts: the scanner is used without giving any data.',
   'privacy.counted.title': 'What we count',
   'privacy.counted.lead': 'To know whether the site is useful to anyone, we add one to daily counters:',
   'privacy.counted.pages': 'Visits per page. Scan reports are all counted together as “report”, never which one.',
   'privacy.counted.source':
     'Which site you come from: only its domain (for example, linkedin.com) and only on the first page of the visit, never the full address.',
-  'privacy.counted.events':
-    'Some uses: scanning a demo domain (which one), opening “Under the hood”, downloading the JSON and switching language.',
+    'privacy.counted.events':
+      'Some uses: scanning one of the demo domains (which one; scans of any other domain are not counted), opening “Under the hood”, downloading the JSON and switching language.',
   'privacy.counted.demo': 'Requesting a demo: only from which button, never what you write.',
   'privacy.counted.how':
     'Each count is a number per day. Nothing is stored about who, at what time, or anything linking one count to another.',
@@ -621,14 +626,18 @@ const en: Record<ShowcaseKey, string> = {
   'privacy.gpc.title': 'Global Privacy Control (GPC)',
   'privacy.gpc.p':
     'If your browser sends the Global Privacy Control signal, the site sends no counts at all. Automated browsers and known bots are not counted either.',
-  'privacy.blocked.title': 'Domains that cannot be scanned yet',
-  'privacy.blocked.p1':
-    'For now only the demo domains are analyzed. If a scan of another one is requested, the server refuses it and adds one to that domain’s count for the day: only the domain (for example, example.com), nothing about who asked. That tells us how much interest there is in opening the scanner.',
+    'privacy.blocked.title':
+      'If the scanner is closed',
+    'privacy.blocked.p1':
+      'While the scanner only takes the demo domains, if a scan of another one is requested, the server refuses it and adds one to that domain’s count for the day: only the domain (for example, example.com), nothing about who asked. With the scanner open to any domain no request is refused for this reason and nothing is counted.',
   'privacy.blocked.p2':
     'These counts are deleted after 30 days and are left out of the backups. Since the server counts them when it refuses the request, they are counted with GPC too.',
-  'privacy.scans.title': 'Scan reports',
-  'privacy.scans.p':
-    'Each scan stores the analyzed domain and its technical result, to show the report at its link. It stores nothing about who started it.',
+    'privacy.scans.title':
+      'Scans and reports',
+    'privacy.scans.p':
+      'Each scan stores the analyzed domain, the date and its technical result (what its server answered to the TLS greeting, and its certificate, which is public), to show the report at its link. It stores nothing about who started it: neither their IP nor any account. It is deleted after 30 days; it is also in the encrypted backups, kept up to 6 months, and goes from them within that time.',
+    'privacy.scans.how':
+      'Scans come from our server (quantumready.fizsar.com) and only negotiate TLS: they request no pages and try nothing. Its IP, the limits and how to exclude a domain in “How the scanner works” (/about-scans).',
   'privacy.demo.title': 'If you request a demo',
   'privacy.demo.what':
     'We keep what you write in the form: name, email, company, the domain you want analyzed and the message, if any, together with the language, the date and the version of this page you accepted. We only use it to answer you and prepare the demo.',
@@ -643,7 +652,8 @@ const en: Record<ShowcaseKey, string> = {
     'The server is at OVH in Beauharnois (Canada). Canada has an adequacy decision of the European Commission, which recognizes that it protects personal data at a level equivalent to the EU’s. The backups, encrypted, are kept in the EU.',
   'privacy.contact.title': 'Contact',
   'privacy.contact.p': 'Privacy questions or requests:',
-  'privacy.version': 'Version of 20 October 2026.',
+    'privacy.version':
+      'Version of 1 November 2026.',
 
   'demo.button': 'Request a free demo',
   'demo.cta': 'Want to see how your domain does?',

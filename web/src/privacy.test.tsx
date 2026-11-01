@@ -26,8 +26,8 @@ function renderAt(path: string, lang: Lang) {
 
 const heading = { es: 'Privacidad', en: 'Privacy' }
 const sections = {
-  es: ['Qué contamos', 'Qué no hacemos', 'Control Global de Privacidad (GPC)', 'Dominios que todavía no se pueden escanear', 'Informes de escaneo', 'Si pides una demo', 'Dónde están los datos', 'Contacto'],
-  en: ['What we count', 'What we do not do', 'Global Privacy Control (GPC)', 'Domains that cannot be scanned yet', 'Scan reports', 'If you request a demo', 'Where the data is', 'Contact'],
+  es: ['Qué contamos', 'Qué no hacemos', 'Control Global de Privacidad (GPC)', 'Si el escáner se cierra', 'Escaneos e informes', 'Si pides una demo', 'Dónde están los datos', 'Contacto'],
+  en: ['What we count', 'What we do not do', 'Global Privacy Control (GPC)', 'If the scanner is closed', 'Scans and reports', 'If you request a demo', 'Where the data is', 'Contact'],
 }
 
 describe('/privacy', () => {
@@ -43,15 +43,22 @@ describe('/privacy', () => {
     it(`says what the code does (${lang})`, async () => {
       renderAt('/privacy', lang)
       const page = (await screen.findByRole('article')).textContent ?? ''
-      // The promises it makes are the ones M1 keeps: GPC, no cookies, 30 days and no backups, beta.
+      // The promises it makes are the ones M1 keeps: GPC, no cookies, 30 days and no backups.
       const facts = {
-        es: [/Global Privacy Control/, /No usamos cookies/, /30 días/, /no entran en las copias de seguridad/, /llegará con la beta/, /también con GPC/,
+        es: [/Global Privacy Control/, /No usamos cookies/, /30 días/, /no entran en las copias de seguridad/, /también con GPC/,
+          // Open scanning (Apertura): what a scan keeps, 30 days (the worker's purge), backups, the IP, the way out.
+          /el dominio analizado, la fecha y su resultado técnico/, /ni su IP ni ninguna cuenta/, /Se borra a los 30 días/,
+          /copias de seguridad cifradas, que se conservan hasta 6 meses, y desaparece/, /nuestro servidor \(quantumready\.fizsar\.com\)/, /cómo excluir un dominio/,
+          /los escaneos de cualquier otro dominio no se cuentan/,
           // Demo requests (sprint 1): what, 12 months (cmd/api purge), backups up to 6 months, how to ask, where.
           /nombre, email, empresa, el dominio/, /borra solo a los 12 meses/, /copias de seguridad cifradas, que se conservan hasta 6 meses/,
-          /escribe a soporte@fizsar\.com/, /OVH, en Beauharnois \(Canadá\)/, /decisión de adecuación/, /Versión del 20 de octubre de 2026/],
-        en: [/Global Privacy Control/, /We use no cookies/, /30 days/, /left out of the backups/, /will come with the beta/, /with GPC too/,
+          /escribe a soporte@fizsar\.com/, /OVH, en Beauharnois \(Canadá\)/, /decisión de adecuación/, /Versión del 1 de noviembre de 2026/],
+        en: [/Global Privacy Control/, /We use no cookies/, /30 days/, /left out of the backups/, /with GPC too/,
+          /the analyzed domain, the date and its technical result/, /neither their IP nor any account/, /deleted after 30 days/,
+          /encrypted backups, kept up to 6 months, and goes/, /our server \(quantumready\.fizsar\.com\)/, /how to exclude a domain/,
+          /scans of any other domain are not counted/,
           /name, email, company, the domain/, /deleted automatically after 12 months/, /encrypted backups, which are kept up to 6 months/,
-          /write to soporte@fizsar\.com/, /OVH in Beauharnois \(Canada\)/, /adequacy decision/, /Version of 20 October 2026/],
+          /write to soporte@fizsar\.com/, /OVH in Beauharnois \(Canada\)/, /adequacy decision/, /Version of 1 November 2026/],
       }[lang]
       for (const re of facts) expect(page, String(re)).toMatch(re)
     })
@@ -68,6 +75,8 @@ describe('/privacy', () => {
       for (const re of forbiddenProseOnPrivacy()) expect(all, String(re)).not.toMatch(re)
       // Neither a full policy nor promises of what is not built yet.
       expect(all).not.toMatch(/anonimizad|anonymi[sz]ed|RGPD|GDPR|cumpl|complian|nunca registra|never log/i)
+      // No accounts in production (Apertura): no beta to wait for, no sign-up.
+      expect(all).not.toMatch(/llegará con la beta|will come with the beta|dominios cuya propiedad|verified domains/i)
     })
   }
 

@@ -102,10 +102,13 @@ describe('about the scanner', () => {
     stubFetch(() => unauth())
     renderAt('/about-scans')
     expect(await screen.findByRole('heading', { level: 1, name: 'Cómo funciona el escáner' })).toBeTruthy()
-    for (const h of ['Qué hace', 'Desde dónde', 'Con qué frecuencia, como máximo', 'Cómo excluir tu dominio']) {
+    for (const h of ['Qué hace', 'Desde dónde', 'Con qué frecuencia, como máximo', 'Qué se guarda', 'Cómo excluir tu dominio']) {
       expect(screen.getByRole('heading', { level: 2, name: h })).toBeTruthy()
     }
     expect(screen.getByText(/149\.56\.13\.98, cuyo nombre inverso es quantumready\.fizsar\.com/)).toBeTruthy()
+    expect(screen.getByText(/durante 30 días \(y en las copias de seguridad cifradas, hasta 6 meses\)\. Nada de quién lo pidió/)).toBeTruthy()
+    expect(screen.getByText(/Solo nuestros propios dominios \(fizsar\.com y quantumready\.fizsar\.com\) reciben además el análisis completo/)).toBeTruthy()
+    expect(screen.getByText(/Escríbenos a soporte@fizsar\.com/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'security.txt' }).getAttribute('href')).toBe('/.well-known/security.txt')
     expect(screen.getAllByRole('link', { name: 'Cómo funciona el escáner' }).length).toBeGreaterThan(0) // footer
   })

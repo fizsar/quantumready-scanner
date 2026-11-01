@@ -40,6 +40,24 @@ describe('accounts off', () => {
     })
   }
 
+  // /about-scans: the owner's opt-out from /org needs an account; without
+  // accounts the only way out is the email to soporte.
+  for (const accounts of [false, true]) {
+    it(`/about-scans offers the opt-out from an account only with accounts on (${accounts})`, async () => {
+      stubFetch((url) =>
+        url === '/api/targets' ? json({ hosts: [], port: 443, accounts }) : json({ error: { code: 'unauthenticated', message: 'x' } }, 401),
+      )
+      renderAt('/about-scans')
+      expect(await screen.findByText(/Escríbenos a soporte@fizsar\.com/)).toBeTruthy()
+      const optout = /Si tienes cuenta, verifica el dominio/
+      if (accounts) expect(await screen.findByText(optout)).toBeTruthy()
+      else {
+        await new Promise((r) => setTimeout(r, 50)) // the flag has been read
+        expect(screen.queryByText(optout)).toBeNull()
+      }
+    })
+  }
+
   it('with accounts on, the same pages and the sign-in link are there', async () => {
     stubFetch((url) =>
       url === '/api/targets' ? json({ hosts: [], port: 443, accounts: true }) : json({ error: { code: 'unauthenticated', message: 'x' } }, 401),

@@ -51,6 +51,7 @@ export function Privacy() {
 
       <Section id="privacy-scans" title={t('privacy.scans.title')}>
         <p>{t('privacy.scans.p')}</p>
+        <p>{t('privacy.scans.how')}</p>
       </Section>
 
       {demo && (

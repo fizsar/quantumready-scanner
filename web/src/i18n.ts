@@ -192,7 +192,8 @@ export const dict = {
     'about.what.title': 'Qué hace',
     'about.what.1': 'Solo abre conexiones TLS al puerto 443 (HTTPS) y negocia el cifrado, como haría un navegador: qué versiones de TLS, cifrados y grupos (incluido el post-cuántico ML-KEM) acepta el servidor y qué certificado presenta.',
     'about.what.2': 'No pide páginas, no envía datos de formularios, no prueba contraseñas ni explota vulnerabilidades. No guarda el contenido de la web.',
-    'about.what.3': 'El análisis básico (el público) abre entre 15 y 40 conexiones, como mucho 4 a la vez y en menos de un minuto. El completo, solo para dominios cuya propiedad se ha verificado, añade hasta 48 sondas que envían el saludo inicial de TLS y cierran sin completar la conexión.',
+    'about.what.3':
+      'Cada análisis abre entre 15 y 40 conexiones, como mucho 4 a la vez y en menos de un minuto. Solo nuestros propios dominios (fizsar.com y quantumready.fizsar.com) reciben además el análisis completo: hasta 48 sondas que envían el saludo inicial de TLS y cierran sin completar la conexión.',
     'about.from.title': 'Desde dónde',
     'about.from.1': 'Todas las conexiones salen de la dirección IP {ip}, cuyo nombre inverso es {ptr}.',
     'about.from.2': 'No se usan otras direcciones ni redes de terceros.',
@@ -200,8 +201,13 @@ export const dict = {
     'about.often.1': 'Si alguien pide otra vez el mismo dominio en menos de 2 minutos, se reutiliza el análisis anterior en lugar de conectar de nuevo.',
     'about.often.2': 'Un mismo dominio se analiza públicamente como mucho 10 veces al día.',
     'about.often.3': 'En total, el escáner empieza como mucho 20 análisis por minuto, para no parecer nunca un barrido de Internet.',
+    'about.keep.title':
+      'Qué se guarda',
+    'about.keep.1':
+      'El dominio, la fecha y el resultado técnico de cada análisis, durante 30 días (y en las copias de seguridad cifradas, hasta 6 meses). Nada de quién lo pidió: ni su IP ni ninguna cuenta. Más en Privacidad (/privacy).',
     'about.optout.title': 'Cómo excluir tu dominio',
-    'about.optout.1': 'Escríbenos a soporte@fizsar.com desde una dirección del dominio (o indicando cómo comprobar que es tuyo) y lo añadiremos a la lista de exclusión, con sus subdominios.',
+    'about.optout.1':
+      'Escríbenos a soporte@fizsar.com desde una dirección del dominio (o indicando cómo comprobar que es tuyo) y lo añadiremos a la lista de exclusión, con sus subdominios: no se volverá a analizar. Los informes que ya existan se borran como todos, a los 30 días.',
     'about.optout.2': 'Si tienes cuenta, verifica el dominio y activa «Bloquear análisis públicos»: el efecto es inmediato. Tú podrás seguir analizándolo desde tu organización.',
     'domains.blockPublic': 'Bloquear los análisis públicos de este dominio (y sus subdominios)',
     'domains.blockedLapsed': 'Los análisis públicos de este dominio siguen bloqueados. Para quitar el bloqueo, verifica el dominio de nuevo.',
@@ -437,7 +443,8 @@ export const dict = {
     'about.what.title': 'What it does',
     'about.what.1': 'It only opens TLS connections to port 443 (HTTPS) and negotiates encryption, as a browser would: which TLS versions, ciphers and groups (including post-quantum ML-KEM) the server accepts and which certificate it presents.',
     'about.what.2': 'It does not request pages, send form data, try passwords or exploit vulnerabilities. It does not store the website content.',
-    'about.what.3': 'The basic scan (the public one) opens between 15 and 40 connections, at most 4 at a time and within a minute. The full scan, only for domains whose ownership has been verified, adds up to 48 probes that send the TLS greeting and close without completing the connection.',
+    'about.what.3':
+      'Each scan opens between 15 and 40 connections, at most 4 at a time and within a minute. Only our own domains (fizsar.com and quantumready.fizsar.com) also get the full scan: up to 48 probes that send the TLS greeting and close without completing the connection.',
     'about.from.title': 'Where from',
     'about.from.1': 'Every connection comes from the IP address {ip}, whose reverse DNS name is {ptr}.',
     'about.from.2': 'No other addresses or third-party networks are used.',
@@ -445,8 +452,13 @@ export const dict = {
     'about.often.1': 'If someone asks for the same domain again within 2 minutes, the previous scan is reused instead of connecting again.',
     'about.often.2': 'A domain is scanned publicly at most 10 times a day.',
     'about.often.3': 'In total, the scanner starts at most 20 scans per minute, so it never looks like an Internet sweep.',
+    'about.keep.title':
+      'What is kept',
+    'about.keep.1':
+      'The domain, the date and the technical result of each scan, for 30 days (and in the encrypted backups, up to 6 months). Nothing about who asked: neither their IP nor any account. More in Privacy (/privacy).',
     'about.optout.title': 'How to exclude your domain',
-    'about.optout.1': 'Write to soporte@fizsar.com from an address of the domain (or telling us how to check it is yours) and we will add it, with its subdomains, to the exclusion list.',
+    'about.optout.1':
+      'Write to soporte@fizsar.com from an address of the domain (or telling us how to check it is yours) and we will add it, with its subdomains, to the exclusion list: it will not be scanned again. Reports that already exist are deleted like every other, after 30 days.',
     'about.optout.2': 'If you have an account, verify the domain and turn on "Block public scans": it takes effect at once. You can still scan it from your organization.',
     'domains.blockPublic': 'Block public scans of this domain (and its subdomains)',
     'domains.blockedLapsed': 'Public scans of this domain are still blocked. To lift the block, verify the domain again.',
