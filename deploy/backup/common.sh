@@ -14,6 +14,15 @@ RESTIC_MOUNTS=()
 # their data, so a restore brings them back empty.
 NO_DATA_TABLES=(usage_daily blocked_targets_daily)
 
+# The services' roles (migrations 00004 and 00005). Roles belong to the
+# cluster, not to a database, so pg_dump leaves them out; but the schema
+# grants to them and its row-level security policies name them, so a restore
+# into a new PostgreSQL fails ("role qr_app does not exist") unless they are
+# created first, as restore-test.sh does (NOLOGIN, as the migrations leave
+# them; migrate gives qr_app and qr_worker LOGIN and their passwords).
+# shellcheck disable=SC2034 # used by restore-test.sh and test.sh
+SERVICE_ROLES=(qr_app qr_worker qr_mailer)
+
 # One JSON object {table: rows} for every table in the public schema, keys in
 # order, so a manifest and a restored database compare as plain strings.
 # MANIFEST_SQL counts every table; DUMP_MANIFEST_SQL (backup.sh) records 0 for

@@ -89,6 +89,9 @@ pings() { grep -c "^$1 ${2:-}" "$fx/pings.log" || true; }
 qr_dumps() { find "$fx/backups" -maxdepth 1 -name "qr-*$1" | wc -l; }
 
 (cd "$fx" && docker compose up -d --wait db >/dev/null 2>&1)
+# The schema of main grants to the service roles and its policies name them:
+# a restore into an empty PostgreSQL needs them created first.
+psql -c 'CREATE ROLE qr_app NOLOGIN; CREATE ROLE qr_worker NOLOGIN; CREATE ROLE qr_mailer NOLOGIN;'
 psql -c 'CREATE TABLE scans (id serial PRIMARY KEY, host text);
 	CREATE TABLE findings (id serial PRIMARY KEY, scan_id int REFERENCES scans);
 	CREATE TABLE "audit log" (id int); CREATE TABLE empty (id int);
@@ -98,7 +101,14 @@ psql -c 'CREATE TABLE scans (id serial PRIMARY KEY, host text);
 	INSERT INTO findings (scan_id) SELECT 1 FROM generate_series(1, 5);
 	INSERT INTO "audit log" VALUES (1);
 	INSERT INTO usage_daily VALUES (current_date, $$page_view$$, $$/$$, 7), (current_date, $$lang_switch$$, $$en$$, 1);
-	INSERT INTO blocked_targets_daily VALUES (current_date, $$example.org$$, 3);'
+	INSERT INTO blocked_targets_daily VALUES (current_date, $$example.org$$, 3);
+	ALTER TABLE scans ENABLE ROW LEVEL SECURITY;
+	CREATE POLICY scans_app ON scans TO qr_app USING (true);
+	GRANT SELECT ON findings TO qr_worker; GRANT INSERT ON "audit log" TO qr_mailer;'
+
+# SERVICE_ROLES are exactly the roles the migrations create.
+check "SERVICE_ROLES = the roles created in migrations/" [ "$(printf '%s
+' "${SERVICE_ROLES[@]}" | sort | paste -sd ' ')" = 	"$(grep -hoE 'CREATE ROLE [a-z_]+' "$here"/../../migrations/*.sql | awk '{print $3}' | sort -u | paste -sd ' ')" ]
 
 # NO_DATA_TABLES are the real M1 tables (a rename must not silently back them up).
 for t in "${NO_DATA_TABLES[@]}"; do

@@ -47,6 +47,10 @@ for _ in $(seq 1 60); do
 done
 docker exec "$pg" pg_isready -h 127.0.0.1 -U postgres -d restore -q
 
+# The services' roles first: the schema grants to them and its policies name them.
+for role in "${SERVICE_ROLES[@]}"; do
+	docker exec "$pg" psql -h 127.0.0.1 -U postgres -d restore -q -v ON_ERROR_STOP=1 		-c "CREATE ROLE $role NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE" </dev/null
+done
 docker exec -i "$pg" pg_restore -h 127.0.0.1 -U postgres -d restore --no-owner --exit-on-error <"$dump"
 got=$(docker exec "$pg" psql -h 127.0.0.1 -U postgres -d restore -tAq -v ON_ERROR_STOP=1 -c "$MANIFEST_SQL")
 want=$(cat "$manifest")

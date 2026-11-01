@@ -164,6 +164,5 @@ public=$(curl -fsS --max-time 10 "$URL/api/health")
 echo "==> public ($URL): $public"
 # The record deploy/ghcr_cleanup.py keeps images by: the commit's tag, also
 # for latest.
-printf '%s sha-%s
-' "$(date -u +%Y-%m-%dT%H:%MZ)" "${commit:0:7}" >> deploy/deployments.txt
+printf '%s sha-%s\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "${commit:0:7}" >> deploy/deployments.txt
 echo "==> done: $TAG (recorded in deploy/deployments.txt: commit it)"
