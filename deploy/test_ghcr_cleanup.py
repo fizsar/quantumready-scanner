@@ -4,6 +4,7 @@ import os
 import sys
 import unittest
 
+sys.dont_write_bytecode = True  # no deploy/__pycache__ in the working tree
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ghcr_cleanup import PlanError, plan, read_deployments  # noqa: E402
 
