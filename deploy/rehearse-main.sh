@@ -175,6 +175,8 @@ echo "   old scan $OLD: $(report "$OLD")"
 [ -n "$AGED" ] && echo "   aged scan $AGED: $(report "$AGED")"
 BEFORE=$(psql_owner -c "select count(*) from scans")
 OLDCOUNT=$(psql_owner -c "select count(*) from scans where created_at < now() - interval '30 days' and status in ('done','failed')")
+echo "   finished scans older than 30 days, by day (what the first purge deletes): $(psql_owner -c "select coalesce(string_agg(d || ' ' || n, ', ' order by d), 'none') from (select created_at::date d, count(*) n from scans where created_at < now() - interval '30 days' and status in ('done','failed') group by 1) x")"
+echo "   scans by status: $(psql_owner -c "select string_agg(status || ' ' || n, ', ' order by status) from (select status, count(*) n from scans group by 1) x"); newest $(psql_owner -c "select max(created_at)::date from scans"), oldest $(psql_owner -c "select min(created_at)::date from scans")"
 
 # --- main: the first deploy --------------------------------------------------
 say "the .env lines main needs (generated here as on the VPS)"
