@@ -176,7 +176,8 @@ if [ -z "$DUMP" ]; then
 	read -r OLD st < <(scan fizsar.com)
 	read -r AGED st2 < <(scan quantumready.fizsar.com)
 	[ "$st$st2" = "donedone" ] && ok "two scans on showcase" || bad "showcase scans: $st $st2"
-	psql_owner -c "update scans set created_at = created_at - interval '40 days', finished_at = finished_at - interval '40 days' where id = '$AGED'" >/dev/null
+	# Its expiry too: main sets one when the scan is created (00021); showcase did not.
+	psql_owner -c "update scans set created_at = created_at - interval '40 days', finished_at = finished_at - interval '40 days', expires_at = expires_at - interval '40 days' where id = '$AGED'" >/dev/null
 	ok "aged $AGED by 40 days (a production scan older than 30 days)"
 else
 	OLD=$(psql_owner -c "select id from scans where status = 'done' and created_at > now() - interval '30 days' order by created_at desc limit 1")
@@ -252,7 +253,11 @@ rm -f "$ROOT/main.dump"
 deploy "$SHOWCASE" || die "rollback to showcase"
 echo "   old scan $OLD: $(report "$OLD")"
 echo "   main's scan $NEW: $(report "$NEW")"
+# Main hands out a public result of the last hour instead of scanning again:
+# two hours older, fizsar.com gets a new scan.
+psql_owner -c "update scans set created_at = created_at - interval '2 hours', finished_at = finished_at - interval '2 hours' where host = 'fizsar.com'" >/dev/null
 read -r RB st < <(scan fizsar.com)
+[ "$RB" != "$OLD" ] && ok "the rollback scan is a new one" || bad "the rollback scan is the old one ($RB)"
 [ "$st" = "done" ] && ok "new scan on showcase after the rollback: $(report "$RB")" || bad "scan after rollback: $st"
 logs_clean
 
