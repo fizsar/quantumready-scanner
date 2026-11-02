@@ -74,7 +74,12 @@ func TestPublicReport(t *testing.T) {
 		-- An organization's scan: never in the public report.
 		INSERT INTO scans (organization_id, host, status, created_at, started_at, finished_at, intensity, result, scoring_version, grade)
 		VALUES ('00000000-0000-4000-8000-0000000000aa', 'private.org', 'done', now(), now(), now(), 'full', '{}', '2026.3', 'A');
-		INSERT INTO scan_exclusions (name, reason, created_at) VALUES ('excluded.org', 'owner asked', now()), ('older.org', NULL, now() - interval '30 days')`); err != nil {
+		INSERT INTO scan_exclusions (name, reason, created_at) VALUES ('excluded.org', 'owner asked', now()), ('older.org', NULL, now() - interval '30 days');
+		-- Refusals (00022) and the closed scanner's 403 (M1).
+		INSERT INTO scan_refusals_daily (day, kind, count) VALUES
+		  ((now() AT TIME ZONE 'UTC')::date, 'client_limit', 4), ((now() AT TIME ZONE 'UTC')::date, 'proof_failed', 2),
+		  ((now() AT TIME ZONE 'UTC')::date - 1, 'excluded', 1), ((now() AT TIME ZONE 'UTC')::date - 40, 'queue_full', 9);
+		INSERT INTO usage_daily (day, event, dim, count) VALUES ((now() AT TIME ZONE 'UTC')::date, 'scan_blocked_403', '', 5)`); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -113,8 +118,27 @@ func TestPublicReport(t *testing.T) {
 			t.Errorf("%s in the report", never)
 		}
 	}
-	if !strings.Contains(s, "Exclusions in force: 2") || !strings.Contains(s, "Not recorded: refusals by limit") {
-		t.Errorf("exclusions or the not-recorded note missing")
+	if !strings.Contains(s, "Exclusions in force: 2") {
+		t.Errorf("exclusions missing")
+	}
+	// Refused requests: day client_limit domain_limit global_limit queue_full excluded proof_failed closed_403.
+	refused := s[strings.Index(s, "Refused requests"):]
+	line := func(prefix string) string {
+		for _, l := range strings.Split(refused, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(l), prefix) {
+				return strings.Join(strings.Fields(l), " ")
+			}
+		}
+		return ""
+	}
+	if got := line(today); got != today+" 4 0 0 0 0 2 5" {
+		t.Errorf("refused today: %q", got)
+	}
+	if got := line(yesterday); got != yesterday+" 0 0 0 0 1 0 0" {
+		t.Errorf("refused yesterday: %q", got)
+	}
+	if got := line("total"); got != "total 4 0 0 0 1 2 5" { // the 40-day-old queue_full is out of the period
+		t.Errorf("refused total: %q", got)
 	}
 	if strings.Contains(s, "IP") {
 		t.Errorf("the report mentions IPs")

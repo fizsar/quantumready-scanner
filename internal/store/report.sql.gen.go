@@ -12,6 +12,38 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const closedRefusalsByDay = `-- name: ClosedRefusalsByDay :many
+SELECT day, sum(count)::bigint AS refused FROM usage_daily
+WHERE event = 'scan_blocked_403' AND day >= $1::date
+GROUP BY day ORDER BY day
+`
+
+type ClosedRefusalsByDayRow struct {
+	Day     pgtype.Date
+	Refused int64
+}
+
+// The closed scanner's 403 host_not_allowed: the M1 counter (bots excluded).
+func (q *Queries) ClosedRefusalsByDay(ctx context.Context, since pgtype.Date) ([]ClosedRefusalsByDayRow, error) {
+	rows, err := q.db.Query(ctx, closedRefusalsByDay, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ClosedRefusalsByDayRow
+	for rows.Next() {
+		var i ClosedRefusalsByDayRow
+		if err := rows.Scan(&i.Day, &i.Refused); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countExclusions = `-- name: CountExclusions :one
 SELECT count(*)::bigint FROM scan_exclusions
 `
@@ -168,6 +200,32 @@ func (q *Queries) PublicScansByDay(ctx context.Context, since time.Time) ([]Publ
 			&i.QueueTimeouts,
 			&i.FullScans,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const refusalsByDay = `-- name: RefusalsByDay :many
+SELECT day, kind, count FROM scan_refusals_daily
+WHERE day >= $1::date ORDER BY day, kind
+`
+
+// Refused public scan requests by kind (migration 00022).
+func (q *Queries) RefusalsByDay(ctx context.Context, since pgtype.Date) ([]ScanRefusalsDaily, error) {
+	rows, err := q.db.Query(ctx, refusalsByDay, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ScanRefusalsDaily
+	for rows.Next() {
+		var i ScanRefusalsDaily
+		if err := rows.Scan(&i.Day, &i.Kind, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

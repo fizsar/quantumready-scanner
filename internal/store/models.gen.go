@@ -158,6 +158,12 @@ type ScanExclusion struct {
 	CreatedAt time.Time
 }
 
+type ScanRefusalsDaily struct {
+	Day   pgtype.Date
+	Kind  string
+	Count int64
+}
+
 type Session struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID

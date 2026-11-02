@@ -90,6 +90,9 @@ type Config struct {
 	// Usage enables the M1 usage counters (POST /api/e and the 403 count);
 	// nil disables them.
 	Usage UsageStore
+	// Refusals counts refused public scan requests by kind (migration
+	// 00022), flushed by the caller (FlushRefusalsLoop); nil counts nothing.
+	Refusals *Refusals
 	// UsageLimiter rate-limits POST /api/e per client; nil means 60/min and
 	// 1,000/day.
 	UsageLimiter *Limiter
