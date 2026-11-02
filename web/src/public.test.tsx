@@ -42,7 +42,10 @@ describe('open public scanning', () => {
       return json({ ...scanView('running'), host: 'example.org' })
     })
     renderAt('/')
-    expect(await screen.findByText('Escribe cualquier dominio para analizarlo. O prueba con uno de estos:')).toBeTruthy()
+    expect(await screen.findByText(/^Escribe cualquier dominio para analizarlo: solo negociamos TLS/)).toBeTruthy()
+    // No demo domains when scanning is open, and the way to /about-scans.
+    expect(screen.queryByText(/demostración/)).toBeNull()
+    expect(screen.getByRole('link', { name: 'Qué hace el escáner, desde qué IP analiza y cómo excluir tu dominio' }).getAttribute('href')).toBe('/about-scans')
     await userEvent.type(screen.getByLabelText('Dominio'), 'example.org')
     await userEvent.click(screen.getByRole('button', { name: 'Escanear' }))
     await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Escaneando example.org'))

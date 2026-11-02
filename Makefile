@@ -75,7 +75,7 @@ check-compose: ## Check the security policy of deploy/compose.prod.yaml (network
 check-files: ## No executable binaries and no files over 1 MB in the repository (exceptions in deploy/check_files.py)
 	python3 deploy/check_files.py
 
-test-deploy: ## Test the deploy helpers without the VPS (deploy.sh refs, check-installed.sh, predeploy-dump.sh, prune-predeploy-dumps.sh, image pins, compose plan, repository files, GHCR cleanup plan)
+test-deploy: ## Test the deploy helpers without the VPS (deploy.sh refs, check-installed.sh, predeploy-dump.sh, prune-predeploy-dumps.sh, image pins, compose plan, scan switch, repository files, GHCR cleanup plan)
 	bash deploy/test-deploy-ref.sh
 	bash deploy/test-pin-images.sh
 	bash deploy/test-check-installed.sh
@@ -83,6 +83,7 @@ test-deploy: ## Test the deploy helpers without the VPS (deploy.sh refs, check-i
 	bash deploy/test-prune-predeploy-dumps.sh
 	bash deploy/test-check-images.sh
 	bash deploy/test-compose-plan.sh
+	bash deploy/test-scan-switch.sh
 	bash deploy/test-check-files.sh
 	python3 deploy/test_ghcr_cleanup.py
 
