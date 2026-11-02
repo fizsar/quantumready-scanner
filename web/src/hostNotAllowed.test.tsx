@@ -24,7 +24,7 @@ function api() {
       const { host } = JSON.parse(String(init.body)) as { host: string }
       return DEMO.includes(host)
         ? json(scanView('queued', { host }), 202)
-        : json({ error: { code: 'host_not_allowed', message: 'Scanning any domain will come with the beta.' } }, 403)
+        : json({ error: { code: 'host_not_allowed', message: 'Right now, scanning is limited to the demo domains.' } }, 403)
     }
     return json(scanView('queued'))
   })
