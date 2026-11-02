@@ -10,22 +10,24 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/fizsar/quantumready-saas/internal/domains"
 	"github.com/fizsar/quantumready-saas/internal/store"
 )
 
-// notRecorded names what public-report cannot show: the API refuses these
-// requests (429 rate_limited, domain_rate_limited and busy; 403
-// scan_not_allowed) without counting them anywhere.
-const notRecorded = `Not recorded: refusals by limit (per client, per domain, global), refusals
-because the queue was full, and refusals of excluded domains. The API answers
-them without counting them (docs/apertura.md says what counting them needs).`
+const refusalsNote = `client_limit, domain_limit, global_limit: 429 by the per-client, per-domain
+and global limits; queue_full: 429, the public queue was full; excluded: 403
+scan_not_allowed (exclusion list or opt-out); proof_failed: 400, no valid proof
+of work. Counted by the API per day and kind only (migration 00022), written
+every 30 s. closed_403: 403 host_not_allowed while the scanner is closed, from
+the M1 counter, which leaves bots out.`
 
 // publicReportCmd prints what public scanning did, day by day (UTC): scans,
-// outcomes, distinct domains, queue timeouts, the longest queue, the most
-// scanned domains (only those at -min or more in the period) and the
-// exclusions. Public scans are kept 30 days, so -days goes up to 31. It only
-// reads: nothing is stored, and the scans table keeps nothing about who asked.
+// outcomes, distinct domains, queue timeouts, the longest queue, the refused
+// requests by kind, the most scanned domains (only those at -min or more in
+// the period) and the exclusions. Public scans are kept 30 days, so -days goes
+// up to 31. It only reads, and nothing it reads says who asked.
 func publicReportCmd(ctx context.Context, args []string, getenv func(string) string, out io.Writer) error {
 	fs := flag.NewFlagSet("public-report", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -72,6 +74,15 @@ func publicReport(ctx context.Context, q *store.Queries, since, now time.Time, m
 		return err
 	}
 	excluded, err := q.CountExclusions(ctx)
+	if err != nil {
+		return err
+	}
+	sinceDay := pgtype.Date{Time: since, Valid: true}
+	refusals, err := q.RefusalsByDay(ctx, sinceDay)
+	if err != nil {
+		return err
+	}
+	closed, err := q.ClosedRefusalsByDay(ctx, sinceDay)
 	if err != nil {
 		return err
 	}
@@ -139,6 +150,10 @@ func publicReport(ctx context.Context, q *store.Queries, since, now time.Time, m
 	fmt.Fprintln(out, "max_queue: the most public scans waiting at once that day, rebuilt from when each was")
 	fmt.Fprintln(out, "created and last claimed (a retried scan counts as waiting until its last claim).")
 
+	if err := refusalTable(out, keys, refusals, closed); err != nil {
+		return err
+	}
+
 	fmt.Fprintf(out, "\nMost scanned domains (registrable; %d scans or more in the period)\n", minScans)
 	var often []dimCount
 	for d, n := range perDomain {
@@ -157,7 +172,53 @@ func publicReport(ctx context.Context, q *store.Queries, since, now time.Time, m
 			return err
 		}
 	}
-	fmt.Fprintf(out, "\nExclusions in force: %d (qradmin exclude list)\n\n%s\n", excluded, notRecorded)
+	fmt.Fprintf(out, "\nExclusions in force: %d (qradmin exclude list)\n", excluded)
+	return nil
+}
+
+// refusalTable prints the refused requests per day and kind.
+func refusalTable(out io.Writer, keys []string, refusals []store.ScanRefusalsDaily, closed []store.ClosedRefusalsByDayRow) error {
+	per := map[string]map[string]int64{}
+	for _, k := range keys {
+		per[k] = map[string]int64{}
+	}
+	for _, r := range refusals {
+		if d := per[r.Day.Time.Format(time.DateOnly)]; d != nil {
+			d[r.Kind] += r.Count
+		}
+	}
+	for _, r := range closed {
+		if d := per[r.Day.Time.Format(time.DateOnly)]; d != nil {
+			d["closed_403"] += r.Refused
+		}
+	}
+	cols := append(append([]string{}, store.RefusalKinds...), "closed_403")
+	fmt.Fprintln(out, "\nRefused requests")
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', tabwriter.AlignRight)
+	fmt.Fprint(w, "day\t")
+	for _, c := range cols {
+		fmt.Fprintf(w, "%s\t", c)
+	}
+	fmt.Fprintln(w)
+	total := map[string]int64{}
+	row := func(label string, m map[string]int64) {
+		fmt.Fprintf(w, "%s\t", label)
+		for _, c := range cols {
+			fmt.Fprintf(w, "%d\t", m[c])
+		}
+		fmt.Fprintln(w)
+	}
+	for _, k := range keys {
+		row(k, per[k])
+		for c, n := range per[k] {
+			total[c] += n
+		}
+	}
+	row("total", total)
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	fmt.Fprintln(out, "\n"+refusalsNote)
 	return nil
 }
 

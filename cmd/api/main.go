@@ -123,11 +123,13 @@ func run(logger *slog.Logger) error {
 	}
 
 	st := store.NewStore(pool)
+	refusals := httpapi.NewRefusals()
 	cfg := httpapi.Config{
 		Version:        version,
 		DB:             pool,
 		Scans:          st,
 		Usage:          st,
+		Refusals:       refusals,
 		Demos:          st,
 		DemoAltcha:     proof, // one ALTCHA key and one replay cache for scans and demos
 		DemoEnabled:    demoOn,
@@ -168,6 +170,10 @@ func run(logger *slog.Logger) error {
 		return st.PurgeDemoRequests(ctx, demoRequestsKeepMonths)
 	}, 24*time.Hour, logger)
 
+	// Refused scan requests (migration 00022), written every 30 s, and once
+	// more after the server has stopped.
+	go httpapi.FlushRefusalsLoop(ctx, refusals, st.AddScanRefusals, refusalsFlushEvery, logger)
+
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	logger.Info("api listening", "addr", addr, "version", version, "commit", commit,
@@ -185,8 +191,16 @@ func run(logger *slog.Logger) error {
 	logger.Info("api shutting down")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return srv.Shutdown(shutdownCtx)
+	err = srv.Shutdown(shutdownCtx)
+	if ferr := refusals.Flush(shutdownCtx, st.AddScanRefusals); ferr != nil {
+		logger.Warn("refusals: last flush failed", "err", ferr)
+	}
+	return err
 }
+
+// refusalsFlushEvery: how often the refused scan requests counted in memory
+// are written (a crash loses at most this much).
+const refusalsFlushEvery = 30 * time.Second
 
 // publicOrigin checks PUBLIC_ORIGIN: scheme and host only, https except for
 // localhost (development).

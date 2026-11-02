@@ -39,3 +39,14 @@ GROUP BY 1 ORDER BY 1;
 
 -- name: CountExclusions :one
 SELECT count(*)::bigint FROM scan_exclusions;
+
+-- name: RefusalsByDay :many
+-- Refused public scan requests by kind (migration 00022).
+SELECT day, kind, count FROM scan_refusals_daily
+WHERE day >= sqlc.arg(since)::date ORDER BY day, kind;
+
+-- name: ClosedRefusalsByDay :many
+-- The closed scanner's 403 host_not_allowed: the M1 counter (bots excluded).
+SELECT day, sum(count)::bigint AS refused FROM usage_daily
+WHERE event = 'scan_blocked_403' AND day >= sqlc.arg(since)::date
+GROUP BY day ORDER BY day;

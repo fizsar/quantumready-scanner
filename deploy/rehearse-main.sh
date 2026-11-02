@@ -4,12 +4,13 @@
 #
 #   deploy/rehearse-main.sh [DUMP]
 #   QR_REHEARSE_MAIN=<commit> deploy/rehearse-main.sh [DUMP]   # default origin/main
+#   QR_REHEARSE_FROM=<commit> ...   # what production runs, and the rollback (default 62eac88)
 #
 #   no DUMP: showcase starts empty; two real scans (fizsar.com and
 #            quantumready.fizsar.com), one of them aged 40 days by SQL.
 #   DUMP:    the production dump (pg_dump -Fc) is restored first.
 #
-# Stages: showcase 62eac88 -> main (origin/main) -> showcase -> main.
+# Stages: FROM (showcase 62eac88 by default) -> main (origin/main) -> FROM -> main.
 # Each deploy does what deploy.sh does on the VPS: compose.prod.yaml of that
 # commit, .env.next, pin_images, recreate_plan + db_guard (db must not be
 # recreated), pull, up --wait, health. Everything lives in /dev/shm (RAM):
@@ -23,7 +24,7 @@ ROOT=/dev/shm/qrr
 W=$ROOT/quantumready # the project name is the directory's, as on the VPS
 DUMP=${1:-}
 ORIGIN=https://quantumready.fizsar.com
-SHOWCASE=62eac88
+SHOWCASE=${QR_REHEARSE_FROM:-62eac88} # where production starts, and where a rollback goes
 MAIN=$(git -C "$REPO" rev-parse --short=7 "${QR_REHEARSE_MAIN:-origin/main}")
 FAILS=0
 
@@ -150,6 +151,16 @@ POSTGRES_DB=quantumready
 SCAN_TARGET_COOLDOWN=5s
 EOF
 chmod 600 "$W/.env"
+say "the .env lines main needs (generated here as on the VPS; showcase ignores them)"
+{
+	echo "QR_APP_DB_PASSWORD=$(openssl rand -hex 32)"
+	echo "QR_WORKER_DB_PASSWORD=$(openssl rand -hex 32)"
+	echo "ALTCHA_HMAC_KEY=$(openssl rand -hex 32)"
+	echo "PUBLIC_ORIGIN=$ORIGIN"
+	echo "ACCOUNTS_ENABLED=false"
+	echo "PUBLIC_SCAN_OPEN=false"
+} >>"$W/.env"
+ok "added: $(grep -oE '^(QR_APP_DB_PASSWORD|QR_WORKER_DB_PASSWORD|ALTCHA_HMAC_KEY|PUBLIC_ORIGIN|ACCOUNTS_ENABLED|PUBLIC_SCAN_OPEN)' "$W/.env" | paste -sd ' ' -)"
 
 if [ -n "$DUMP" ]; then
 	say "restore the production dump into an empty database"
@@ -178,19 +189,13 @@ OLDCOUNT=$(psql_owner -c "select count(*) from scans where created_at < now() - 
 echo "   finished scans older than 30 days, by day (what the first purge deletes): $(psql_owner -c "select coalesce(string_agg(d || ' ' || n, ', ' order by d), 'none') from (select created_at::date d, count(*) n from scans where created_at < now() - interval '30 days' and status in ('done','failed') group by 1) x")"
 echo "   scans by status: $(psql_owner -c "select string_agg(status || ' ' || n, ', ' order by status) from (select status, count(*) n from scans group by 1) x"); newest $(psql_owner -c "select max(created_at)::date from scans"), oldest $(psql_owner -c "select min(created_at)::date from scans")"
 
-# --- main: the first deploy --------------------------------------------------
-say "the .env lines main needs (generated here as on the VPS)"
-{
-	echo "QR_APP_DB_PASSWORD=$(openssl rand -hex 32)"
-	echo "QR_WORKER_DB_PASSWORD=$(openssl rand -hex 32)"
-	echo "ALTCHA_HMAC_KEY=$(openssl rand -hex 32)"
-	echo "PUBLIC_ORIGIN=$ORIGIN"
-	echo "ACCOUNTS_ENABLED=false"
-	echo "PUBLIC_SCAN_OPEN=false"
-} >>"$W/.env"
-ok "added: $(grep -oE '^(QR_APP_DB_PASSWORD|QR_WORKER_DB_PASSWORD|ALTCHA_HMAC_KEY|PUBLIC_ORIGIN|ACCOUNTS_ENABLED|PUBLIC_SCAN_OPEN)' "$W/.env" | paste -sd ' ' -)"
-deploy "$MAIN" || die "first deploy of main"
-want=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21
+# --- main ---------------------------------------------------------------------
+deploy "$MAIN" || die "deploy of main"
+# Every migration of that commit applied: 0 and the numbers of its files.
+want=$( (
+	echo 0
+	git -C "$REPO" ls-tree --name-only "$MAIN" migrations/ | sed -n 's|^migrations/0*\([0-9][0-9]*\)_.*\.sql$|\1|p'
+) | sort -n | paste -sd, -)
 got=$(psql_owner -c "select string_agg(version_id::text, ',' order by version_id) from goose_db_version where is_applied")
 [ "$got" = "$want" ] && ok "goose: $got" || bad "goose: $got, want $want"
 docker logs quantumready-migrate-1 2>&1 | grep -q 'login users' && ok "migrate gave LOGIN: $(docker logs quantumready-migrate-1 2>&1 | grep -o '"roles":[^}]*' | head -1)" || bad "no 'login users' line in migrate"

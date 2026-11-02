@@ -113,6 +113,7 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 	}
 	if a.cfg.PublicScanOpen && a.cfg.Altcha != nil {
 		if err := a.cfg.Altcha.Verify(req.Altcha); err != nil {
+			a.refused(RefusedProofFailed)
 			writeError(w, r, http.StatusBadRequest, "proof_failed")
 			return
 		}
@@ -126,6 +127,7 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if blocked {
+			a.refused(RefusedExcluded)
 			writeError(w, r, http.StatusForbidden, "scan_not_allowed")
 			return
 		}
@@ -155,16 +157,18 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, r, "public queue length", err)
 		return
 	} else if queued >= int64(a.cfg.PublicQueueMax) {
+		a.refused(RefusedQueueFull)
 		w.Header().Set("Retry-After", "60")
 		writeError(w, r, http.StatusTooManyRequests, "busy")
 		return
 	}
 
 	var slots []slot
-	take := func(lim *Limiter, key, code string) bool {
+	take := func(lim *Limiter, key, code, kind string) bool {
 		ok, retry := lim.Reserve(key)
 		if !ok {
 			cancelAll(slots)
+			a.refused(kind)
 			w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
 			writeError(w, r, http.StatusTooManyRequests, code)
 			return false
@@ -172,11 +176,11 @@ func (a *api) createScan(w http.ResponseWriter, r *http.Request) {
 		slots = append(slots, slot{lim, key})
 		return true
 	}
-	if !take(a.cfg.Limiter, rateKey(clientAddr(r, a.cfg.TrustedProxies)), "rate_limited") {
+	if !take(a.cfg.Limiter, rateKey(clientAddr(r, a.cfg.TrustedProxies)), "rate_limited", RefusedClientLimit) {
 		return
 	}
-	if open && (!take(a.cfg.PublicLimits.PerDomain, domains.Registrable(host), "domain_rate_limited") ||
-		!take(a.cfg.PublicLimits.Global, "all", "busy")) {
+	if open && (!take(a.cfg.PublicLimits.PerDomain, domains.Registrable(host), "domain_rate_limited", RefusedDomainLimit) ||
+		!take(a.cfg.PublicLimits.Global, "all", "busy", RefusedGlobalLimit)) {
 		return
 	}
 	sc, reused, err := a.cfg.Scans.EnqueueOrReuse(r.Context(), store.Public,
