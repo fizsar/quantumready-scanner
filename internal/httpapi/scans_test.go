@@ -177,11 +177,11 @@ func TestCreateScanRejects(t *testing.T) {
 	}
 
 	e := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"example.com"}`, reqOpts{lang: "en-US,en;q=0.9"}), 403, "host_not_allowed")
-	if e.Message != "Right now, scanning is limited to the demo domains." {
+	if e.Message != "Right now, only the demo domains can be scanned." {
 		t.Errorf("English message = %q", e.Message)
 	}
 	esMsg := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"example.com"}`, reqOpts{lang: "es"}), 403, "host_not_allowed")
-	if esMsg.Message != "Ahora mismo el escaneo está limitado a los dominios de demostración." {
+	if esMsg.Message != "Ahora mismo solo se pueden escanear los dominios de demostración." {
 		t.Errorf("Spanish message = %q", esMsg.Message)
 	}
 	es := wantError(t, a.do(t, "POST", "/api/scans", `{"host":"fizsar.com:8443"}`, reqOpts{lang: "es"}), 400, "port_not_allowed")

@@ -213,7 +213,7 @@ const es = {
 
   'hna.title': 'Ahora mismo no se puede escanear ese dominio',
   'hna.why':
-    'Ahora mismo el escaneo está limitado a los dominios de demostración.',
+    'Ahora mismo solo se pueden escanear los dominios de demostración.',
   'hna.meanwhile': 'Mientras tanto, puedes ver un análisis real:',
   'hna.scan': 'Escanear {host}',
   'hna.examples': 'Ver ejemplos de informes',
@@ -575,7 +575,7 @@ const en: Record<ShowcaseKey, string> = {
 
   'hna.title': 'That domain cannot be scanned right now',
   'hna.why':
-    'Right now, scanning is limited to the demo domains.',
+    'Right now, only the demo domains can be scanned.',
   'hna.meanwhile': 'Meanwhile, you can see a real analysis:',
   'hna.scan': 'Scan {host}',
   'hna.examples': 'See example reports',
