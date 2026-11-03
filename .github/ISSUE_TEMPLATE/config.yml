@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability (privately)
+    url: https://github.com/fizsar/quantumready-saas/blob/main/SECURITY.md
+    about: Never in a public issue. How to report it, by email.
+  - name: Exclude my domain from scans
+    url: https://quantumready.fizsar.com/about-scans
+    about: How the scanner works and how to ask us not to scan your domain.

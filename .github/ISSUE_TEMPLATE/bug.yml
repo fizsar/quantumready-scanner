@@ -1,0 +1,24 @@
+name: Bug
+description: Something in the code or the website does not work.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce it
+      description: The page or command, the browser or OS, the commit if you run it locally.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Remove secrets, IP addresses and personal data first.
+      render: text

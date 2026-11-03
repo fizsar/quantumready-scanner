@@ -1,0 +1,15 @@
+name: Idea
+description: Something the scanner or the reports could do.
+labels: [idea]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        There is no public roadmap: ideas are welcome, but may stay open for a long time.
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What it would check or show, and why it matters (a standard, a real case…).
+    validations:
+      required: true

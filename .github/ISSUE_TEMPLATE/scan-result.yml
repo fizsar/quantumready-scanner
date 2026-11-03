@@ -1,0 +1,28 @@
+name: Scan result looks wrong
+description: A report says something about a server that is not true.
+labels: [scan-result]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. Results are kept 30 days, so please report soon after the scan.
+  - type: input
+    id: report
+    attributes:
+      label: Report link
+      placeholder: https://quantumready.fizsar.com/scans/…
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What looks wrong
+      description: Which finding, grade or probe, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: What another tool says (testssl.sh, openssl s_client…), or the server's configuration if it is yours. Remove anything private.
+      render: text
