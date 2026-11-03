@@ -12,6 +12,33 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
+// rolesLock is a PostgreSQL advisory lock shared by every test package on
+// the database. Roles belong to the whole cluster, not to a test's schema, and
+// PostgreSQL refuses two concurrent changes of the same role ("tuple
+// concurrently updated"): migration 00005 runs ALTER ROLE qr_worker each time a
+// schema is migrated, and some tests change the service roles themselves. So
+// migrations hold it shared (they still run in parallel with each other), and
+// LockRoles exclusive.
+const rolesLock int64 = 0x51525f524f4c4553 // "QR_ROLES"
+
+// LockRoles holds rolesLock exclusively until the test ends: for tests that
+// change the cluster's roles (ALTER ROLE, CREATE ROLE…). Call it after the
+// test's schema is migrated, since Schema waits for the shared lock.
+func LockRoles(t testing.TB) {
+	t.Helper()
+	ctx := context.Background()
+	c, err := pgx.Connect(ctx, DSN(t))
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	if _, err := c.Exec(ctx, "SELECT pg_advisory_lock($1)", rolesLock); err != nil {
+		_ = c.Close(ctx)
+		t.Fatalf("lock roles: %v", err)
+	}
+	// Closing the session releases the lock.
+	t.Cleanup(func() { _ = c.Close(context.Background()) })
+}
+
 // Schema creates a fresh schema, applies migrate to it and returns a pool
 // whose connections use it (search_path). Test packages can then run in
 // parallel against the same database without seeing each other's rows. The
@@ -54,7 +81,16 @@ func Schema(t testing.TB, migrate func(context.Context, *sql.DB) error) *pgxpool
 
 	db := stdlib.OpenDB(*cfg.ConnConfig.Copy())
 	defer db.Close()
-	if err := migrate(ctx, db); err != nil {
+	// Shared: migrations run in parallel with each other, never while a test
+	// holds LockRoles.
+	if _, err := admin.Exec(ctx, "SELECT pg_advisory_lock_shared($1)", rolesLock); err != nil {
+		t.Fatalf("lock roles (shared): %v", err)
+	}
+	err = migrate(ctx, db)
+	if _, uerr := admin.Exec(ctx, "SELECT pg_advisory_unlock_shared($1)", rolesLock); uerr != nil {
+		t.Fatalf("unlock roles: %v", uerr)
+	}
+	if err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 

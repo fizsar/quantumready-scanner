@@ -34,8 +34,9 @@ func connAs(t *testing.T, user, password string) *pgx.ConnConfig {
 
 func TestSyncLoginRoles(t *testing.T) {
 	pool := newTestStore(t).Pool() // migrations applied: the roles exist
+	testdb.LockRoles(t)            // no migration changes the roles meanwhile; released last
 	db := stdlib.OpenDB(*pool.Config().ConnConfig.Copy())
-	t.Cleanup(func() { _ = db.Close() }) // registered first: runs last
+	t.Cleanup(func() { _ = db.Close() }) // runs before the lock is released
 	ctx := context.Background()
 	nologin := func() {
 		for _, r := range LoginRoles {
