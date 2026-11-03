@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -73,6 +74,18 @@ var wantScansGrants = []string{
 func denied(err error) bool {
 	var pg *pgconn.PgError
 	return errors.As(err, &pg) && pg.Code == "42501"
+}
+
+// Exactly these privileges on scans, on a database migrated in order. (Until
+// 16/11/2026 this also ran on the path production took through showcase.)
+func TestScansGrants(t *testing.T) {
+	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error { _, err := Up(ctx, db); return err })
+	if got := scansPrivileges(t, pool); !slices.Equal(got, wantScansGrants) {
+		t.Errorf("privileges on scans:
+ %v
+want
+ %v", got, wantScansGrants)
+	}
 }
 
 // What qr_app and qr_worker can and cannot write in scans.
