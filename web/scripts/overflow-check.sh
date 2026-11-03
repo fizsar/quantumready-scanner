@@ -8,7 +8,7 @@
 # and a scan judged with 2026.2. Everything runs in a throwaway internal
 # Docker network: no published ports, no Internet.
 #
-#   web/scripts/overflow-check.sh [WIDTH] [PAGE...]   (default: / /architecture /examples /privacy /about-scans and the reports, ES and EN)
+#   web/scripts/overflow-check.sh [WIDTH] [PAGE...]   (default: / /architecture /examples /privacy /about-scans /lab/orbital and the reports, ES and EN)
 #   OVERFLOW_OPEN=1 web/scripts/overflow-check.sh ...  (the home page with the scanner open)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -19,7 +19,7 @@ PAGES=("$@")
 FIZSAR_ES=00000000-0000-4000-8000-000000000001 FIZSAR_EN=00000000-0000-4000-8000-000000000002
 EXPORT_ES=00000000-0000-4000-8000-000000000003 EXPORT_EN=00000000-0000-4000-8000-000000000004
 OLD_ES=00000000-0000-4000-8000-000000000005
-[ ${#PAGES[@]} -gt 0 ] || PAGES=(/?lang=es /architecture?lang=es /examples?lang=es /privacy?lang=es /about-scans?lang=es /?lang=en /architecture?lang=en /examples?lang=en /privacy?lang=en /about-scans?lang=en
+[ ${#PAGES[@]} -gt 0 ] || PAGES=(/?lang=es /architecture?lang=es /examples?lang=es /privacy?lang=es /about-scans?lang=es /lab/orbital?lang=es /?lang=en /architecture?lang=en /examples?lang=en /privacy?lang=en /about-scans?lang=en /lab/orbital?lang=en
 	"/scans/$FIZSAR_ES?lang=es" "/scans/$FIZSAR_EN?lang=en" "/scans/$EXPORT_ES?lang=es" "/scans/$EXPORT_EN?lang=en" "/scans/$OLD_ES?lang=es")
 CHROME=${CHROME_IMAGE:-zenika/alpine-chrome:124@sha256:eb3378c1ed0079f94db054a5fe1aaa790a254ec0d6bbc67eda052420d86a179d}
 NODE=$(grep -m1 -E '^FROM node:' Dockerfile | awk '{print $2}')

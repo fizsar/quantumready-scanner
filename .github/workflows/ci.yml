@@ -133,6 +133,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # three.js (the redesign's 3D scenes) only in a lazy chunk, never in the initial load.
+      - run: npm run check-bundle
 
   # The backup scripts that run on the VPS: shellcheck of every deploy script,
   # then backup and restore drill against a throwaway PostgreSQL and a local
