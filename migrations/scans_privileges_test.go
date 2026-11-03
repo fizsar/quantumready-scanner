@@ -81,10 +81,7 @@ func denied(err error) bool {
 func TestScansGrants(t *testing.T) {
 	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error { _, err := Up(ctx, db); return err })
 	if got := scansPrivileges(t, pool); !slices.Equal(got, wantScansGrants) {
-		t.Errorf("privileges on scans:
- %v
-want
- %v", got, wantScansGrants)
+		t.Errorf("privileges on scans:\n %v\nwant\n %v", got, wantScansGrants)
 	}
 }
 
