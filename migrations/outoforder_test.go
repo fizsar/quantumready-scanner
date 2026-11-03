@@ -5,9 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io/fs"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -33,66 +31,33 @@ func tableExists(ctx context.Context, db *sql.DB, name string) bool {
 	return ok
 }
 
-// The path production will follow: 00015 (M1) and 00017 (demo requests)
-// arrive from showcase on a database at 00003, then main's migrations (here 4
-// and 14 of phase 3, 16 and 18) arrive, some of them below 17. Only the 4–16
-// gap is filled out of order; any other missing migration still fails.
-func TestOutOfOrderOnlyForPhase3(t *testing.T) {
+// Migrations apply in order only: a pending one below the newest applied
+// one is refused, and nothing is applied. (The window for 00004–00016 out of
+// order closed with the rollback window to showcase, on 16/11/2026.)
+func TestNoOutOfOrder(t *testing.T) {
 	testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
-		showcase := fstest.MapFS{"00001_a.sql": sqlFile("t1"), "00002_b.sql": sqlFile("t2"),
-			"00015_m1.sql": sqlFile("t15"), "00017_demo.sql": sqlFile("t17")}
-		if _, err := up(ctx, db, showcase); err != nil {
-			t.Fatalf("showcase: %v", err)
+		first := fstest.MapFS{"00001_a.sql": sqlFile("t1"), "00002_b.sql": sqlFile("t2"), "00015_c.sql": sqlFile("t15")}
+		if _, err := up(ctx, db, first); err != nil {
+			t.Fatalf("first: %v", err)
 		}
-		main := fstest.MapFS{"00004_p3.sql": sqlFile("t4"), "00014_p3.sql": sqlFile("t14"),
-			"00016_m1_grants.sql": sqlFile("t16"), "00018_demo_grants.sql": sqlFile("t18")}
-		for k, v := range showcase {
-			main[k] = v
+		later := fstest.MapFS{"00004_d.sql": sqlFile("t4"), "00016_e.sql": sqlFile("t16")}
+		for k, v := range first {
+			later[k] = v
 		}
-		res, err := up(ctx, db, main)
-		if err != nil {
-			t.Fatalf("main after showcase: %v", err)
+		if _, err := up(ctx, db, later); err == nil || !strings.Contains(err.Error(), "[4]") {
+			t.Errorf("00004 below 00015: %v, want a refusal naming it", err)
 		}
-		var got []int64
-		for _, r := range res {
-			got = append(got, r.Source.Version)
+		if tableExists(ctx, db, "t4") || tableExists(ctx, db, "t16") {
+			t.Error("a migration was applied after the refusal")
 		}
-		if !slices.Equal(got, []int64{4, 14, 16, 18}) {
-			t.Errorf("main after showcase applied %v, want [4 14 16 18]", got)
-		}
-		// A gap outside 4–16 (here 3) is refused, and nothing is applied.
-		main["00003_x.sql"] = sqlFile("t3")
-		if _, err := up(ctx, db, main); err == nil || !strings.Contains(err.Error(), "[3]") {
-			t.Errorf("missing 00003: %v, want a refusal naming it", err)
-		}
-		if tableExists(ctx, db, "t3") {
-			t.Error("00003 was applied out of order")
+		// In order, nothing missing below: applied.
+		delete(later, "00004_d.sql")
+		res, err := up(ctx, db, later)
+		if err != nil || !slices.Equal(versions(res), []int64{16}) {
+			t.Errorf("00016 after 00015: %v %v", versions(res), err)
 		}
 		return nil
 	})
-}
-
-// showcaseFiles is what the showcase branch ships: 00001–00003, 00015 and 00017.
-func showcaseFiles(t *testing.T) fstest.MapFS {
-	t.Helper()
-	out := fstest.MapFS{}
-	names, err := fs.Glob(files, "*.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, n := range names {
-		if v, _ := strconv.Atoi(n[:5]); v <= 3 || v == 15 || v == 17 {
-			data, err := fs.ReadFile(files, n)
-			if err != nil {
-				t.Fatal(err)
-			}
-			out[n] = &fstest.MapFile{Data: data}
-		}
-	}
-	if len(out) != 5 {
-		t.Fatalf("showcase files: %d, want 5", len(out))
-	}
-	return out
 }
 
 func versions(res []*goose.MigrationResult) []int64 {
@@ -152,58 +117,23 @@ var (
 	wantM1RLS = "blocked_targets_daily rls=false force=false policies=0, demo_requests rls=false force=false policies=0, usage_daily rls=false force=false policies=0"
 )
 
-// The real path of production: a database at 00003 gets 00015 (M1) and
-// 00017 (demo requests) from showcase, then main's migrations: 00004–00014
-// and 00016 out of order, and 00018. The showcase tables must end up with
-// exactly the privileges of a database migrated in order; the API (qr_app)
-// must be able to count, store demo requests and purge both, without reading
-// a request back; the other roles must not touch them.
-func TestRealPathProductionToMain(t *testing.T) {
-	var applied, again []int64
+// The tables M1 and the demo form brought (usage_daily, blocked_targets_daily,
+// demo_requests): exactly these privileges and no RLS; the API (qr_app) can
+// count, store demo requests and purge both, without reading a request back;
+// the other roles cannot touch them. (Until 16/11/2026 this ran on the path
+// production really took, through the showcase branch; production now has
+// every migration, in order from here on.)
+func TestM1Privileges(t *testing.T) {
 	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
-		p, err := goose.NewProvider(goose.DialectPostgres, db, files)
-		if err != nil {
-			return err
-		}
-		if _, err := p.UpTo(ctx, 3); err != nil {
-			return err
-		}
-		res, err := up(ctx, db, showcaseFiles(t))
-		if err != nil || !slices.Equal(versions(res), []int64{15, 17}) {
-			t.Fatalf("showcase on production: %v %v, want 00015 and 00017", versions(res), err)
-		}
-		if res, err = Up(ctx, db); err != nil {
-			t.Fatalf("main after M1: %v", err)
-		}
-		applied = versions(res)
-		if res, err = Up(ctx, db); err != nil {
-			t.Fatalf("main again: %v", err)
-		}
-		again = versions(res)
-		return nil
-	})
-	// 19 and 20 (Apertura) and 21 (security review) come after production's newest (17): in order.
-	if want := []int64{4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 19, 20, 21, 22}; !slices.Equal(applied, want) {
-		t.Errorf("main after M1 applied %v, want %v", applied, want)
-	}
-	if len(again) != 0 {
-		t.Errorf("second Up applied %v, want nothing", again)
-	}
-
-	grants, rls := m1Privileges(t, pool)
-	if !slices.Equal(grants, wantM1Grants) {
-		t.Errorf("M1 privileges after the real path:\n %v\nwant\n %v", grants, wantM1Grants)
-	}
-	if rls != wantM1RLS {
-		t.Errorf("M1 RLS after the real path: %s, want %s", rls, wantM1RLS)
-	}
-	// The same as a database migrated in order.
-	fresh := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
 		_, err := Up(ctx, db)
 		return err
 	})
-	if g, r := m1Privileges(t, fresh); !slices.Equal(g, grants) || r != rls {
-		t.Errorf("in-order database differs: %v %s", g, r)
+	grants, rls := m1Privileges(t, pool)
+	if !slices.Equal(grants, wantM1Grants) {
+		t.Errorf("M1 privileges:\n %v\nwant\n %v", grants, wantM1Grants)
+	}
+	if rls != wantM1RLS {
+		t.Errorf("M1 RLS: %s, want %s", rls, wantM1RLS)
 	}
 
 	ctx := context.Background()

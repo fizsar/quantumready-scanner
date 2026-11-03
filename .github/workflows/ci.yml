@@ -1,7 +1,7 @@
 name: CI
 
 # Minutes (GitHub Actions is billed for this private repository):
-# - pushes run CI only on main and showcase; any other branch is checked
+# - pushes run CI only on main; any other branch is checked
 #   through its pull request, so a commit is not built twice;
 # - changes that only touch docs/ or Markdown files (screenshots included)
 #   run no CI, and so no Release either;
@@ -9,7 +9,7 @@ name: CI
 #   the tip of a branch gets checked and released.
 on:
   push:
-    branches: [main, showcase]
+    branches: [main]
     paths-ignore:
       - "docs/**"
       - "**/*.md"
@@ -97,7 +97,7 @@ jobs:
 
   # Its own job, in parallel with Go: 10 targets of 10 s each were 2 of the
   # Go job's 7 minutes. No database, no Docker. Only on pushes (main and
-  # showcase), not on pull requests: about 3 billed minutes less per PR run.
+  # pull requests: about 3 billed minutes less per PR run.
   fuzz:
     name: Fuzz
     if: github.event_name == 'push'

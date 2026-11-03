@@ -18,22 +18,19 @@ var files embed.FS
 // FS returns the embedded migration files.
 func FS() fs.FS { return files }
 
-// outOfOrder is the one gap goose may fill below the newest applied
-// migration: main's migrations (00004–00014 of phase 3 and 00016, the M1
-// grants), when they reach a production database that already has the ones
-// deployed from the showcase branch before phase 3 (00015 M1, 00017 demo
-// requests). Any other missing migration is still an error. Remove after 3.7.
-var outOfOrder = struct{ from, to int64 }{4, 16}
-
-// Up applies all pending migrations and returns the ones it ran. It holds a
-// PostgreSQL advisory lock, so concurrent runs are safe, and it is a no-op
-// when the schema is already current.
+// Up applies all pending migrations, in order, and returns the ones it ran.
+// It holds a PostgreSQL advisory lock, so concurrent runs are safe, and it is
+// a no-op when the schema is already current. A pending migration below the
+// newest applied one is an error: migrations apply in order only. (Until the
+// rollback window to the showcase branch closed on 16/11/2026, 00004–00016
+// could be applied out of order: production had 00015 and 00017 from
+// showcase before the phase 3 migrations.)
 func Up(ctx context.Context, db *sql.DB) ([]*goose.MigrationResult, error) {
 	return up(ctx, db, files)
 }
 
 func up(ctx context.Context, db *sql.DB, fsys fs.FS) ([]*goose.MigrationResult, error) {
-	p, err := provider(db, fsys, false)
+	p, err := provider(db, fsys)
 	if err != nil {
 		return nil, err
 	}
@@ -41,28 +38,18 @@ func up(ctx context.Context, db *sql.DB, fsys fs.FS) ([]*goose.MigrationResult, 
 	if err != nil {
 		return nil, err
 	}
-	if len(missing) == 0 {
-		return p.Up(ctx)
-	}
-	for _, v := range missing {
-		if v < outOfOrder.from || v > outOfOrder.to {
-			return nil, fmt.Errorf("migrations: %v are missing below the newest applied one; only %d–%d may be applied out of order",
-				missing, outOfOrder.from, outOfOrder.to)
-		}
-	}
-	p, err = provider(db, fsys, true)
-	if err != nil {
-		return nil, err
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("migrations: %v are missing below the newest applied one; migrations apply in order only", missing)
 	}
 	return p.Up(ctx)
 }
 
-func provider(db *sql.DB, fsys fs.FS, allowOutOfOrder bool) (*goose.Provider, error) {
+func provider(db *sql.DB, fsys fs.FS) (*goose.Provider, error) {
 	locker, err := lock.NewPostgresSessionLocker()
 	if err != nil {
 		return nil, err
 	}
-	return goose.NewProvider(goose.DialectPostgres, db, fsys, goose.WithSessionLocker(locker), goose.WithAllowOutofOrder(allowOutOfOrder))
+	return goose.NewProvider(goose.DialectPostgres, db, fsys, goose.WithSessionLocker(locker))
 }
 
 // missingBelowNewest lists the pending migrations older than the newest

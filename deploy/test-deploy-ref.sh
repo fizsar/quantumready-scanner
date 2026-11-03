@@ -53,13 +53,13 @@ check() { # check WANT TAG
 }
 check accept "sha-$onmain"
 check accept "sha-$base"        # on both branches
-check accept "sha-$onshowcase"
+check refuse "sha-$onshowcase"  # showcase: closed on 16/11/2026
 check accept latest
 check refuse "sha-$onother"     # pushed, but to another branch
 check refuse "sha-$local_only"  # never pushed
 check refuse "sha-0000000"      # unknown commit
 check refuse "v1.0"             # not a tag deploy.sh knows
-grep -q "is not on origin/main nor origin/showcase" <(QR_DEPLOY_DRY_RUN=1 bash deploy/deploy.sh "sha-$onother" 2>&1 || true) \
+grep -q "is not on origin/main;" <(QR_DEPLOY_DRY_RUN=1 bash deploy/deploy.sh "sha-$onother" 2>&1 || true) \
 	|| { echo "FAIL: the refusal does not explain why"; fails=1; }
 
 digests() { # digests WANT DESCRIPTION STATUSES TAG [PATTERN] [PIN_UNRECORDED]

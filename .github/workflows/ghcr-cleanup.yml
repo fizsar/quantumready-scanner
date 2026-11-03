@@ -3,7 +3,7 @@ name: GHCR cleanup
 # By hand only. Deletes old versions of the api and web images in GHCR
 # (deploy/ghcr_cleanup.py): keeps the tags in production and for rollback and
 # everything deployed in the last 30 days (deploy/deployments.txt on the ref
-# it runs on), the 5 newest builds of main and of showcase, latest, any extra
+# it runs on), the 5 newest builds of main, latest, any extra
 # tag given and every untagged version. Dry run by default: it lists what it
 # would delete and how much it would free, in the job summary.
 #
@@ -39,7 +39,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      # Full history of every branch: the newest builds of main and showcase.
+      # Full history: the newest builds of main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

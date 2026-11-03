@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"slices"
 	"testing"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pressly/goose/v3"
 
 	"github.com/fizsar/quantumready-saas/internal/store"
 	"github.com/fizsar/quantumready-saas/internal/testdb"
@@ -75,46 +73,6 @@ var wantScansGrants = []string{
 func denied(err error) bool {
 	var pg *pgconn.PgError
 	return errors.As(err, &pg) && pg.Code == "42501"
-}
-
-// The real path of production (showcase's 1–3, 15 and 17, then main) ends
-// with exactly the privileges on scans above, the same as a database migrated
-// in order; production's existing scans keep their expiry.
-func TestScansColumnPrivilegesRealPath(t *testing.T) {
-	var before time.Time
-	pool := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error {
-		p, err := goose.NewProvider(goose.DialectPostgres, db, files)
-		if err != nil {
-			return err
-		}
-		if _, err := p.UpTo(ctx, 3); err != nil {
-			return err
-		}
-		// A scan of the showcase era, as production has them.
-		if err := db.QueryRowContext(ctx, `INSERT INTO scans (host, port, created_at) VALUES ('old.example', 443, now() - interval '3 days') RETURNING created_at`).Scan(&before); err != nil {
-			return err
-		}
-		if _, err := up(ctx, db, showcaseFiles(t)); err != nil {
-			return err
-		}
-		_, err = Up(ctx, db)
-		return err
-	})
-	got := scansPrivileges(t, pool)
-	if !slices.Equal(got, wantScansGrants) {
-		t.Errorf("privileges on scans after the real path:\n %v\nwant\n %v", got, wantScansGrants)
-	}
-	fresh := testdb.Schema(t, func(ctx context.Context, db *sql.DB) error { _, err := Up(ctx, db); return err })
-	if g := scansPrivileges(t, fresh); !slices.Equal(g, got) {
-		t.Errorf("in-order database differs: %v", g)
-	}
-	var exp *time.Time
-	if err := pool.QueryRow(context.Background(), "SELECT expires_at FROM scans WHERE host = 'old.example'").Scan(&exp); err != nil {
-		t.Fatal(err)
-	}
-	if exp == nil {
-		t.Error("the showcase-era scan has no expiry after the migrations")
-	}
 }
 
 // What qr_app and qr_worker can and cannot write in scans.

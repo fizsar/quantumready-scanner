@@ -10,7 +10,7 @@ Always kept, in both images:
 - the tag in production and the rollback tag: the last two lines of
   deploy/deployments.txt (deploy.sh appends a line after each deploy);
 - every tag deployed in the last --days days (30), from the same file;
-- the --per-branch (5) most recent builds of each branch (main, showcase),
+- the --per-branch (5) most recent builds of each branch (main),
   in first-parent order;
 - the version tagged latest, any --keep tag, and every untagged version
   (they may be parts of a multi-platform image; nothing here deletes them).
@@ -19,7 +19,7 @@ It refuses to run if the file names no deployment, or if the production or
 rollback tag is missing from an image: the file would be wrong.
 
 Needs GH_TOKEN with packages: read (packages: write for --apply) and the git
-history of the branches (origin/main, origin/showcase).
+history of the branches (origin/main).
 """
 import argparse
 import base64
@@ -165,7 +165,7 @@ def main():
     ap.add_argument("--deployments", default="deploy/deployments.txt")
     ap.add_argument("--days", type=int, default=30)
     ap.add_argument("--per-branch", type=int, default=5)
-    ap.add_argument("--branches", default="main,showcase")
+    ap.add_argument("--branches", default="main")
     args = ap.parse_args()
     token = os.environ.get("GH_TOKEN") or sys.exit("GH_TOKEN is not set")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")

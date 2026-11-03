@@ -4,13 +4,13 @@
 #
 #   deploy/rehearse-main.sh [DUMP]
 #   QR_REHEARSE_MAIN=<commit> deploy/rehearse-main.sh [DUMP]   # default origin/main
-#   QR_REHEARSE_FROM=<commit> ...   # what production runs, and the rollback (default 62eac88)
+#   QR_REHEARSE_FROM=<commit> ...   # what production runs, and the rollback (required)
 #
 #   no DUMP: showcase starts empty; two real scans (fizsar.com and
 #            quantumready.fizsar.com), one of them aged 40 days by SQL.
 #   DUMP:    the production dump (pg_dump -Fc) is restored first.
 #
-# Stages: FROM (showcase 62eac88 by default) -> main (origin/main) -> FROM -> main.
+# Stages: FROM (what production runs) -> main (origin/main) -> FROM -> main.
 # Each deploy does what deploy.sh does on the VPS: compose.prod.yaml of that
 # commit, .env.next, pin_images, recreate_plan + db_guard (db must not be
 # recreated), pull, up --wait, health. Everything lives in /dev/shm (RAM):
@@ -24,7 +24,7 @@ ROOT=/dev/shm/qrr
 W=$ROOT/quantumready # the project name is the directory's, as on the VPS
 DUMP=${1:-}
 ORIGIN=https://quantumready.fizsar.com
-SHOWCASE=${QR_REHEARSE_FROM:-62eac88} # where production starts, and where a rollback goes
+SHOWCASE=${QR_REHEARSE_FROM:?set QR_REHEARSE_FROM to the commit production runs (where a rollback goes)}
 MAIN=$(git -C "$REPO" rev-parse --short=7 "${QR_REHEARSE_MAIN:-origin/main}")
 FAILS=0
 
