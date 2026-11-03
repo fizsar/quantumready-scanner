@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Local rehearsal of the first deploy of main (Apertura step 7) and of the
-# rollback to showcase, with the VPS protocol (docs/despliegue-main.md):
+# rollback to showcase, with the VPS protocol (deploy.sh):
 #
 #   deploy/rehearse-main.sh [DUMP]
 #   QR_REHEARSE_MAIN=<commit> deploy/rehearse-main.sh [DUMP]   # default origin/main

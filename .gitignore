@@ -28,3 +28,5 @@ web/dist/
 /mailer
 /qradmin
 /qrscan
+# Private notes of whoever works locally (Claude Code reads them; never committed).
+CLAUDE.local.md
