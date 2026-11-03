@@ -30,7 +30,8 @@ async function open() {
     if (msg.id && pending.has(msg.id)) {
       const { ok, bad } = pending.get(msg.id)
       pending.delete(msg.id)
-      msg.error ? bad(new Error(JSON.stringify(msg.error))) : ok(msg.result)
+      if (msg.error) bad(new Error(JSON.stringify(msg.error)))
+      else ok(msg.result)
     } else if (msg.method) for (const l of listeners) l(msg)
   }
   const send = (method, params = {}) => new Promise((ok, bad) => { const id = ++seq; pending.set(id, { ok, bad }); ws.send(JSON.stringify({ id, method, params })) })
@@ -107,12 +108,12 @@ async function scene(base, path, profile) {
   let info = null
   for (let k = 0; k < 400; k++) {
     await sleep(100)
-    info = await evaluate(page, `(() => { const c = document.querySelector('canvas.lab-canvas'); return { mode: document.querySelector('.lab')?.dataset.mode, ready: c?.dataset.ready === 'true', firstFrame: __ready } })()`)
+    info = await evaluate(page, `(() => { const c = document.querySelector('canvas[data-points]'); return { mode: document.querySelector('[data-mode]')?.dataset.mode, ready: c?.dataset.ready === 'true', firstFrame: __ready, story: !!document.querySelector('.story') } })()`)
     if (info?.ready || info?.mode === 'still') break
   }
   // When each piece arrived (ms since navigation start).
   const timeline = await evaluate(page, `Object.fromEntries(performance.getEntriesByType('resource')
-    .filter((e) => /index-|LabOrbital-|orbitalScene-|sampler\\.worker-|orbital-1s|jetbrains/.test(e.name))
+    .filter((e) => /index-|LabOrbital-|Story-|orbitalScene-|engine-|three\\.module-|\\.worker-|orbital-1s|story-1s|jetbrains/.test(e.name))
     .map((e) => [e.name.split('/').pop().replace(/-[\\w-]{8}\\./, '.'), [Math.round(e.startTime), Math.round(e.responseEnd)]]))`)
   if (process.env.TIMELINE) console.log(JSON.stringify(timeline))
   const gpu = await evaluate(page, `(() => { const gl = document.createElement('canvas').getContext('webgl2'); const e = gl?.getExtension('WEBGL_debug_renderer_info'); return gl ? gl.getParameter(e ? e.UNMASKED_RENDERER_WEBGL : gl.RENDERER) : 'no webgl2' })()`)
@@ -120,13 +121,19 @@ async function scene(base, path, profile) {
     await page.close()
     return { mode: info?.mode, gpu, errors }
   }
+  // Main-thread time while scrolling (PROFILE=1): script, style, layout, tasks.
+  await page.send('Performance.enable')
+  const metrics = async () => Object.fromEntries((await page.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]))
+  const m0 = await metrics()
   // Scroll through the track in 10 s and count frames (the scene renders in requestAnimationFrame too).
   const r = await evaluate(page, `(async () => {
-    const t = document.querySelector('.lab-track')
+    const t = document.querySelector('.lab-track, .story-track')
     const top = t.getBoundingClientRect().top + scrollY
     const span = t.offsetHeight - innerHeight
     scrollTo(0, top)
-    await new Promise((r) => setTimeout(r, 1500)) // the adaptive point count settles
+    // HIDE=selector: take an element out (to find what costs frames).
+    for (const e of document.querySelectorAll(${JSON.stringify(process.env.HIDE ?? '')} || 'x-none')) e.style.display = 'none'
+    await new Promise((r) => setTimeout(r, ${Number(process.env.SETTLE ?? 1500)})) // the adaptive point count settles (SETTLE ms)
     const dts = []
     let last = performance.now()
     const start = last
@@ -140,13 +147,19 @@ async function scene(base, path, profile) {
       requestAnimationFrame(step)
     })
     dts.sort((a, b) => a - b)
-    const c = document.querySelector('canvas.lab-canvas')
+    const c = document.querySelector('canvas[data-points]')
     return { fps: dts.length / 10, p95: dts[Math.floor(dts.length * 0.95)], points: +c.dataset.points, drawn: +c.dataset.drawn, w: c.width, h: c.height }
   })()`)
+  if (process.env.PROFILE) {
+    const m1 = await metrics()
+    const keys = ['TaskDuration', 'ScriptDuration', 'RecalcStyleDuration', 'LayoutDuration', 'LayoutCount', 'RecalcStyleCount']
+    console.log(JSON.stringify(Object.fromEntries(keys.map((k) => [k, Math.round((m1[k] - m0[k]) * (k.endsWith('Count') ? 1 : 1000))]))))
+  }
   await page.close()
-  // GPU memory: 4 orbitals × points × (3 floats position + 1 float sign), the
-  // drawing buffer (RGBA8, double-buffered) and its depth buffer (4 bytes).
-  const buffers = 4 * r.points * 16
+  // GPU memory: 4 orbitals × points × (3 floats position + 1 float sign or hue),
+  // the story's wave seeds (4 floats per point), the drawing buffer (RGBA8,
+  // double-buffered) and its depth buffer (4 bytes).
+  const buffers = 4 * r.points * 16 + (info.story ? r.points * 16 : 0)
   const framebuffer = r.w * r.h * (4 * 2 + 4)
   return { mode: '3d', errors, gpu, firstFrameMs: Math.round(info.firstFrame), fps: Math.round(r.fps * 10) / 10, p95FrameMs: Math.round(r.p95 * 10) / 10, points: r.points, drawn: r.drawn, canvas: `${r.w}×${r.h}`, gpuMB: Math.round(((buffers + framebuffer) / 2 ** 20) * 10) / 10 }
 }
