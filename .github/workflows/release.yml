@@ -22,7 +22,11 @@ concurrency:
 jobs:
   publish:
     name: Publish (${{ matrix.image }})
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    # Only CI runs of a push to this repository by its owner: never a pull
+    # request (from a fork or not; its CI run has event pull_request), never a
+    # run whose code comes from another repository, never another actor.
+    # internal/cipolicy evaluates this condition against such events.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.actor.login == github.repository_owner
     runs-on: ubuntu-latest
     permissions:
       contents: read
