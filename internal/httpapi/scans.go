@@ -54,9 +54,13 @@ type createScanRequest struct {
 func (a *api) demoOn() bool { return a.cfg.Demos != nil && a.cfg.DemoEnabled }
 
 func (a *api) listTargets(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort,
+	body := map[string]any{"hosts": a.cfg.Allowlist.Hosts(), "port": ScanPort,
 		"open": a.cfg.PublicScanOpen, "proof": a.cfg.PublicScanOpen && a.cfg.Altcha != nil, "demo": a.demoOn(),
-		"accounts": a.cfg.Accounts != nil})
+		"accounts": a.cfg.Accounts != nil}
+	if a.cfg.SourceURL != "" {
+		body["source"] = a.cfg.SourceURL // the web's "Source code" link
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 // slot is one rate-limit reservation, given back if no scan is started.

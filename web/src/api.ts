@@ -112,7 +112,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** open: any domain can be scanned; proof: a proof of work is required; demo: the demo request form is on. */
-export function getTargets(): Promise<{ hosts: string[]; port: number; open?: boolean; proof?: boolean; demo?: boolean; accounts?: boolean }> {
+export function getTargets(): Promise<{ hosts: string[]; port: number; open?: boolean; proof?: boolean; demo?: boolean; accounts?: boolean; source?: string }> {
   return request('/api/targets')
 }
 

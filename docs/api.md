@@ -8,6 +8,8 @@ Todas las respuestas son JSON (`Cache-Control: no-store`, `X-Content-Type-Option
 
 Los dominios que se pueden escanear (la allowlist), para que el frontend no tenga su propia copia: `{"hosts": ["fizsar.com", "quantumready.fizsar.com"], "port": 443}`.
 
+Con `QR_SOURCE_URL` puesta (el repositorio público, `https://github.com/owner/repo`), añade `"source"`: esa URL en el commit con el que se compiló la API (`…/tree/<commit>`), el enlace «Código fuente» del pie de la web (la oferta del código fuente que pide la AGPL). Vacía, no hay campo ni enlace. La API no arranca con un valor que no sea una URL https sin consulta ni fragmento; la web solo enlaza una URL https.
+
 ## `POST /api/scans`
 
 Pide un escaneo. Cuerpo (máx. 1 KiB, `Content-Type: application/json`, campos desconocidos rechazados, un solo valor JSON: cualquier cosa detrás → `invalid_json`):

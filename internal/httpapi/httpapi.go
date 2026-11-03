@@ -33,6 +33,9 @@ type Pinger interface {
 type Config struct {
 	// Version is reported by GET /api/health.
 	Version string
+	// SourceURL is where this code is published, at the commit it was built
+	// from (QR_SOURCE_URL; the AGPL's offer of the source). Empty: no link.
+	SourceURL string
 	// DB is checked by GET /api/health.
 	DB Pinger
 	// PingTimeout bounds the database check. Zero means defaultPingTimeout.

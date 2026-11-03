@@ -84,6 +84,10 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	source, err := sourceConfig(os.Getenv, commit)
+	if err != nil {
+		return err
+	}
 	if openScans {
 		logger.Warn("PUBLIC_SCAN_OPEN: anyone can scan any domain (basic), with a proof of work")
 	}
@@ -126,6 +130,7 @@ func run(logger *slog.Logger) error {
 	refusals := httpapi.NewRefusals()
 	cfg := httpapi.Config{
 		Version:        version,
+		SourceURL:      source,
 		DB:             pool,
 		Scans:          st,
 		Usage:          st,
@@ -180,7 +185,7 @@ func run(logger *slog.Logger) error {
 		"allowlist", allow.Len(), "full_scan_domains", full.Len(), "trusted_proxies", len(trusted),
 		"rate_per_minute", lim.perMinute, "rate_per_day", lim.perDay, "target_cooldown", lim.cooldown.String(),
 		"demo_enabled", demoOn, "demo_proof_of_work", demoOn && proof != nil, "accounts_enabled", accountsOn,
-		"public_scan_open", openScans)
+		"public_scan_open", openScans, "source_url", source)
 
 	select {
 	case err := <-errCh:

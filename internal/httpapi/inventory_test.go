@@ -104,6 +104,20 @@ func TestRouteInventoryAccountsOn(t *testing.T) {
 }
 
 // GET /api/targets tells the web whether accounts are on.
+// The AGPL's "Source code" link: only when QR_SOURCE_URL is set.
+func TestTargetsSource(t *testing.T) {
+	for _, src := range []string{"", "https://github.com/fizsar/quantumready-saas/tree/5637c0d"} {
+		cfg := production(t, false)
+		cfg.SourceURL = src
+		rec := httptest.NewRecorder()
+		NewRouter(cfg).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/targets", nil))
+		has := strings.Contains(rec.Body.String(), `"source":`)
+		if rec.Code != http.StatusOK || has != (src != "") || (src != "" && !strings.Contains(rec.Body.String(), `"source":"`+src+`"`)) {
+			t.Errorf("source %q: %d %s", src, rec.Code, rec.Body)
+		}
+	}
+}
+
 func TestTargetsSayAccounts(t *testing.T) {
 	for _, on := range []bool{false, true} {
 		rec := httptest.NewRecorder()

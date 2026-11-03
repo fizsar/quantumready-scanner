@@ -4,7 +4,7 @@ import type { Lang } from './api'
 import { useAuth } from './auth'
 import { useLang } from './i18n'
 import { useShowcaseT } from './i18n.showcase'
-import { useAccountsEnabled, useDemoEnabled } from './features'
+import { useAccountsEnabled, useDemoEnabled, useSourceURL } from './features'
 import { pageView, track } from './metrics'
 import { AboutScans } from './pages/AboutScans'
 import { AccountPage, ForgotPage, LoginPage, RegisterPage, ResetPage, VerifyPage } from './pages/AccountPages'
@@ -72,6 +72,7 @@ export default function App() {
         <a href="https://fizsar.com">← fizsar.com</a>
         <Link to="/about-scans">{t('nav.about')}</Link>
         <ShowcaseFooterLinks />
+        <SourceLink />
       </footer>
     </div>
   )
@@ -103,6 +104,17 @@ function PageViews() {
   const { pathname } = useLocation()
   useEffect(() => pageView(pathname), [pathname])
   return null
+}
+
+/** The AGPL's "Source code" link, at the deployed commit; only once QR_SOURCE_URL is set. */
+function SourceLink() {
+  const { t } = useLang()
+  const url = useSourceURL()
+  return url ? (
+    <a href={url} rel="noopener">
+      {t('footer.source')}
+    </a>
+  ) : null
 }
 
 function ShowcaseFooterLinks() {
