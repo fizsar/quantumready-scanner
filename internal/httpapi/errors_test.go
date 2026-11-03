@@ -25,3 +25,21 @@ func TestErrorMessagesMakeNoPromises(t *testing.T) {
 		}
 	}
 }
+
+// The domain errors answer both the public scan form and adding a domain to
+// an organization (accounts, off in production): no words that only fit the
+// latter ("verify", "add").
+func TestDomainMessagesFitBothForms(t *testing.T) {
+	accountOnly := regexp.MustCompile(`(?i)verific|verif(y|ied)|añad|\badd\b`)
+	for _, code := range []string{"invalid_domain", "domain_ip", "domain_reserved", "domain_unknown_tld", "domain_public_suffix"} {
+		byLang, ok := messages[code]
+		if !ok {
+			t.Fatalf("%s: no message", code)
+		}
+		for lang, msg := range byLang {
+			if accountOnly.MatchString(msg) {
+				t.Errorf("%s (%s): %q", code, lang, msg)
+			}
+		}
+	}
+}
