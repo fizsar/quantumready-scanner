@@ -22,6 +22,7 @@ import { usePageMeta } from './usePageMeta'
 const Examples = lazy(() => import('./pages/Examples'))
 // Redesign prototype (hidden: noindex, not linked, not in the sitemap); its 3D code loads later still.
 const LabOrbital = lazy(() => import('./lab/LabOrbital'))
+const LabStory = lazy(() => import('./lab/story/Story'))
 
 export default function App() {
   const { t } = useLang()
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/demo" element={<DemoRoute />} />
           <Route path="/examples" element={<Suspense><Examples /></Suspense>} />
           <Route path="/lab/orbital" element={<Suspense><LabOrbital /></Suspense>} />
+          <Route path="/lab/historia" element={<Suspense><LabStory /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

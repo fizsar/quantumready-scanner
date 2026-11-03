@@ -19,6 +19,7 @@ declare module 'react' {
       mfrac: MathProps
       msub: MathProps
       msup: MathProps
+      msqrt: MathProps
       msubsup: MathProps
       mtext: MathProps
       mspace: MathProps & { width?: string }

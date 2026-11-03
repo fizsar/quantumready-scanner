@@ -2,11 +2,12 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { orbitalImages } from './build/orbitalImages.ts'
+import { storyImages } from './build/storyImages.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // orbitalImages: the still images of /lab/orbital, rendered at build time.
-  plugins: [react(), orbitalImages()],
+  // orbitalImages and storyImages: the still images of /lab/orbital and /lab/historia, rendered at build time.
+  plugins: [react(), orbitalImages(), storyImages()],
   // three.js is one lazy chunk of ~530 kB (~130 kB gzip), loaded only by the
   // 3D scenes; scripts/check-bundle.mjs keeps it out of the initial load.
   build: { chunkSizeWarningLimit: 600 },
