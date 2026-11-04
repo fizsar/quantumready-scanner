@@ -1,5 +1,5 @@
-// The view shared by the 3D scene (orbitalScene.ts) and the build-time still
-// images (build/orbitalImages.ts), so both show the same cloud from the same
+// The view shared by the 3D story (story/engine.ts) and the build-time still
+// images (build/storyImages.ts), so both show the same cloud from the same
 // place. No three.js and no DOM.
 
 /** Seed of the samples: the still image is the first points of the 3D cloud. */

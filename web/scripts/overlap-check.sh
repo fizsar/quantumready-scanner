@@ -1,18 +1,48 @@
 #!/usr/bin/env bash
-# No text over the 3D stage unless it sits on its own opaque panel: the lab
-# pages scrolled from top to bottom in a real Chromium, at a phone width and
-# at an iPhone's (393×852, DPR 3). Same throwaway setup as overflow-check.sh
-# (production nginx config, internal Docker network, no Internet). Chromium
-# runs without a GPU here, so the stage shows the still images: the same
-# element, the same visibility rules as the 3D canvas.
+# /lab/historia scrolled from top to bottom in real engines, Chromium and
+# WebKit (Playwright, pinned image), with phone profiles: no text over the 3D
+# stage without its own panel, never an empty screen, panels that fit
+# (overlap-check.mjs). The site is built and served with the production
+# nginx config in a throwaway internal Docker network (no Internet).
+# Without a GPU in the container the stage shows the still images: the same
+# element and the same visibility rules as the 3D canvas.
 #
-#   web/scripts/overlap-check.sh [SIZES] [PAGE...]
-#   SIZES: WxHxDPR,... (default 375x667x2,375x812x1,393x852x3,1440x900x1)
-#
-# Also checks that the panels that stay on screen never scroll inside or cut
-# an equation, and that on phones the scene keeps at least 40 % of the height.
+#   web/scripts/overlap-check.sh [PROFILES] [PATH...]
+#   PROFILES: engine:WxHxDPR,... (default: chromium at 375×667, 375×812,
+#             393×852 DPR 3 and 1440×900; webkit at 375×667, 393×852 and
+#             393×659 (an iPhone with Safari’s toolbars), DPR 3)
+#   BASE=https://… web/scripts/overlap-check.sh   checks a site already up
+#             (for instance production, as any visitor would) instead of a build.
 set -euo pipefail
-SIZES=${1:-375x667x2,375x812x1,393x852x3,1440x900x1}
+cd "$(dirname "$0")/.."
+PROFILES=${1:-chromium:375x667x2,chromium:375x812x1,chromium:393x852x3,chromium:1440x900x1,webkit:375x667x3,webkit:393x852x3,webkit:393x659x3}
 shift || true
 [ $# -gt 0 ] || set -- '/lab/historia?lang=es' '/lab/historia?lang=en'
-CHECK=overlap-check.mjs exec bash "$(dirname "$0")/overflow-check.sh" "$SIZES" "$@"
+# The same version as the playwright package in package.json.
+PW=mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+[ -d node_modules/playwright ] || npm ci --no-fund --no-audit
+
+if [ -n "${BASE:-}" ]; then
+	docker run --rm --ipc=host -v "$PWD:/web:ro" -w /web "$PW" node scripts/overlap-check.mjs "$BASE" "$PROFILES" "$@"
+	exit
+fi
+
+NGINX=$(grep -m1 -E '^FROM .*nginx' Dockerfile | awk '{print $2}')
+NET=qr-overlap-$$
+npm run -s build >/dev/null
+serve=$(mktemp -d)
+cp -r dist/. "$serve/"
+mkdir -p "$serve/api"
+echo '{"hosts":["fizsar.com","quantumready.fizsar.com"],"port":443,"open":true,"proof":true}' >"$serve/api/targets"
+chmod -R a+rX "$serve"
+cleanup() {
+	docker rm -f "$NET-web" >/dev/null 2>&1 || true
+	docker network rm "$NET" >/dev/null 2>&1 || true
+	rm -rf "$serve"
+}
+trap cleanup EXIT
+docker network create --internal "$NET" >/dev/null
+docker run -d --name "$NET-web" --network "$NET" --network-alias web -v "$serve:/usr/share/nginx/html:ro" \
+	-v "$PWD/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+	-v "$PWD/nginx/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro" "$NGINX" >/dev/null
+docker run --rm --ipc=host --network "$NET" -v "$PWD:/web:ro" -w /web "$PW" node scripts/overlap-check.mjs http://web:8080 "$PROFILES" "$@"

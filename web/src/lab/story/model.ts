@@ -113,11 +113,30 @@ export function termState(step: Step, term: Term): 'hidden' | 'shown' | 'active'
   return b < a ? 'shown' : b === a ? 'active' : 'hidden'
 }
 
+type Span = { top: number; bottom: number }
+
+/** How much of the screen (height vh) the story track fills: 0 … 1. */
+export const trackShare = (track: Span, vh: number) => Math.max(0, Math.min(vh, track.bottom) - Math.max(0, track.top)) / vh
+
 /**
- * Whether the story track fills the whole screen (its top at or above the
- * viewport's, its bottom at or below): only then is the stage shown.
+ * The stage (fixed behind the page) is clipped to the part of the track that
+ * is on screen, so it is never behind the intro, the header or the sources,
+ * and it fades in as the track comes in: from 0 at its first pixel to full
+ * once it fills 40 % of the screen. No all-or-nothing switch, so no empty
+ * screen while the track enters or leaves (whatever the browser's toolbars do
+ * to the viewport height).
  */
-export const coversViewport = (r: { top: number; bottom: number }, vh: number) => r.top <= 1 && r.bottom >= vh - 1
+export function stageView(track: Span, stage: Span, vh: number): { clipTop: number; clipBottom: number; opacity: number; on: boolean } {
+  const clipTop = Math.max(0, Math.min(stage.bottom, track.top) - stage.top)
+  const clipBottom = Math.max(0, stage.bottom - Math.max(stage.top, track.bottom))
+  const shown = stage.bottom - stage.top - clipTop - clipBottom
+  const f = Math.min(1, trackShare(track, vh) / 0.4)
+  const opacity = shown > 0 ? f * f * (3 - 2 * f) : 0
+  return { clipTop, clipBottom, opacity, on: opacity > 0 }
+}
+
+/** A fixed panel (the phone sheet, the label) shows while the track lies behind all of it. */
+export const covers = (track: Span, box: Span) => box.bottom > box.top && track.top <= box.top + 1 && track.bottom >= box.bottom - 1
 
 /** Progress through the track: scrolled viewports, +0.35 so a shape morphs while the next panel comes in. */
 export const progressAt = (scrolled: number) => Math.min(STEPS.length - 1e-6, Math.max(0, scrolled + 0.35))

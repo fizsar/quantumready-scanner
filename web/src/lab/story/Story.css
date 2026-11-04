@@ -38,14 +38,9 @@
   z-index: 0;
   pointer-events: none;
   background: var(--bg);
+  /* Clip, opacity and visibility follow the scroll (Story.tsx, model.ts stageView). */
   opacity: 0;
   visibility: hidden;
-}
-/* Fades in; hides at once (no transition back), so text outside the track never sits on it. */
-.story-stage[data-active='true'] {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.5s ease;
 }
 .story-canvas,
 .story-still {

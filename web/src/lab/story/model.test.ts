@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { density, ORBITALS, sample } from '../hydrogen'
-import { BURST, burstDir, densityWeights, fieldAt, fillBase, frameAt, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
+import { BURST, burstDir, covers, densityWeights, fieldAt, fillBase, frameAt, stageView, trackShare, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
 import { field, MEET, psi, SAMPLES, sampleX } from './wave'
 
 describe('the story timeline', () => {
@@ -168,5 +168,40 @@ describe('the helix and its density', () => {
       expect(fillTop).toBeLessThan(helixLow)
       expect(helixLow - fillTop).toBeLessThan(0.4)
     }
+  })
+})
+
+describe('what is on screen', () => {
+  const vh = 800
+  const stage = { top: 0, bottom: vh }
+  it('the stage is clipped to the part of the track on screen', () => {
+    expect(stageView({ top: 600, bottom: 9000 }, stage, vh)).toMatchObject({ clipTop: 600, clipBottom: 0 })
+    expect(stageView({ top: -50, bottom: 9000 }, stage, vh)).toMatchObject({ clipTop: 0, clipBottom: 0, opacity: 1 })
+    expect(stageView({ top: -9000, bottom: 300 }, stage, vh)).toMatchObject({ clipTop: 0, clipBottom: 500 })
+    // A phone's stage is the top part of the screen (above the sheet).
+    expect(stageView({ top: 100, bottom: 9000 }, { top: 0, bottom: 450 }, vh)).toMatchObject({ clipTop: 100, clipBottom: 0 })
+  })
+
+  it('fades in progressively as the track comes in, never all or nothing', () => {
+    const op = (top: number) => stageView({ top, bottom: 9000 }, stage, vh).opacity
+    expect(op(vh + 10)).toBe(0)
+    expect(stageView({ top: vh + 10, bottom: 9000 }, stage, vh).on).toBe(false)
+    let prev = 0
+    for (let top = vh; top >= 0; top -= 10) {
+      expect(op(top)).toBeGreaterThanOrEqual(prev)
+      expect(op(top) - prev).toBeLessThan(0.1) // no jump
+      prev = op(top)
+    }
+    expect(op(vh - 40)).toBeGreaterThan(0)
+    expect(op(vh * 0.6)).toBe(1)
+    expect(trackShare({ top: 200, bottom: 9000 }, vh)).toBeCloseTo(0.75, 9)
+  })
+
+  it('a panel shows only while the track lies behind all of it', () => {
+    const sheet = { top: 450, bottom: vh }
+    expect(covers({ top: 500, bottom: 9000 }, sheet)).toBe(false)
+    expect(covers({ top: 440, bottom: 9000 }, sheet)).toBe(true)
+    expect(covers({ top: -9000, bottom: vh - 20 }, sheet)).toBe(false)
+    expect(covers({ top: 0, bottom: 9000 }, { top: 0, bottom: 0 })).toBe(false) // not laid out (display: none)
   })
 })

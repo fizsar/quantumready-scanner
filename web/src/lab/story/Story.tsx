@@ -7,7 +7,7 @@ import { energy, r95 } from '../hydrogen'
 import { SEED } from '../view'
 import type { Story as Engine } from './engine'
 import { loadStory, storyStillURL } from './load'
-import { coversViewport, orbitalOf, progressAt, STEPS, stepAt, termState, type Step, type Term } from './model'
+import { covers, orbitalOf, progressAt, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
 import { TEXT } from './texts'
 import './Story.css'
 
@@ -21,10 +21,14 @@ export default function Story() {
   const mode: Mode = failed ? { kind: 'still', reason: 'no-webgl2' } : chosen
   const [index, setIndex] = useState(0)
   const [ready, setReady] = useState(false)
-  const [active, setActive] = useState(false)
+  // The label (wide screens) and the sheet (phones): shown while the track is behind them.
+  const [capOn, setCapOn] = useState(false)
+  const [sheetOn, setSheetOn] = useState(false)
   const track = useRef<HTMLDivElement>(null)
   const article = useRef<HTMLElement>(null)
   const sheet = useRef<HTMLDivElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
+  const caption = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const engine = useRef<Engine | null>(null)
   const visible = useRef(false)
@@ -35,30 +39,41 @@ export default function Story() {
       raf = 0
       const el = track.current
       if (!el) return
+      // The visible height (iOS toolbars change it while scrolling), not 100vh.
+      const vh = window.visualViewport?.height ?? window.innerHeight
       const r = el.getBoundingClientRect()
-      const p = progressAt(-r.top / window.innerHeight)
+      const p = progressAt(-r.top / vh)
       engine.current?.setProgress(p)
       setIndex(stepAt(p))
-      // The stage (and the label) only while the track fills the screen: no text
-      // outside the panels (intro, header, sources) is ever drawn over the particles.
-      const on = coversViewport(r, window.innerHeight)
-      if (on !== visible.current) show(on)
+      // The stage: clipped to the track on screen and fading in with it (model.ts stageView).
+      const st = stage.current
+      if (st) {
+        const v = stageView(r, st.getBoundingClientRect(), vh)
+        st.style.clipPath = `inset(${v.clipTop}px 0 ${v.clipBottom}px 0)`
+        st.style.opacity = String(v.opacity)
+        st.style.visibility = v.on ? 'visible' : 'hidden'
+        if (v.on !== visible.current) {
+          visible.current = v.on
+          if (v.on) engine.current?.start()
+          else engine.current?.stop()
+        }
+      }
+      if (sheet.current) setSheetOn(covers(r, sheet.current.getBoundingClientRect()))
+      if (caption.current) setCapOn(covers(r, caption.current.getBoundingClientRect()))
     }
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update)
     }
-    const show = (on: boolean) => {
-      visible.current = on
-      setActive(on)
-      if (on) engine.current?.start()
-      else engine.current?.stop()
-    }
     update()
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
+    window.visualViewport?.addEventListener('resize', onScroll)
+    window.visualViewport?.addEventListener('scroll', onScroll)
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
+      window.visualViewport?.removeEventListener('resize', onScroll)
+      window.visualViewport?.removeEventListener('scroll', onScroll)
       cancelAnimationFrame(raf)
     }
   }, [])
@@ -119,21 +134,16 @@ export default function Story() {
         {mode.kind === 'still' && <p className="story-note">{tx.still[mode.reason]}</p>}
       </header>
 
-      <div className="story-stage" data-active={active} data-backdrop aria-hidden="true">
-        {mode.kind === 'still' ? (
-          <img className="story-still" src={storyStillURL(step.id)} alt="" />
-        ) : (
-          <>
-            {!ready && <img className="story-still" src={storyStillURL(STEPS[0].id)} alt="" />}
-            <canvas ref={canvas} className="story-canvas" data-ready={ready} />
-          </>
-        )}
+      {/* Never an empty scene: the step's still image until the 3D has drawn. */}
+      <div ref={stage} className="story-stage" data-backdrop aria-hidden="true">
+        {(mode.kind === 'still' || !ready) && <img className="story-still" src={storyStillURL(step.id)} alt="" />}
+        {mode.kind === '3d' && <canvas ref={canvas} className="story-canvas" data-ready={ready} />}
       </div>
 
       {/* Wide screens: the label (quantum numbers or the equation) on the right.
           Every step's label is mounted once and only the current one is visible:
           changing step toggles an attribute, never the DOM (no relayout while scrolling). */}
-      <div className="story-caption" data-active={active}>
+      <div ref={caption} className="story-caption" data-active={capOn}>
         {/* One group per scene, so the box fits its scene (it resizes once, at the change of scene). */}
         {([1, 2] as const).map((scene) => (
           <div key={scene} className="story-cap-group" data-on={step.scene === scene}>
@@ -149,7 +159,7 @@ export default function Story() {
       </div>
 
       {/* Phones: text and 3D in separate zones, the current step in a panel below the scene. */}
-      <div ref={sheet} className="story-sheet" data-active={active} aria-hidden="true">
+      <div ref={sheet} className="story-sheet" data-active={sheetOn} aria-hidden="true">
         {STEPS.map((s, i) => (
           <div key={s.id} className="story-layer" data-current={i === index}>
             <StepText step={s} first={sceneStart(i)} lang={lang} />
