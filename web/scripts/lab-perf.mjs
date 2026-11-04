@@ -105,6 +105,9 @@ async function scene(base, path, profile) {
     source: `window.__ready = 0; new MutationObserver((_, o) => { if (document.querySelector('canvas[data-ready="true"]')) { __ready = performance.now(); o.disconnect() } }).observe(document, { subtree: true, attributes: true, childList: true });`,
   })
   await page.send('Page.navigate', { url: `${base}${path}` })
+  // The story starts drawing only once its track fills the screen: go there.
+  await sleep(1000)
+  await evaluate(page, `(() => { const t = document.querySelector('.story-track'); if (t) scrollTo(0, t.getBoundingClientRect().top + scrollY) })()`)
   let info = null
   for (let k = 0; k < 400; k++) {
     await sleep(100)
