@@ -103,6 +103,30 @@ describe('/lab/historia', () => {
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toContain('Superposición e interferencia')
   })
 
+  it('the stage shows only while the story fills the screen: never behind the intro, the header or the sources', async () => {
+    media(() => true)
+    let rect = { top: 300, bottom: 9000 } // the intro is on screen, the track starts below it
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const r = this.classList.contains('story-track') ? rect : { top: 0, bottom: 0 }
+      return { ...r, left: 0, right: 0, width: 0, height: r.bottom - r.top, x: 0, y: r.top, toJSON() {} } as DOMRect
+    })
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    const active = () => document.querySelector('.story-stage')?.getAttribute('data-active')
+    const scroll = async (r: { top: number; bottom: number }) => {
+      rect = r
+      window.dispatchEvent(new Event('scroll'))
+      await new Promise((ok) => requestAnimationFrame(() => setTimeout(ok)))
+    }
+    await waitFor(() => expect(active()).toBe('false'))
+    await scroll({ top: -10, bottom: 8000 }) // the track fills the screen
+    await waitFor(() => expect(active()).toBe('true'))
+    expect(document.querySelector('.story-caption')?.getAttribute('data-active')).toBe('true')
+    await scroll({ top: -9000, bottom: window.innerHeight - 50 }) // the sources come in from below
+    await waitFor(() => expect(active()).toBe('false'))
+    expect(document.querySelector('.story-sheet')?.getAttribute('data-active')).toBe('false')
+  })
+
   it('is not linked from the other pages', async () => {
     renderAt('/')
     await screen.findByRole('heading', { level: 1 })

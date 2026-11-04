@@ -7,7 +7,7 @@ import { energy, r95 } from '../hydrogen'
 import { SEED } from '../view'
 import type { Story as Engine } from './engine'
 import { loadStory, storyStillURL } from './load'
-import { orbitalOf, progressAt, STEPS, stepAt, termState, type Step, type Term } from './model'
+import { coversViewport, orbitalOf, progressAt, STEPS, stepAt, termState, type Step, type Term } from './model'
 import { TEXT } from './texts'
 import './Story.css'
 
@@ -23,6 +23,8 @@ export default function Story() {
   const [ready, setReady] = useState(false)
   const [active, setActive] = useState(false)
   const track = useRef<HTMLDivElement>(null)
+  const article = useRef<HTMLElement>(null)
+  const sheet = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const engine = useRef<Engine | null>(null)
   const visible = useRef(false)
@@ -33,31 +35,42 @@ export default function Story() {
       raf = 0
       const el = track.current
       if (!el) return
-      const p = progressAt(-el.getBoundingClientRect().top / window.innerHeight)
+      const r = el.getBoundingClientRect()
+      const p = progressAt(-r.top / window.innerHeight)
       engine.current?.setProgress(p)
       setIndex(stepAt(p))
+      // The stage (and the label) only while the track fills the screen: no text
+      // outside the panels (intro, header, sources) is ever drawn over the particles.
+      const on = coversViewport(r, window.innerHeight)
+      if (on !== visible.current) show(on)
     }
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update)
     }
-    update()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
     const show = (on: boolean) => {
       visible.current = on
       setActive(on)
       if (on) engine.current?.start()
       else engine.current?.stop()
     }
-    const io = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(([e]) => show(e.isIntersecting))
-    if (io && track.current) io.observe(track.current)
-    else show(true)
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
-      io?.disconnect()
       cancelAnimationFrame(raf)
     }
+  }, [])
+
+  // Phones: the sheet is as tall as its tallest step (every step is stacked in
+  // it), never scrolls inside, and the scene takes the rest of the screen above.
+  useEffect(() => {
+    const el = sheet.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => article.current?.style.setProperty('--sheet-h', `${el.offsetHeight}px`))
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [])
 
   // 3D only: three.js loads once the page has painted and the main thread is idle.
@@ -94,7 +107,7 @@ export default function Story() {
   const sceneStart = (i: number) => i === 0 || STEPS[i - 1].scene !== STEPS[i].scene
 
   return (
-    <article className="story" aria-labelledby="story-title" data-mode={mode.kind}>
+    <article ref={article} className="story" aria-labelledby="story-title" data-mode={mode.kind}>
       <header className="story-intro">
         <p className="prompt">
           <span className="user">guest@quantumready</span>:<span className="path">~/lab</span>$ ./historia
@@ -106,7 +119,7 @@ export default function Story() {
         {mode.kind === 'still' && <p className="story-note">{tx.still[mode.reason]}</p>}
       </header>
 
-      <div className="story-stage" data-active={active} aria-hidden="true">
+      <div className="story-stage" data-active={active} data-backdrop aria-hidden="true">
         {mode.kind === 'still' ? (
           <img className="story-still" src={storyStillURL(step.id)} alt="" />
         ) : (
@@ -121,15 +134,22 @@ export default function Story() {
           Every step's label is mounted once and only the current one is visible:
           changing step toggles an attribute, never the DOM (no relayout while scrolling). */}
       <div className="story-caption" data-active={active}>
-        {STEPS.map((s, i) => (
-          <div key={s.id} className="story-layer" data-current={i === index}>
-            <Caption step={s} lang={lang} />
+        {/* One group per scene, so the box fits its scene (it resizes once, at the change of scene). */}
+        {([1, 2] as const).map((scene) => (
+          <div key={scene} className="story-cap-group" data-on={step.scene === scene}>
+            {STEPS.map((s, i) =>
+              s.scene === scene ? (
+                <div key={s.id} className="story-layer" data-current={i === index}>
+                  <Caption step={s} lang={lang} />
+                </div>
+              ) : null,
+            )}
           </div>
         ))}
       </div>
 
       {/* Phones: text and 3D in separate zones, the current step in a panel below the scene. */}
-      <div className="story-sheet" data-active={active} aria-hidden="true">
+      <div ref={sheet} className="story-sheet" data-active={active} aria-hidden="true">
         {STEPS.map((s, i) => (
           <div key={s.id} className="story-layer" data-current={i === index}>
             <StepText step={s} first={sceneStart(i)} lang={lang} />

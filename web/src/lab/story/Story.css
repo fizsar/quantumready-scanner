@@ -6,7 +6,6 @@
 .story {
   /* Behind every text: the page background, 88 % opaque. */
   --story-panel: rgba(5, 6, 11, 0.88);
-  --story-scene: 56svh;
   width: 100%;
   position: relative;
 }
@@ -40,10 +39,13 @@
   pointer-events: none;
   background: var(--bg);
   opacity: 0;
-  transition: opacity 0.5s ease;
+  visibility: hidden;
 }
+/* Fades in; hides at once (no transition back), so text outside the track never sits on it. */
 .story-stage[data-active='true'] {
   opacity: 1;
+  visibility: visible;
+  transition: opacity 0.5s ease;
 }
 .story-canvas,
 .story-still {
@@ -128,11 +130,11 @@
   padding: 1rem 1.25rem;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.4s ease, visibility 0.4s;
 }
 .story-caption[data-active='true'] {
   opacity: 1;
   visibility: visible;
+  transition: opacity 0.4s ease;
 }
 .story-cap {
   display: grid;
@@ -180,12 +182,12 @@
 
 /* Caption and sheet hold every step stacked in one grid cell; only the current
    one is visible. Toggling visibility needs no layout. */
-.story-caption,
-.story-sheet {
+.story-cap-group {
+  display: grid;
   grid-template-areas: 'layer';
 }
-.story-caption {
-  display: grid;
+.story-cap-group[data-on='false'] {
+  display: none;
 }
 .story-layer {
   grid-area: layer;
@@ -221,34 +223,35 @@
 
 /* Phones: scene above, text below, never on top of each other. */
 @media (max-width: 40rem) {
+  /* The scene above the sheet: the sheet's height is measured (Story.tsx). */
   .story-stage {
-    bottom: auto;
-    height: var(--story-scene);
+    bottom: var(--sheet-h, 45svh);
   }
   .story-caption {
     display: none;
   }
   .story-sheet {
     display: grid;
+    grid-template-areas: 'layer';
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    top: var(--story-scene);
     z-index: 2;
-    padding: 1rem var(--gutter) 1.25rem;
+    padding: 0.85rem var(--gutter) 1rem;
     border-radius: 12px 12px 0 0;
     border-bottom: 0;
     background: rgb(5, 6, 11);
-    overflow-y: auto;
+    /* As tall as its tallest step: never scrolls inside (overlap-check.sh checks it). */
+    overflow: hidden;
     align-content: start;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.4s ease, visibility 0.4s;
   }
   .story-sheet[data-active='true'] {
     opacity: 1;
     visibility: visible;
+    transition: opacity 0.4s ease;
   }
   .story-sheet .story-h {
     font-size: 1.25rem;
