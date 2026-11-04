@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { frameAt, progressAt, STEPS, stepAt, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
+import { density, ORBITALS, sample } from '../hydrogen'
+import { BURST, burstDir, densityWeights, fieldAt, fillBase, frameAt, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
 import { field, MEET, psi, SAMPLES, sampleX } from './wave'
 
 describe('the story timeline', () => {
@@ -30,10 +31,11 @@ describe('the story timeline', () => {
   })
 
   it('the camera moves continuously with the scroll (no jumps)', () => {
-    for (let p = 0; p < STEPS.length - 0.01; p += 0.01) {
+    // Fast moves (a wide shot) are fine; a jump is not: 1/1000 of a step never moves it more than 0.05.
+    for (let p = 0; p < STEPS.length - 0.001; p += 0.001) {
       const a = frameAt(p).cam
-      const b = frameAt(p + 0.01).cam
-      expect(Math.abs(a.az - b.az) + Math.abs(a.el - b.el) + Math.abs(a.dist - b.dist)).toBeLessThan(0.1)
+      const b = frameAt(p + 0.001).cam
+      expect(Math.abs(a.az - b.az) + Math.abs(a.el - b.el) + Math.abs(a.dist - b.dist)).toBeLessThan(0.05)
     }
   })
 
@@ -56,32 +58,36 @@ describe('the story timeline', () => {
 
 describe('the wave as particles', () => {
   const seeds = waveSeeds(5000, 1)
-  it('each particle belongs to a sample of ψ: ψ in the complex plane (70 %) or |ψ|² below', () => {
+  it('each particle belongs to a sample of ψ: on the helix (65 %) or in the |ψ|² fill below', () => {
     let fan = 0
     for (let i = 0; i < 5000; i++) {
-      expect(Number.isInteger(seeds[4 * i]) && seeds[4 * i] >= 0 && seeds[4 * i] < SAMPLES).toBe(true)
+      expect(seeds[4 * i] >= 0 && seeds[4 * i] <= SAMPLES - 1).toBe(true)
       if (seeds[4 * i + 2] === 0) fan++
     }
-    expect(fan / 5000).toBeCloseTo(0.7, 1)
+    expect(fan / 5000).toBeCloseTo(0.65, 1)
   })
 
   it('position, colour and opacity follow ψ: the phase sets the hue, |ψ| the opacity', () => {
     const t = 4
     const f = field(t)
+    const PEAK = Math.abs(psi(-12, 0)[0]) // field()'s scale: |ψ| at a packet's centre at t = 0
     for (let i = 0; i < 300; i++) {
       const w = wavePoint(seeds, i, f)
       const col = seeds[4 * i]
       const [re, im] = psi(sampleX(col), t)
-      const amp = Math.hypot(re, im)
+      const [fr, fi] = fieldAt(f, col)
+      // Interpolating between samples stays within 0.5 % of the peak of the exact ψ.
+      expect(Math.hypot(fr - re / PEAK, fi - im / PEAK)).toBeLessThan(0.005)
+      const amp = Math.hypot(fr, fi)
       if (seeds[4 * i + 2] === 0 && amp > 1e-6) {
-        // On the segment from the axis to ψ (scaled): Re and Im in the same ratio.
-        if (Math.abs(w.pos[1]) > 1e-6) expect((w.pos[2] - seeds[4 * i + 3]) / w.pos[1]).toBeCloseTo(im / re, 3)
-        expect(w.hue).toBeCloseTo(0.5 + (0.5 * re) / amp, 5) // ½ + ½ cos(arg ψ)
+        // On the helix: Re and Im of ψ in the same ratio.
+        if (Math.abs(w.pos[1]) > 1e-6) expect((w.pos[2] - seeds[4 * i + 3]) / w.pos[1]).toBeCloseTo(fi / fr, 3)
+        expect(w.hue).toBeCloseTo(0.5 + (0.5 * fr) / amp, 5) // ½ + ½ cos(arg ψ)
       }
       if (seeds[4 * i + 2] === 1) {
         // The lower particles fill the area under |ψ|² (field units): height = s · |ψ|² · dens.
-        const d = f[2 * col] ** 2 + f[2 * col + 1] ** 2
-        expect(w.pos[1] - WAVE.base).toBeCloseTo(seeds[4 * i + 1] * d * WAVE.dens, 6)
+        const d = fr ** 2 + fi ** 2
+        expect(w.pos[1] - fillBase(f)).toBeCloseTo(seeds[4 * i + 1] * d * WAVE.dens, 6)
       }
       expect(w.alpha).toBeGreaterThanOrEqual(0)
       expect(w.alpha).toBeLessThanOrEqual(1)
@@ -97,5 +103,70 @@ describe('the wave as particles', () => {
     const values = Array.from({ length: 100 }, (_, k) => top(centre - 50 + k))
     const minima = values.filter((v, k) => k > 0 && k < 99 && v < values[k - 1] && v < values[k + 1])
     expect(minima.length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('light', () => {
+  it('the same coverage per pixel for any particle count: n · size² · opacity is constant', () => {
+    const cover = (n: number) => n * storySize(n) ** 2 * storyAlpha(n)
+    for (const n of [25_000, 40_000, 50_000, 80_000]) expect(cover(n) / cover(N_REF)).toBeCloseTo(1, 9)
+    expect(storyAlpha(25_000)).toBeLessThanOrEqual(0.35)
+  })
+
+  for (const o of ORBITALS)
+    it(`${o.name}${o.sub}: weights have mean 1 and dim where points are dense (the nucleus keeps detail)`, () => {
+      const s = sample(o, 4000, 3)
+      const w = densityWeights(o, s.positions)
+      expect(w.reduce((a, v) => a + v, 0) / 4000).toBeCloseTo(1, 6)
+      const at = (i: number) => density(o, s.positions[3 * i], s.positions[3 * i + 1], s.positions[3 * i + 2])
+      // Monotonic: denser → lighter weight.
+      const order = [...w.keys()].sort((i, j) => at(i) - at(j))
+      for (let k = 1; k < order.length; k++) expect(w[order[k]]).toBeLessThanOrEqual(w[order[k - 1]] + 1e-6)
+      expect(Math.max(...w) / Math.min(...w)).toBeGreaterThan(1.5)
+    })
+})
+
+describe('spectacle', () => {
+  it('particles burst apart when the scene changes, stir between orbitals, and stay put on the wave', () => {
+    expect(frameAt(3.75).burst).toBe(BURST.scene) // 4f → the wave
+    expect(frameAt(1.75).burst).toBe(BURST.orbital)
+    expect(frameAt(5.5).burst).toBe(0)
+    expect(BURST.scene).toBeGreaterThan(5 * BURST.orbital)
+    for (let i = 0; i < 500; i++) {
+      const l = Math.hypot(...burstDir(i))
+      expect(l).toBeGreaterThanOrEqual(0.5 - 1e-9)
+      expect(l).toBeLessThanOrEqual(1.5 + 1e-9)
+    }
+  })
+
+  it('the camera dives towards the nucleus in 1s, keeps the 2p nodal plane edge-on, and opens wide into scene 2', () => {
+    expect(frameAt(0.5).cam.dist).toBeLessThan(3)
+    for (const p of [1, 1.25, 1.5]) expect(Math.abs(frameAt(p).cam.el)).toBeLessThan(0.05)
+    expect(frameAt(3.5).cam.dist).toBeGreaterThan(10)
+  })
+})
+
+describe('the helix and its density', () => {
+  const seeds = waveSeeds(6000, 2)
+  it('ψ is a thin helix of radius |ψ| around the axis, with |ψ|² filled right below it', () => {
+    for (const t of [0, 3, MEET]) {
+      const f = field(t)
+      let helixLow = 0 // −(widest radius): the bottom of the cylinder the helix turns in
+      let fillTop = -Infinity
+      for (let i = 0; i < 6000; i++) {
+        const w = wavePoint(seeds, i, f)
+        const col = seeds[4 * i]
+        const amp = Math.hypot(...fieldAt(f, col))
+        if (seeds[4 * i + 2] === 0) {
+          const r = Math.hypot(w.pos[1], w.pos[2] - seeds[4 * i + 3])
+          expect(r / WAVE.amp).toBeGreaterThanOrEqual(0.95 * amp - 1e-6)
+          expect(r / WAVE.amp).toBeLessThanOrEqual(amp + 1e-6)
+          helixLow = Math.min(helixLow, -r)
+        } else fillTop = Math.max(fillTop, w.pos[1])
+      }
+      // The fill never reaches the helix, and its peak sits just under it (0.15, plus sampling).
+      expect(fillTop).toBeLessThan(helixLow)
+      expect(helixLow - fillTop).toBeLessThan(0.4)
+    }
   })
 })

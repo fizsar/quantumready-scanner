@@ -74,4 +74,5 @@ for _ in $(seq 1 50); do
 done
 urls=()
 for p in "${PAGES[@]}"; do urls+=("http://web:8080$p"); done
-docker run --rm --network "$NET" -v "$PWD/scripts/overflow-check.mjs:/check.mjs:ro" "$NODE" node /check.mjs "$chrome_ip" "$WIDTH" "${urls[@]}"
+# CHECK: another checker with the same setup (overlap-check.sh uses it).
+docker run --rm --network "$NET" -v "$PWD/scripts/${CHECK:-overflow-check.mjs}:/check.mjs:ro" "$NODE" node /check.mjs "$chrome_ip" "$WIDTH" "${urls[@]}"

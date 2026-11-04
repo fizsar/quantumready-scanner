@@ -2,7 +2,7 @@
 // over (transferred, not copied): the first orbital first, so the scene starts
 // early, then the wave's particle seeds and the other orbitals.
 import { ORBITALS, sample } from '../hydrogen'
-import { orbitalHues, waveSeeds } from './model'
+import { densityWeights, orbitalHues, waveSeeds } from './model'
 
 export interface StoryRequest {
   count: number
@@ -10,7 +10,8 @@ export interface StoryRequest {
 }
 
 export type StoryReply =
-  | { kind: 'orbital'; index: number; positions: Float32Array; hues: Float32Array; r95: number }
+  /** looks: per particle (hue, light weight). */
+  | { kind: 'orbital'; index: number; positions: Float32Array; looks: Float32Array; r95: number }
   | { kind: 'seeds'; seeds: Float32Array }
 
 const scope = self as unknown as { onmessage: (e: MessageEvent<StoryRequest>) => void; postMessage: (m: StoryReply, t: Transferable[]) => void }
@@ -18,9 +19,16 @@ const scope = self as unknown as { onmessage: (e: MessageEvent<StoryRequest>) =>
 scope.onmessage = (e) => {
   const { count, seed } = e.data
   const orbital = (index: number) => {
-    const s = sample(ORBITALS[index], count, seed)
+    const o = ORBITALS[index]
+    const s = sample(o, count, seed)
     const hues = orbitalHues(s.signs)
-    scope.postMessage({ kind: 'orbital', index, positions: s.positions, hues, r95: s.r95 }, [s.positions.buffer, hues.buffer])
+    const weights = densityWeights(o, s.positions)
+    const looks = new Float32Array(count * 2)
+    for (let i = 0; i < count; i++) {
+      looks[2 * i] = hues[i]
+      looks[2 * i + 1] = weights[i]
+    }
+    scope.postMessage({ kind: 'orbital', index, positions: s.positions, looks, r95: s.r95 }, [s.positions.buffer, looks.buffer])
   }
   orbital(0)
   const seeds = waveSeeds(count, seed)
