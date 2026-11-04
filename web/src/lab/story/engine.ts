@@ -1,12 +1,14 @@
 // The story engine (three.js, WebGL2): ONE cloud of particles that morphs on
 // the GPU from shape to shape as the visitor scrolls, with soft additive
 // sprites for the glow, simulated depth of field (size and opacity by distance
-// from the focus) and a camera that glides with the scroll. Imported
-// dynamically, and only in 3D mode: nothing here is in the initial bundle.
+// from the focus), a burst when the scene changes and a camera that travels
+// with the scroll. Imported dynamically, and only in 3D mode: nothing here is
+// in the initial bundle.
 //
-// Shapes come from model.ts: static ones (the orbitals) live in buffers;
-// the wave is computed in the vertex shader from a 512-texel field texture
-// that the CPU refreshes from wave.ts (the tested physics) when t changes.
+// Shapes come from model.ts: static ones (the orbitals) live in buffers, each
+// particle with a hue and a light weight; the wave is computed in the vertex
+// shader from a 512-texel field texture that the CPU refreshes from wave.ts
+// (the tested physics) when t changes.
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -27,7 +29,7 @@ import {
 } from 'three'
 import { pixelRatio } from '../capability'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SIZE } from '../view'
-import { camPos, DOF, frameAt, shapeKey, STEPS, storyAlpha, WAVE, type Shape } from './model'
+import { camPos, DOF, fillBase, frameAt, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
 import type { StoryReply, StoryRequest } from './story.worker'
 import { field, SAMPLES, X_RANGE } from './wave'
 
@@ -49,18 +51,20 @@ export interface StoryOptions {
 const f = (v: number) => v.toFixed(6)
 const vertex = /* glsl */ `
 in vec3 aPosB;
-in float aHueA;
-in float aHueB;
+in vec2 aLookA;
+in vec2 aLookB;
 in vec4 aSeed;
 uniform int uKindA;
 uniform int uKindB;
 uniform float uMix;
+uniform float uBurst;
 uniform float uScaleA;
 uniform float uScaleB;
 uniform float uSpin;
 uniform sampler2D uField;
 uniform float uSize;
 uniform float uFocus;
+uniform float uBase;
 uniform vec3 uPos;
 uniform vec3 uNeg;
 out vec3 vColor;
@@ -68,17 +72,20 @@ out float vAlpha;
 
 // model.ts wavePoint(), in GLSL.
 void wave(out vec3 p, out float hue, out float alpha) {
+  // model.ts fieldAt(): linear interpolation between the two nearest samples.
   float col = aSeed.x;
-  vec2 f = texelFetch(uField, ivec2(int(col), 0), 0).rg;
+  int i0 = min(int(floor(col)), ${SAMPLES - 2});
+  vec2 f = mix(texelFetch(uField, ivec2(i0, 0), 0).rg, texelFetch(uField, ivec2(i0 + 1, 0), 0).rg, col - float(i0));
   float x = (${f(-X_RANGE)} + ${f(2 * X_RANGE)} * (col + 0.5) / ${f(SAMPLES)}) * ${f(WAVE.xScale)};
   if (aSeed.z < 0.5) {
     float amp = length(f);
-    p = vec3(x, aSeed.y * f.x * ${f(WAVE.amp)}, aSeed.y * f.y * ${f(WAVE.amp)} + aSeed.w);
+    float r = 1.0 - 0.05 * aSeed.y;
+    p = vec3(x, r * f.x * ${f(WAVE.amp)}, r * f.y * ${f(WAVE.amp)} + aSeed.w);
     hue = amp > 0.0 ? 0.5 + 0.5 * f.x / amp : 0.5;
     alpha = min(1.0, amp);
   } else {
     float d = dot(f, f);
-    p = vec3(x + aSeed.w, ${f(WAVE.base)} + aSeed.y * d * ${f(WAVE.dens)}, aSeed.w);
+    p = vec3(x + aSeed.w, uBase + aSeed.y * d * ${f(WAVE.dens)}, aSeed.w);
     hue = 0.85;
     alpha = min(1.0, d * 1.2);
   }
@@ -91,18 +98,32 @@ vec3 orbital(vec3 q, float scale) {
   return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
 }
 
+// model.ts burstDir(), in GLSL.
+float h(float k) { return fract(sin(float(gl_VertexID + 1) * k) * 43758.5453); }
+vec3 burstDir() {
+  float z = h(12.9898) * 2.0 - 1.0;
+  float a = h(78.233) * 6.2831853;
+  float r = sqrt(1.0 - z * z);
+  return vec3(r * cos(a), z, r * sin(a)) * (0.5 + h(37.719));
+}
+
 void main() {
   vec3 pa; float ha; float aa;
   vec3 pb; float hb; float ab;
-  if (uKindA == 1) wave(pa, ha, aa); else { pa = orbital(position, uScaleA); ha = aHueA; aa = 1.0; }
-  if (uKindB == 1) wave(pb, hb, ab); else { pb = orbital(aPosB, uScaleB); hb = aHueB; ab = 1.0; }
-  vec3 p = mix(pa, pb, uMix);
+  if (uKindA == 1) wave(pa, ha, aa); else { pa = orbital(position, uScaleA); ha = aLookA.x; aa = aLookA.y; }
+  if (uKindB == 1) wave(pb, hb, ab); else { pb = orbital(aPosB, uScaleB); hb = aLookB.x; ab = aLookB.y; }
+  // Fly apart and back together during a morph.
+  vec3 p = mix(pa, pb, uMix) + uBurst * sin(3.14159265 * uMix) * burstDir();
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = -mv.z;
-  float blur = 1.0 + ${f(DOF)} * abs(dist - uFocus);
+  // Orbitals: depth of field, normal points. The wave: crisp and fine.
+  float isWave = mix(float(uKindA), float(uKindB), uMix);
+  float blur = 1.0 + ${f(DOF)} * (1.0 - isWave) * abs(dist - uFocus);
+  float size = mix(1.0, ${f(WAVE_SIZE)}, isWave);
+  float gain = mix(1.0, ${f(WAVE_GAIN)}, isWave);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = uSize * blur / dist;
-  vAlpha = mix(aa, ab, uMix) / (blur * blur);
+  gl_PointSize = uSize * size * blur / dist;
+  vAlpha = mix(aa, ab, uMix) * gain / (blur * blur);
   vColor = mix(uNeg, uPos, mix(ha, hb, uMix));
 }`
 
@@ -118,7 +139,7 @@ void main() {
   if (d > 1.0) discard;
   // A soft sprite: bright core, gaussian halo.
   float g = exp(-d * 3.5);
-  fragColor = vec4(vColor, g * vAlpha * uAlpha);
+  fragColor = vec4(vColor, min(1.0, g * vAlpha * uAlpha));
 }`
 
 const unit = (c: [number, number, number]) => c.map((v) => v / 255) as [number, number, number]
@@ -138,7 +159,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   }
 
   const scene = new Scene()
-  const camera = new PerspectiveCamera(38, 1, 0.1, 60)
+  const camera = new PerspectiveCamera(38, 1, 0.1, 80)
   const fieldData = new Float32Array(SAMPLES * 2)
   const fieldTex = new DataTexture(fieldData, SAMPLES, 1, RGFormat, FloatType)
   fieldTex.minFilter = NearestFilter
@@ -156,13 +177,15 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       uKindA: { value: 0 },
       uKindB: { value: 0 },
       uMix: { value: 0 },
+      uBurst: { value: 0 },
       uScaleA: { value: 1 },
       uScaleB: { value: 1 },
       uSpin: { value: 0 },
       uField: { value: fieldTex },
       uSize: { value: 1 },
       uFocus: { value: 5 },
-      uAlpha: { value: 0.3 },
+      uBase: { value: -2 },
+      uAlpha: { value: 0.05 },
       // Raw sRGB values: the shader writes them as they are (no colour management).
       uPos: { value: new Vector3(...unit(POSITIVE)) },
       uNeg: { value: new Vector3(...unit(NEGATIVE)) },
@@ -172,22 +195,15 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   cloud.frustumCulled = false
   scene.add(cloud)
 
-  const orbitals: { pos: BufferAttribute; hue: BufferAttribute; scale: number }[] = []
+  const orbitals: { pos: BufferAttribute; look: BufferAttribute; scale: number }[] = []
   let seeds: BufferAttribute | null = null
   let drawn = opts.points
-  const setDrawn = (n: number) => {
-    drawn = n
-    geometry.setDrawRange(0, n)
-    material.uniforms.uAlpha.value = storyAlpha(n)
-    canvas.dataset.drawn = String(n)
-  }
   canvas.dataset.points = String(opts.points)
-  setDrawn(drawn)
 
   const worker = new Worker(new URL('./story.worker.ts', import.meta.url), { type: 'module' })
   worker.onmessage = (e: MessageEvent<StoryReply>) => {
     const m = e.data
-    if (m.kind === 'orbital') orbitals[m.index] = { pos: new BufferAttribute(m.positions, 3), hue: new BufferAttribute(m.hues, 1), scale: RADIUS / m.r95 }
+    if (m.kind === 'orbital') orbitals[m.index] = { pos: new BufferAttribute(m.positions, 3), look: new BufferAttribute(m.looks, 2), scale: RADIUS / m.r95 }
     else seeds = new BufferAttribute(m.seeds, 4)
     bound = ''
   }
@@ -201,7 +217,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   const bind = (side: 'A' | 'B', s: Shape) => {
     const o = s.kind === 'orbital' ? orbitals[s.index] : orbitals[0]
     geometry.setAttribute(side === 'A' ? 'position' : 'aPosB', o.pos)
-    geometry.setAttribute(side === 'A' ? 'aHueA' : 'aHueB', o.hue)
+    geometry.setAttribute(side === 'A' ? 'aLookA' : 'aLookB', o.look)
     material.uniforms[`uKind${side}`].value = s.kind === 'wave' ? 1 : 0
     material.uniforms[`uScale${side}`].value = o.scale
   }
@@ -209,10 +225,10 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   function apply(time: number) {
     if (!orbitals[0]) return false
     const fr = frameAt(progress)
-    let { a, b, mix } = fr
+    let { a, b, mix, burst } = fr
     // Data still on its way: stay on the last shape that has arrived.
-    if (!ready(b)) [b, mix] = [a, 0]
-    if (!ready(a)) [a, b, mix] = [STEPS[0].shape, STEPS[0].shape, 0]
+    if (!ready(b)) [b, mix, burst] = [a, 0, 0]
+    if (!ready(a)) [a, b, mix, burst] = [STEPS[0].shape, STEPS[0].shape, 0, 0]
     // Rebind only when the pair of shapes (or the data that arrived) changes.
     const key = `${shapeKey(a)}${shapeKey(b)}${seeds ? 's' : ''}${orbitals.length}`
     if (key !== bound) {
@@ -222,15 +238,17 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       bound = key
     }
     material.uniforms.uMix.value = mix
+    material.uniforms.uBurst.value = burst
     if ((a.kind === 'wave' || b.kind === 'wave') && fr.t !== lastT) {
       field(fr.t, fieldData)
       fieldTex.needsUpdate = true
+      material.uniforms.uBase.value = fillBase(fieldData)
       lastT = fr.t
     }
-    // Cinematic camera: the step's path, plus a slow orbit while on the atom.
+    // The step's camera path, plus a slow sway; the atom spins slowly.
     const atom = STEPS[fr.step].scene === 1 ? 1 - mix : 0
     material.uniforms.uSpin.value = time * 0.00012 * atom
-    const cam = { ...fr.cam, az: fr.cam.az + 0.12 * Math.sin(time * 0.00009) }
+    const cam = { ...fr.cam, az: fr.cam.az + 0.08 * Math.sin(time * 0.00009) }
     camera.position.set(...camPos(cam))
     camera.lookAt(...cam.target)
     if (camera.fov !== cam.fov) {
@@ -241,7 +259,6 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     return true
   }
 
-  let wide = false
   function resize() {
     const w = canvas.clientWidth
     const h = canvas.clientHeight
@@ -251,16 +268,23 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     // Portrait: zoom out until the scene (the wave is the widest) fits the width.
     camera.zoom = Math.min(1, (w / h) * 0.9)
     // Wide screens: the text panels are on the left, so the scene moves right.
-    wide = w > 900 && w / h > 1.25
-    if (wide) camera.setViewOffset(w, h, -0.2 * w, 0, w, h)
+    if (w > 900 && w / h > 1.25) camera.setViewOffset(w, h, -0.2 * w, 0, w, h)
     else camera.clearViewOffset()
     camera.updateProjectionMatrix()
-    // Pixels at distance 5 = SIZE × the shorter side (as the prototype), scaled with the zoom.
-    material.uniforms.uSize.value = SIZE * Math.min(w, h) * dpr * 5 * camera.zoom
+    // Pixels at distance 5 = SIZE × the shorter side, in drawing-buffer pixels
+    // (× the capped DPR), scaled with the zoom and for the particle count (model.ts).
+    material.uniforms.uSize.value = SIZE * Math.min(w, h) * dpr * 5 * camera.zoom * storySize(drawn)
+  }
+  const setDrawn = (n: number) => {
+    drawn = n
+    geometry.setDrawRange(0, n)
+    material.uniforms.uAlpha.value = storyAlpha(n)
+    resize()
+    canvas.dataset.drawn = String(n)
   }
   const ro = new ResizeObserver(resize)
   ro.observe(canvas)
-  resize()
+  setDrawn(drawn)
 
   let raf = 0
   let running = false

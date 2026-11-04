@@ -1,11 +1,12 @@
 // Vite plugin: one still image per step of /lab/historia, rendered at build
 // time from the story model (model.ts, wave.ts, hydrogen.ts) with the step's
-// camera, as the engine draws the end of that step: additive soft points, the
-// same depth of field, hue from indigo to green. Emitted as
+// camera at its start (the wave at the end of its time range), as the engine
+// draws it: additive soft points with the same light weights, sizes and depth
+// of field, hue from indigo to green. Emitted as
 // dist/lab/story-<step>.png and served by the dev server at the same path.
 import type { Plugin } from 'vite'
 import { ORBITALS, sample } from '../src/lab/hydrogen.ts'
-import { camPos, DOF, orbitalHues, STEPS, storyAlpha, waveSeeds, wavePoint, type Step } from '../src/lab/story/model.ts'
+import { camPos, densityWeights, DOF, orbitalHues, STEPS, storyAlpha, storySize, WAVE_GAIN, WAVE_SIZE, waveSeeds, wavePoint, type Step } from '../src/lab/story/model.ts'
 import { field } from '../src/lab/story/wave.ts'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SEED, SIZE } from '../src/lab/view.ts'
 import { encodePNG } from './orbitalImages.ts'
@@ -31,13 +32,14 @@ export function stepParticles(step: Step, n = STORY_POINTS): { pos: Float32Array
     const s = sample(ORBITALS[step.shape.index], n, SEED)
     const scale = RADIUS / s.r95
     const h = orbitalHues(s.signs)
+    const w = densityWeights(ORBITALS[step.shape.index], s.positions)
     for (let i = 0; i < n; i++) {
       // physics (x, y, z) → three (x, z, −y), as the engine's orbital().
       pos[3 * i] = s.positions[3 * i] * scale
       pos[3 * i + 1] = s.positions[3 * i + 2] * scale
       pos[3 * i + 2] = -s.positions[3 * i + 1] * scale
       hue[i] = h[i]
-      alpha[i] = 1
+      alpha[i] = w[i]
     }
   } else {
     const seeds = waveSeeds(n, SEED)
@@ -84,6 +86,9 @@ export function renderStep(step: Step, px = STORY_PX, n = STORY_POINTS): Uint8Ar
   const weight = new Float32Array(px * px)
   const hueSum = new Float32Array(px * px)
   const a0 = storyAlpha(n)
+  const wave = step.shape.kind === 'wave'
+  const sizeK = storySize(n) * (wave ? WAVE_SIZE : 1)
+  const gain = wave ? WAVE_GAIN : 1
   for (let i = 0; i < n; i++) {
     if (alpha[i] <= 0) continue
     const d = sub([pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]], eye)
@@ -91,9 +96,9 @@ export function renderStep(step: Step, px = STORY_PX, n = STORY_POINTS): Uint8Ar
     if (z <= 0.1) continue
     const u = ((dot(d, right) / (z * tan) + 1) / 2) * px
     const v = ((1 - dot(d, up) / (z * tan)) / 2) * px
-    const blur = 1 + DOF * Math.abs(z - cam.dist)
-    const radius = (SIZE * px * 5 * blur) / z / 2
-    const a = (alpha[i] / (blur * blur)) * a0
+    const blur = 1 + (wave ? 0 : DOF) * Math.abs(z - cam.dist)
+    const radius = (SIZE * px * 5 * sizeK * blur) / z / 2
+    const a = Math.min(1, ((alpha[i] * gain) / (blur * blur)) * a0)
     const x0 = Math.max(0, Math.floor(u - radius))
     const x1 = Math.min(px - 1, Math.ceil(u + radius))
     const y0 = Math.max(0, Math.floor(v - radius))
