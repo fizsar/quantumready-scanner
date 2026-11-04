@@ -116,7 +116,7 @@ async function scene(base, path, profile) {
   }
   // When each piece arrived (ms since navigation start).
   const timeline = await evaluate(page, `Object.fromEntries(performance.getEntriesByType('resource')
-    .filter((e) => /index-|LabOrbital-|Story-|orbitalScene-|engine-|three\\.module-|\\.worker-|orbital-1s|story-1s|jetbrains/.test(e.name))
+    .filter((e) => /index-|Story-|engine-|three\\.module-|\\.worker-|story-1s|jetbrains/.test(e.name))
     .map((e) => [e.name.split('/').pop().replace(/-[\\w-]{8}\\./, '.'), [Math.round(e.startTime), Math.round(e.responseEnd)]]))`)
   if (process.env.TIMELINE) console.log(JSON.stringify(timeline))
   const gpu = await evaluate(page, `(() => { const gl = document.createElement('canvas').getContext('webgl2'); const e = gl?.getExtension('WEBGL_debug_renderer_info'); return gl ? gl.getParameter(e ? e.UNMASKED_RENDERER_WEBGL : gl.RENDERER) : 'no webgl2' })()`)

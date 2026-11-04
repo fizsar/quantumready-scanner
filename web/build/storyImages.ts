@@ -9,7 +9,7 @@ import { ORBITALS, sample } from '../src/lab/hydrogen.ts'
 import { camPos, densityWeights, DOF, orbitalHues, STEPS, storyAlpha, storySize, WAVE_GAIN, WAVE_SIZE, waveSeeds, wavePoint, type Step } from '../src/lab/story/model.ts'
 import { field } from '../src/lab/story/wave.ts'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SEED, SIZE } from '../src/lab/view.ts'
-import { encodePNG } from './orbitalImages.ts'
+import { encodePNG } from './png.ts'
 
 export const STORY_PX = 640
 export const STORY_POINTS = 40_000
