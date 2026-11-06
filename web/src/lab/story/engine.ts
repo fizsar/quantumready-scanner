@@ -5,10 +5,11 @@
 // with the scroll. Imported dynamically, and only in 3D mode: nothing here is
 // in the initial bundle.
 //
-// Shapes come from model.ts: static ones (the orbitals) live in buffers, each
-// particle with a hue and a light weight; the wave is computed in the vertex
-// shader from a 512-texel field texture that the CPU refreshes from wave.ts
-// (the tested physics) when t changes.
+// Shapes come from model.ts: static ones (the orbitals, the figures of scenes
+// 3–5) live in buffers, each particle with a hue and a light weight; the wave
+// is computed in the vertex shader from a 512-texel field texture that the CPU
+// refreshes from wave.ts (the tested physics) when t changes. On the circuit's
+// wires some particles flow (the shader moves them along x with the time).
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -30,6 +31,7 @@ import {
 import { pixelRatio } from '../capability'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS } from '../view'
 import { fit, type Box, type Frame } from './camera'
+import { WIRE, type FigureId } from './figures'
 import { DOF, fillBase, frameAt, POINT, shapeBox, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
 import type { StoryReply, StoryRequest } from './story.worker'
 import { field, SAMPLES, X_RANGE } from './wave'
@@ -52,6 +54,8 @@ export interface StoryOptions {
 }
 
 const f = (v: number) => v.toFixed(6)
+/** One pass of the flowing particles along the circuit's wires (ms). */
+const FLOW_MS = 5000
 const vertex = /* glsl */ `
 in vec3 aPosB;
 in vec2 aLookA;
@@ -64,6 +68,7 @@ uniform float uBurst;
 uniform float uScaleA;
 uniform float uScaleB;
 uniform float uSpin;
+uniform float uTime;
 uniform sampler2D uField;
 uniform float uSize;
 uniform float uFocus;
@@ -101,6 +106,16 @@ vec3 orbital(vec3 q, float scale) {
   return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
 }
 
+// A figure (figures.ts): as built, in world units. A negative weight flows
+// along the wire, from x0 to x1 and round again (one pass every FLOW_MS).
+vec3 figure(vec3 q, vec2 look, out float hue, out float alpha) {
+  hue = look.x;
+  alpha = abs(look.y);
+  if (look.y >= 0.0) return q;
+  float u = fract((q.x - ${f(WIRE.x0)}) / ${f(WIRE.x1 - WIRE.x0)} + uTime / ${f(FLOW_MS)});
+  return vec3(${f(WIRE.x0)} + u * ${f(WIRE.x1 - WIRE.x0)}, q.y, q.z);
+}
+
 // model.ts burstDir(), in GLSL.
 float h(float k) { return fract(sin(float(gl_VertexID + 1) * k) * 43758.5453); }
 vec3 burstDir() {
@@ -113,14 +128,14 @@ vec3 burstDir() {
 void main() {
   vec3 pa; float ha; float aa;
   vec3 pb; float hb; float ab;
-  if (uKindA == 1) wave(pa, ha, aa); else { pa = orbital(position, uScaleA); ha = aLookA.x; aa = aLookA.y; }
-  if (uKindB == 1) wave(pb, hb, ab); else { pb = orbital(aPosB, uScaleB); hb = aLookB.x; ab = aLookB.y; }
+  if (uKindA == 1) wave(pa, ha, aa); else if (uKindA == 2) pa = figure(position, aLookA, ha, aa); else { pa = orbital(position, uScaleA); ha = aLookA.x; aa = aLookA.y; }
+  if (uKindB == 1) wave(pb, hb, ab); else if (uKindB == 2) pb = figure(aPosB, aLookB, hb, ab); else { pb = orbital(aPosB, uScaleB); hb = aLookB.x; ab = aLookB.y; }
   // Fly apart and back together during a morph.
   vec3 p = mix(pa, pb, uMix) + uBurst * sin(3.14159265 * uMix) * burstDir();
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = -mv.z;
   // Orbitals: depth of field, normal points. The wave: crisp and fine.
-  float isWave = mix(float(uKindA), float(uKindB), uMix);
+  float isWave = mix(uKindA == 1 ? 1.0 : 0.0, uKindB == 1 ? 1.0 : 0.0, uMix);
   float blur = 1.0 + ${f(DOF)} * (1.0 - isWave) * abs(dist - uFocus);
   float size = mix(1.0, ${f(WAVE_SIZE)}, isWave);
   float gain = mix(1.0, ${f(WAVE_GAIN)}, isWave);
@@ -184,6 +199,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       uScaleA: { value: 1 },
       uScaleB: { value: 1 },
       uSpin: { value: 0 },
+      uTime: { value: 0 },
       uField: { value: fieldTex },
       uSize: { value: 1 },
       uFocus: { value: 5 },
@@ -199,6 +215,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   scene.add(cloud)
 
   const orbitals: { pos: BufferAttribute; look: BufferAttribute; scale: number }[] = []
+  const figures = new Map<FigureId, { pos: BufferAttribute; look: BufferAttribute; scale: number }>()
   let seeds: BufferAttribute | null = null
   let drawn = opts.points
   canvas.dataset.points = String(opts.points)
@@ -207,6 +224,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   worker.onmessage = (e: MessageEvent<StoryReply>) => {
     const m = e.data
     if (m.kind === 'orbital') orbitals[m.index] = { pos: new BufferAttribute(m.positions, 3), look: new BufferAttribute(m.looks, 2), scale: RADIUS / m.r95 }
+    else if (m.kind === 'figure') figures.set(m.id, { pos: new BufferAttribute(m.positions, 3), look: new BufferAttribute(m.looks, 2), scale: 1 })
     else seeds = new BufferAttribute(m.seeds, 4)
     bound = ''
   }
@@ -216,12 +234,12 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   let bound = ''
   let lastT = Number.NaN
   /** Whether a shape's data has arrived from the worker. */
-  const ready = (s: Shape) => (s.kind === 'orbital' ? !!orbitals[s.index] : !!seeds)
+  const ready = (s: Shape) => (s.kind === 'orbital' ? !!orbitals[s.index] : s.kind === 'figure' ? figures.has(s.id) : !!seeds)
   const bind = (side: 'A' | 'B', s: Shape) => {
-    const o = s.kind === 'orbital' ? orbitals[s.index] : orbitals[0]
+    const o = s.kind === 'orbital' ? orbitals[s.index] : s.kind === 'figure' ? figures.get(s.id)! : orbitals[0]
     geometry.setAttribute(side === 'A' ? 'position' : 'aPosB', o.pos)
     geometry.setAttribute(side === 'A' ? 'aLookA' : 'aLookB', o.look)
-    material.uniforms[`uKind${side}`].value = s.kind === 'wave' ? 1 : 0
+    material.uniforms[`uKind${side}`].value = s.kind === 'wave' ? 1 : s.kind === 'figure' ? 2 : 0
     material.uniforms[`uScale${side}`].value = o.scale
   }
 
@@ -233,7 +251,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     if (!ready(b)) [b, mix, burst] = [a, 0, 0]
     if (!ready(a)) [a, b, mix, burst] = [STEPS[0].shape, STEPS[0].shape, 0, 0]
     // Rebind only when the pair of shapes (or the data that arrived) changes.
-    const key = `${shapeKey(a)}${shapeKey(b)}${seeds ? 's' : ''}${orbitals.length}`
+    const key = `${shapeKey(a)}${shapeKey(b)}${seeds ? 's' : ''}${orbitals.length}.${figures.size}`
     if (key !== bound) {
       geometry.setAttribute('aSeed', seeds ?? new BufferAttribute(new Float32Array(drawn * 4), 4))
       bind('A', a)
@@ -253,6 +271,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     // in the free part of the screen (camera.ts fit).
     const atom = STEPS[fr.step].scene === 1 ? 1 - mix : 0
     material.uniforms.uSpin.value = time * 0.00012 * atom
+    material.uniforms.uTime.value = time % FLOW_MS // small: float32 keeps its precision
     const box = lerpBox(shapeBox(a, fieldData), shapeBox(b, fieldData), mix)
     const shot = fit(box, fr.cam.az + 0.08 * Math.sin(time * 0.00009), fr.cam.el, fr.cam.frame, fr.cam.fov, frameNow())
     camera.position.set(...shot.position)

@@ -9,9 +9,11 @@
 import { density, ORBITALS, rng, rQuantile, type Orbital } from '../hydrogen.ts'
 import { RADIUS } from '../view.ts'
 import { sphereHull, type Box, type V3 } from './camera.ts'
+import { figureBox, type FigureId } from './figures.ts'
 import { SAMPLES, sampleX, X_RANGE } from './wave.ts'
 
-export type Shape = { kind: 'orbital'; index: number } | { kind: 'wave'; t0: number; t1: number }
+/** What the particles form: an orbital, the wave, or a figure of scenes 3–5 (figures.ts). */
+export type Shape = { kind: 'orbital'; index: number } | { kind: 'wave'; t0: number; t1: number } | { kind: 'figure'; id: FigureId }
 
 /**
  * Camera on a sphere around the shape's centre: azimuth and elevation in
@@ -79,9 +81,12 @@ export function densityWeights(o: Pick<Orbital, 'n' | 'l' | 'm'>, positions: Flo
 /** Terms of the Schrödinger equation that scene 2 reveals one by one. */
 export type Term = 'psi' | 'dt' | 'kin' | 'pot' | 'sup'
 
+export type Scene = 1 | 2 | 3 | 4 | 5
+export const SCENES: readonly Scene[] = [1, 2, 3, 4, 5]
+
 export interface Step {
   id: string
-  scene: 1 | 2
+  scene: Scene
   shape: Shape
   /** Where the camera is when the step starts (and its still image). */
   cam: Cam
@@ -92,6 +97,7 @@ export interface Step {
 }
 
 const cam = (az: number, el: number, frame: number): Cam => ({ az, el, frame, fov: 38 })
+const fig = (id: FigureId): Shape => ({ kind: 'figure', id })
 /** Scene 2 looks at the wave from three quarters (az ≈ 2π − 0.6, after the turn from the atom). */
 const TAU = 2 * Math.PI
 
@@ -109,6 +115,23 @@ export const STEPS: readonly Step[] = [
   { id: 'kin', scene: 2, shape: { kind: 'wave', t0: 3, t1: 5 }, cam: cam(TAU - 0.52, 0.22, 1.1), term: 'kin' },
   { id: 'pot', scene: 2, shape: { kind: 'wave', t0: 5, t1: 5.4 }, cam: cam(TAU - 0.7, 0.42, 1.1), term: 'pot' },
   { id: 'sup', scene: 2, shape: { kind: 'wave', t0: 5.4, t1: 6 }, cam: cam(TAU - 0.5, 0.26, 1.05), term: 'sup' },
+  // Scene 3, the qubit: a Bloch sphere seen from above the equator, a little to the side.
+  { id: 'q0', scene: 3, shape: fig('bloch0'), cam: cam(0.55, 0.3, 1.1), via: cam(0.75, 0.26, 1.05) },
+  { id: 'qH', scene: 3, shape: fig('blochH'), cam: cam(0.9, 0.24, 1.1), via: cam(0.7, 0.3, 1.05) },
+  { id: 'qM', scene: 3, shape: fig('blochM'), cam: cam(0.55, 0.22, 1.1) },
+  { id: 'bell', scene: 3, shape: fig('bell'), cam: cam(0.18, 0.2, 1.05), via: cam(0.3, 0.24, 1.05) },
+  // Scene 4, the computer: the circuit head-on, then the register from above at an angle.
+  { id: 'circ', scene: 4, shape: fig('circuit'), cam: cam(0.08, 0.06, 1.05), via: cam(0.18, 0.1, 1.05) },
+  { id: 'reg3', scene: 4, shape: fig('reg3'), cam: cam(0.25, 0.3, 1.05) },
+  { id: 'reg6', scene: 4, shape: fig('reg6'), cam: cam(0.45, 0.55, 1.05) },
+  { id: 'reg10', scene: 4, shape: fig('reg10'), cam: cam(0.6, 0.7, 1.05) },
+  // Scene 5, Shor: the plots head-on, the cubes and the curve slightly from the side.
+  { id: 'shorF', scene: 5, shape: fig('shorF'), cam: cam(0.06, 0.05, 1.05) },
+  { id: 'qft', scene: 5, shape: fig('shorQFT'), cam: cam(-0.06, 0.06, 1.05) },
+  { id: 'key', scene: 5, shape: fig('key'), cam: cam(0.3, 0.3, 1.05) },
+  { id: 'factors', scene: 5, shape: fig('factors'), cam: cam(0.4, 0.25, 1.05) },
+  { id: 'curve', scene: 5, shape: fig('curve'), cam: cam(0.12, 0.08, 1.05) },
+  { id: 'broken', scene: 5, shape: fig('curveBroken'), cam: cam(0.3, 0.15, 1.1) },
 ]
 
 export const TERMS: readonly Term[] = ['psi', 'dt', 'kin', 'pot', 'sup']
@@ -176,7 +199,7 @@ export function stepAt(p: number) {
 const smooth = (f: number) => f * f * (3 - 2 * f)
 const lerp = (a: number, b: number, f: number) => a + (b - a) * f
 
-/** How far particles fly apart in the middle of a morph (world units): a gentle stir between orbitals, a burst from the atom to the wave. */
+/** How far particles fly apart in the middle of a morph (world units): a gentle stir within a scene, a burst from one scene to the next. */
 export const BURST = { orbital: 0.3, scene: 2.4 }
 
 /**
@@ -194,14 +217,12 @@ export function frameAt(p: number): { a: Shape; b: Shape; mix: number; burst: nu
   const cur = STEPS[i]
   const next = STEPS[Math.min(i + 1, last)]
   const cam = camAlong(cur, i === last ? cur.cam : next.cam, f)
-  if (cur.shape.kind === 'wave') {
-    const t = lerp(cur.shape.t0, cur.shape.t1, f)
-    return { a: cur.shape, b: cur.shape, mix: 0, burst: 0, t, cam, step: i }
-  }
+  // A wave runs its time range through the whole step, morphing or not.
+  const tCur = cur.shape.kind === 'wave' ? lerp(cur.shape.t0, cur.shape.t1, f) : 0
   if (i === last || shapeKey(next.shape) === shapeKey(cur.shape))
-    return { a: cur.shape, b: cur.shape, mix: 0, burst: 0, t: 0, cam, step: i }
+    return { a: cur.shape, b: cur.shape, mix: 0, burst: 0, t: tCur, cam, step: i }
   const m = smooth(Math.min(1, Math.max(0, (f - 0.5) * 2)))
-  const t = next.shape.kind === 'wave' ? next.shape.t0 : 0
+  const t = next.shape.kind === 'wave' ? next.shape.t0 : tCur
   const burst = next.scene !== cur.scene ? BURST.scene : BURST.orbital
   return { a: cur.shape, b: next.shape, mix: m, burst, t, cam, step: i }
 }
@@ -213,7 +234,7 @@ function camAlong(s: Step, end: Cam, f: number): Cam {
 }
 
 /** A short key per shape: equal keys draw the same particles (the wave's time aside). */
-export const shapeKey = (s: Shape) => (s.kind === 'orbital' ? `o${s.index}` : 'w')
+export const shapeKey = (s: Shape) => (s.kind === 'orbital' ? `o${s.index}` : s.kind === 'figure' ? `f${s.id}` : 'w')
 
 export function camLerp(a: Cam, b: Cam, f: number): Cam {
   return {
@@ -249,7 +270,8 @@ export function waveBox(field: Float32Array): Box {
 }
 
 /** The box around a shape (the wave's depends on its field at the moment). */
-export const shapeBox = (s: Shape, field?: Float32Array): Box => (s.kind === 'orbital' ? orbitalBoxes[s.index] : waveBox(field!))
+export const shapeBox = (s: Shape, field?: Float32Array): Box =>
+  s.kind === 'orbital' ? orbitalBoxes[s.index] : s.kind === 'figure' ? figureBox(s.id) : waveBox(field!)
 
 /**
  * Direction and strength of particle i's flight in a burst: a unit vector

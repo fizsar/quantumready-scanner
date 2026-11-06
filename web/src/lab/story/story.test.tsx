@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { json, stubFetch } from '../../test/fixtures'
 import { renderAt } from '../../test/render'
+import { curvePoints } from './figures'
 
 // The engine (the only importer of three.js here) is replaced by a spy.
 const engine = vi.hoisted(() => ({
@@ -152,6 +153,44 @@ describe('/lab/historia', () => {
     expect(panel.querySelector('.story-h .story-nowrap')?.textContent).toBe('(n, l, m) = (1, 0, 0)')
     expect(screen.getAllByText(/Cohen-Tannoudji/).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toContain('Superposición e interferencia')
+  })
+
+  it('scenes 3–5: each panel shows the numbers computed by quantum.ts (Spanish)', async () => {
+    media(() => true)
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    const cap = (id: string) => document.getElementById(`story-step-${id}`)!.closest('.story-panel')!.querySelector('.story-cap')!
+    const line = (id: string) => cap(id).querySelector('.story-scale')!.textContent
+    expect(line('q0')).toBe('θ = 0: |0⟩, vector (0; 0; 1)')
+    expect(line('qH')).toBe('θ = π/2, φ = 0: P(0) = 0,5 · P(1) = 0,5')
+    expect(line('qM')).toBe('resultado 1: |1⟩, vector (0; 0; −1)')
+    expect(line('bell')).toBe('cada cúbit: vector (0; 0; 0), pureza 0,5 · ⟨Z⊗Z⟩ = 1')
+    expect(line('circ')).toBe('P(00) = 0,5 · P(01) = 0 · P(10) = 0 · P(11) = 0,5')
+    expect(line('reg3')).toBe('2³ = 8 amplitudes de 0,354')
+    expect(line('reg10')).toBe('2¹⁰ = 1024 amplitudes de 0,031')
+    expect(line('shorF')).toBe('f = 1, 7, 4, 13, 1, 7, … → r = 4')
+    expect(line('qft')).toBe('picos en y = 0, 64, 128, 192, P = 0,25 · r = 4')
+    expect(line('factors')).toBe('mcd(48, 15) = 3 · mcd(50, 15) = 5 · 3 × 5 = 15')
+    expect(line('curve')).toBe(`sobre 𝔽₁₀₁: ${curvePoints().length + 1} puntos (con el del infinito)`)
+    expect(line('broken')).toBe('RSA-2048: < 1.000.000 cúbits ruidosos, < 7 días, con 0,1 % de error por puerta, ciclo de 1 µs y 10 µs de reacción')
+    // The formula of each step in MathML.
+    for (const id of ['q0', 'bell', 'circ', 'reg6', 'shorF', 'qft', 'key', 'factors', 'curve'])
+      expect(cap(id).querySelector('math')?.namespaceURI, id).toBe('http://www.w3.org/1998/Math/MathML')
+    // Scene headings and the sources of scenes 3–5.
+    for (const s of ['Escena 3 · El cúbit', 'Escena 4 · El ordenador cuántico', 'Escena 5 · El algoritmo de Shor']) expect(screen.getAllByText(s).length).toBeGreaterThan(0)
+    const sources = document.querySelector('.story-sources')!.textContent!
+    for (const s of ['Nielsen', 'SIAM J. Comput. 26(5), 1484–1509', 'Commun. ACM 21(2)', 'RFC 7748', 'arXiv:2505.15917', 'Quantum 5, 433', 'ASIACRYPT 2017', '2330 cúbits lógicos'])
+      expect(sources, s).toContain(s)
+  })
+
+  it('scenes 3–5 in English, numbers in English format', async () => {
+    media(() => true)
+    renderAt('/lab/historia', 'en')
+    await screen.findByRole('heading', { level: 1 })
+    const line = (id: string) => document.getElementById(`story-step-${id}`)!.closest('.story-panel')!.querySelector('.story-scale')!.textContent
+    expect(line('qH')).toBe('θ = π/2, φ = 0: P(0) = 0.5 · P(1) = 0.5')
+    expect(line('factors')).toBe('gcd(48, 15) = 3 · gcd(50, 15) = 5 · 3 × 5 = 15')
+    expect(line('broken')).toBe('RSA-2048: < 1,000,000 noisy qubits, < 7 days, at 0.1% gate error, 1 µs cycle and 10 µs reaction')
   })
 
   it('the stage shows only the track on screen, with soft edges, and fades in with it; the sheet shows once the track is behind it', async () => {

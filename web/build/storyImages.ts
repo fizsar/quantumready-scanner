@@ -7,6 +7,7 @@
 import type { Plugin } from 'vite'
 import { ORBITALS, sample } from '../src/lab/hydrogen.ts'
 import { fit, project } from '../src/lab/story/camera.ts'
+import { buildFigure } from '../src/lab/story/figures.ts'
 import { densityWeights, DOF, orbitalHues, POINT, shapeBox, STEPS, storyAlpha, storySize, WAVE_GAIN, WAVE_SIZE, waveSeeds, wavePoint, type Step } from '../src/lab/story/model.ts'
 import { field } from '../src/lab/story/wave.ts'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SEED } from '../src/lab/view.ts'
@@ -40,6 +41,14 @@ export function stepParticles(step: Step, n = STORY_POINTS): { pos: Float32Array
       pos[3 * i + 2] = -s.positions[3 * i + 1] * scale
       hue[i] = h[i]
       alpha[i] = w[i]
+    }
+  } else if (step.shape.kind === 'figure') {
+    // As built for the engine; flowing particles (negative weight) at their place on the wire.
+    const b = buildFigure(step.shape.id, n, SEED)
+    pos.set(b.positions)
+    for (let i = 0; i < n; i++) {
+      hue[i] = b.looks[2 * i]
+      alpha[i] = Math.abs(b.looks[2 * i + 1])
     }
   } else {
     const seeds = waveSeeds(n, SEED)

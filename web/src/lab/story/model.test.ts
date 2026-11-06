@@ -4,9 +4,27 @@ import { BURST, burstDir, covers, densityWeights, EDGE, fieldAt, fillBase, frame
 import { field, MEET, psi, SAMPLES, sampleX } from './wave'
 
 describe('the story timeline', () => {
-  it('scene 1 is the four orbitals, scene 2 reveals the five terms in order', () => {
-    expect(STEPS.map((s) => s.id)).toEqual(['1s', '2pz', '3dz2', '4fxyz', 'psi', 'dt', 'kin', 'pot', 'sup'])
+  it('scene 1 is the four orbitals, scene 2 reveals the five terms in order, scenes 3–5 follow', () => {
+    expect(STEPS.map((s) => s.id)).toEqual(
+      ['1s', '2pz', '3dz2', '4fxyz', 'psi', 'dt', 'kin', 'pot', 'sup', 'q0', 'qH', 'qM', 'bell', 'circ', 'reg3', 'reg6', 'reg10', 'shorF', 'qft', 'key', 'factors', 'curve', 'broken'],
+    )
+    expect(STEPS.map((s) => s.scene)).toEqual([1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5])
     expect(STEPS.filter((s) => s.scene === 2).map((s) => s.term)).toEqual([...TERMS])
+    // Every step of scenes 3–5 is a figure, each a different one.
+    const figs = STEPS.filter((s) => s.scene >= 3).map((s) => (s.shape.kind === 'figure' ? s.shape.id : null))
+    expect(figs).not.toContain(null)
+    expect(new Set(figs).size).toBe(figs.length)
+  })
+
+  it('from the wave to the qubit: the wave keeps running while it morphs, with the burst of a change of scene', () => {
+    const sup = STEPS.findIndex((s) => s.id === 'sup')
+    expect(frameAt(sup + 0.3)).toMatchObject({ a: { kind: 'wave' }, mix: 0 })
+    const fr = frameAt(sup + 0.9)
+    expect(fr).toMatchObject({ a: { kind: 'wave' }, b: { kind: 'figure', id: 'bloch0' }, burst: BURST.scene })
+    expect(fr.mix).toBeGreaterThan(0.5)
+    expect(fr.t).toBeCloseTo(5.4 + 0.6 * 0.9, 9)
+    // Within a scene, a gentle stir.
+    expect(frameAt(sup + 1.9).burst).toBe(BURST.orbital)
   })
 
   it('a change of shape holds for the first half of the step and morphs in the second', () => {
@@ -21,9 +39,10 @@ describe('the story timeline', () => {
     expect(frameAt(5).t).toBe(0)
     expect(frameAt(5.5).t).toBeCloseTo(1.5, 9)
     expect(frameAt(6).t).toBe(3)
-    expect(frameAt(STEPS.length).t).toBeCloseTo(MEET, 4)
+    const end = STEPS.findIndex((s) => s.id === 'sup') + 1
+    expect(frameAt(end - 1e-7).t).toBeCloseTo(MEET, 4)
     let prev = -1
-    for (let p = 4; p < STEPS.length; p += 0.01) {
+    for (let p = 4; p < end; p += 0.01) {
       const t = frameAt(p).t
       expect(t).toBeGreaterThanOrEqual(prev - 1e-9)
       prev = t

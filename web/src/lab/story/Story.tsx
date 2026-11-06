@@ -6,6 +6,7 @@ import { chooseMode, type Mode } from '../capability'
 import { energy, r95 } from '../hydrogen'
 import { SEED } from '../view'
 import type { Story as Engine } from './engine'
+import { FigureCaption } from './captions'
 import { loadStory, storyStillURL } from './load'
 import { covers, orbitalOf, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
 import { TEXT } from './texts'
@@ -195,6 +196,7 @@ export default function Story() {
         <h2 id="story-sources-title">{tx.sources}</h2>
         <p>{tx.method}</p>
         <p>{tx.units}</p>
+        <p>{tx.methodQuantum}</p>
         <Sources lang={lang} />
       </section>
     </article>
@@ -223,7 +225,7 @@ function StepText({ step, first, lang, headingId }: { step: Step; first: boolean
       </h2>
       <p className="story-body">{t.body}</p>
       <p className="story-legend">
-        {(step.scene === 1 ? tx.legendAtom : tx.legendWave).map((l, k) => (
+        {tx.legend[step.scene].map((l, k) => (
           <span key={l} className={k === 0 ? 'story-pos' : 'story-neg'}>
             ● {l}{' '}
           </span>
@@ -253,6 +255,7 @@ const num = (v: number) => String(v).replace('-', '−')
 function Caption({ step, lang }: { step: Step; lang: Lang }) {
   const tx = TEXT[lang]
   const o = orbitalOf(step)
+  if (step.shape.kind === 'figure') return <FigureCaption step={step} lang={lang} />
   if (o) {
     const e = new Intl.NumberFormat(lang, {
       minimumFractionDigits: 2,
@@ -421,6 +424,40 @@ function Sources({ lang }: { lang: Lang }) {
         </a>{' '}
         ({es ? 'Laguerre, Legendre y armónicos esféricos' : 'Laguerre, Legendre and spherical harmonics'}
         ).
+      </li>
+      <li>
+        M. A. Nielsen, I. L. Chuang, <cite>Quantum Computation and Quantum Information</cite>, {es ? 'ed. del 10.º aniversario' : '10th anniversary ed.'}, Cambridge
+        University Press, 2010: §1.2 ({es ? 'la esfera de Bloch' : 'the Bloch sphere'}), §1.3.6 ({es ? 'estados de Bell' : 'Bell states'}), §2.4.3 (
+        {es ? 'traza parcial' : 'partial trace'}), §5.1–5.3 ({es ? 'QFT, búsqueda del orden y Shor' : 'QFT, order finding and Shor'}).
+      </li>
+      <li>
+        P. W. Shor, «Polynomial-Time Algorithms for Prime Factorization and Discrete Logarithms on a Quantum Computer», <cite>SIAM J. Comput.</cite> 26(5), 1484–1509
+        (1997).
+      </li>
+      <li>
+        R. L. Rivest, A. Shamir, L. Adleman, «A Method for Obtaining Digital Signatures and Public-Key Cryptosystems», <cite>Commun. ACM</cite> 21(2), 120–126 (1978).
+      </li>
+      <li>
+        A. Langley, M. Hamburg, S. Turner,{' '}
+        <a href="https://www.rfc-editor.org/rfc/rfc7748" rel="noopener">
+          RFC 7748
+        </a>{' '}
+        ({es ? 'X25519: la curva' : 'X25519: the curve'} y² = x³ + 486662x² + x {es ? 'sobre' : 'over'} 2²⁵⁵ − 19), 2016.
+      </li>
+      <li>
+        C. Gidney, «How to factor 2048 bit RSA integers with less than a million noisy qubits»,{' '}
+        <a href="https://arxiv.org/abs/2505.15917" rel="noopener">
+          arXiv:2505.15917
+        </a>{' '}
+        (2025):{' '}
+        {es
+          ? 'menos de un millón de cúbits ruidosos y menos de una semana, suponiendo un 0,1 % de error por puerta, un ciclo de 1 µs y 10 µs de tiempo de reacción. Antes, C. Gidney y M. Ekerå, '
+          : 'under a million noisy qubits and under a week, assuming 0.1% gate error, a 1 µs cycle and 10 µs reaction time. Earlier, C. Gidney and M. Ekerå, '}
+        <cite>Quantum</cite> 5, 433 (2021): {es ? '20 millones de cúbits y 8 horas.' : '20 million qubits and 8 hours.'}
+      </li>
+      <li>
+        M. Roetteler, M. Naehrig, K. M. Svore, K. Lauter, «Quantum Resource Estimates for Computing Elliptic Curve Discrete Logarithms», ASIACRYPT 2017:{' '}
+        {es ? '2330 cúbits lógicos para una curva de 256 bits.' : '2330 logical qubits for a 256-bit curve.'}
       </li>
       <li>
         CODATA 2022 (NIST), R∞hc:{' '}

@@ -12,6 +12,7 @@
 // CPU throttling does not slow the GPU: the mobile FPS is a CPU-side estimate.
 const [port, what, ...args] = process.argv.slice(2)
 const runs = Number(process.env.RUNS ?? 5)
+const SECONDS = Number(process.env.SECONDS ?? 10)
 
 const PROFILES = {
   desktop: { width: 1440, height: 900, dpr: 1, mobile: false, cpu: 1, net: null, cores: null },
@@ -128,7 +129,8 @@ async function scene(base, path, profile) {
   await page.send('Performance.enable')
   const metrics = async () => Object.fromEntries((await page.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]))
   const m0 = await metrics()
-  // Scroll through the track in 10 s and count frames (the scene renders in requestAnimationFrame too).
+  // Scroll through the track in SECONDS (10 by default) and count frames (the scene renders in
+  // requestAnimationFrame too). Longer stories: scale SECONDS to compare at the same speed per step.
   const r = await evaluate(page, `(async () => {
     const t = document.querySelector('.lab-track, .story-track')
     const top = t.getBoundingClientRect().top + scrollY
@@ -143,7 +145,7 @@ async function scene(base, path, profile) {
     await new Promise((done) => {
       const step = (now) => {
         dts.push(now - last); last = now
-        const f = (now - start) / 10000
+        const f = (now - start) / ${SECONDS * 1000}
         scrollTo(0, top + span * Math.min(1, f))
         f < 1 ? requestAnimationFrame(step) : done()
       }
@@ -151,7 +153,7 @@ async function scene(base, path, profile) {
     })
     dts.sort((a, b) => a - b)
     const c = document.querySelector('canvas[data-points]')
-    return { fps: dts.length / 10, p95: dts[Math.floor(dts.length * 0.95)], points: +c.dataset.points, drawn: +c.dataset.drawn, w: c.width, h: c.height }
+    return { fps: dts.length / ${SECONDS}, p95: dts[Math.floor(dts.length * 0.95)], points: +c.dataset.points, drawn: +c.dataset.drawn, w: c.width, h: c.height }
   })()`)
   if (process.env.PROFILE) {
     const m1 = await metrics()
