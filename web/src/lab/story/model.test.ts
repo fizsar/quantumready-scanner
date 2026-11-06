@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { density, ORBITALS, sample } from '../hydrogen'
-import { BURST, burstDir, covers, densityWeights, EDGE, fieldAt, fillBase, frameAt, stageMask, stageView, trackShare, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
+import { BURST, burstDir, covers, densityWeights, EDGE, fieldAt, fillBase, frameAt, MAX_BLUR, MAX_POINT, panelsShown, pointPx, stageMask, stageView, trackShare, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
 import { field, MEET, psi, SAMPLES, sampleX } from './wave'
 
 describe('the story timeline', () => {
@@ -25,6 +25,37 @@ describe('the story timeline', () => {
     expect(fr.t).toBeCloseTo(5.4 + 0.6 * 0.9, 9)
     // Within a scene, a gentle stir.
     expect(frameAt(sup + 1.9).burst).toBe(BURST.orbital)
+  })
+
+  it('panels only with the scene in place: phones (sheet below the stage) and desktops', () => {
+    const vh = 852
+    const stage = { top: 0, bottom: 470 } // phone: the stage above the sheet
+    const sheet = { top: 470, bottom: 852 }
+    // Entering: the track's top still inside the stage zone (the intro above): no sheet,
+    // even with most of the zone already covered.
+    expect(panelsShown({ top: 300, bottom: 9000 }, stage, vh, sheet)).toBe(false)
+    expect(panelsShown({ top: 40, bottom: 9000 }, stage, vh, sheet)).toBe(false)
+    // The scene fills its zone: the sheet comes in.
+    expect(panelsShown({ top: 0, bottom: 9000 }, stage, vh, sheet)).toBe(true)
+    expect(panelsShown({ top: -5000, bottom: 900 }, stage, vh, sheet)).toBe(true)
+    // Leaving: the track's end above the sheet's bottom: the sheet goes first.
+    expect(panelsShown({ top: -5000, bottom: 840 }, stage, vh, sheet)).toBe(false)
+    // A stage shorter than 40 % of the screen never gets a panel.
+    expect(panelsShown({ top: -100, bottom: 9000 }, { top: 0, bottom: 300 }, vh, { top: 300, bottom: 852 })).toBe(false)
+    // Desktop: the stage is the whole screen; panels from 40 % of visible scene.
+    const full = { top: 0, bottom: 900 }
+    expect(panelsShown({ top: 560, bottom: 9000 }, full, 900)).toBe(false) // 340 px of scene
+    expect(panelsShown({ top: 530, bottom: 9000 }, full, 900)).toBe(true) // 370 px
+    expect(panelsShown({ top: -9000, bottom: 340 }, full, 900)).toBe(false)
+    expect(panelsShown({ top: -9000, bottom: 370 }, full, 900)).toBe(true)
+  })
+
+  it('point size: the blur grows a point by MAX_BLUR at most, and no point is wider than MAX_POINT of the height', () => {
+    expect(pointPx(10, 1, 2, 1000)).toBe(5)
+    expect(pointPx(10, 5, 2, 1000)).toBeCloseTo((10 * MAX_BLUR) / 2, 12)
+    expect(pointPx(10, 5, 0.01, 1000)).toBeCloseTo(MAX_POINT * 1000, 12)
+    expect(MAX_BLUR).toBeLessThanOrEqual(2)
+    expect(MAX_POINT).toBeLessThanOrEqual(0.04)
   })
 
   it('a change of shape holds for the first half of the step and morphs in the second', () => {
@@ -54,7 +85,21 @@ describe('the story timeline', () => {
     for (let p = 0; p < STEPS.length - 0.001; p += 0.001) {
       const a = frameAt(p).cam
       const b = frameAt(p + 0.001).cam
-      expect(Math.abs(a.az - b.az) + Math.abs(a.el - b.el) + Math.abs(a.frame - b.frame)).toBeLessThan(0.05)
+      // The azimuth as an angle: the same direction ± 2π is no jump.
+      const daz = Math.abs(Math.atan2(Math.sin(a.az - b.az), Math.cos(a.az - b.az)))
+      expect(daz + Math.abs(a.el - b.el) + Math.abs(a.frame - b.frame)).toBeLessThan(0.05)
+    }
+  })
+
+  it('between two steps the camera turns the short way round', () => {
+    for (let i = 0; i < STEPS.length - 1; i++) {
+      let turned = 0
+      for (let f = 0; f < 1; f += 0.01) {
+        const a = frameAt(i + f).cam.az
+        const b = frameAt(i + f + 0.01).cam.az
+        turned += Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)))
+      }
+      expect(turned, STEPS[i].id).toBeLessThan(Math.PI + 1e-6)
     }
   })
 

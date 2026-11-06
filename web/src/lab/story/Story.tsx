@@ -8,7 +8,7 @@ import { SEED } from '../view'
 import type { Story as Engine } from './engine'
 import { FigureCaption } from './captions'
 import { loadStory, storyStillURL } from './load'
-import { covers, orbitalOf, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
+import { orbitalOf, panelsShown, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
 import { TEXT } from './texts'
 import './Story.css'
 
@@ -83,10 +83,14 @@ export default function Story() {
         }
         latest.current.free = free
         engine.current?.setFrame(free)
+        // Text panels only with the scene in place: entering, the intro leaves, the
+        // scene fills its zone, then the panel comes in; leaving, the other way round.
+        const on = panelsShown(r, box, vh, phone ? sh!.getBoundingClientRect() : undefined)
+        article.current?.setAttribute('data-panels', on ? 'on' : 'off')
+        setSheetOn(phone && on)
         st.style.setProperty('--free-left', `${free.left}px`)
         st.style.setProperty('--free-right', `${box.width - free.right}px`)
       }
-      if (sheet.current) setSheetOn(covers(r, sheet.current.getBoundingClientRect()))
     }
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update)

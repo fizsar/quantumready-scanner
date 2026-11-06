@@ -30,6 +30,18 @@ export interface Cam {
 
 /** Depth of field: point size grows and opacity falls with the distance from the focus (orbitals only). */
 export const DOF = 0.2
+/** The blur grows a point to at most this many times its size (its light still falls as 1/blur²). */
+export const MAX_BLUR = 1.6
+/** No point is ever wider than this share of the drawing area's height (a particle near the camera). */
+export const MAX_POINT = 0.03
+
+/**
+ * A point's diameter in drawing-buffer pixels: its world size (base = POINT ×
+ * focal length × storySize) at its depth, grown by the blur up to MAX_BLUR, and
+ * never more than MAX_POINT of the height. The engine's vertex shader does the same.
+ */
+export const pointPx = (base: number, blur: number, depth: number, bufferHeight: number) =>
+  Math.min((base * Math.min(blur, MAX_BLUR)) / depth, MAX_POINT * bufferHeight)
 
 // ---- light ----
 //
@@ -97,6 +109,8 @@ export interface Step {
 }
 
 const cam = (az: number, el: number, frame: number): Cam => ({ az, el, frame, fov: 38 })
+/** Scene 2: a longer lens (less perspective: the helix stays regular from end to end). */
+const waveCam = (az: number, el: number): Cam => ({ az: TAU + az, el, frame: 1.08, fov: 16 })
 const fig = (id: FigureId): Shape => ({ kind: 'figure', id })
 /** Scene 2 looks at the wave from three quarters (az ≈ 2π − 0.6, after the turn from the atom). */
 const TAU = 2 * Math.PI
@@ -110,11 +124,13 @@ export const STEPS: readonly Step[] = [
   { id: '3dz2', scene: 1, shape: { kind: 'orbital', index: 2 }, cam: cam(2.6, 0.04, 1.15), via: cam(3.3, 0.12, 1.05) },
   // From above at an angle, the eight octants; then a wide shot for the change of scene.
   { id: '4fxyz', scene: 1, shape: { kind: 'orbital', index: 3 }, cam: cam(3.9, 0.62, 1.15), via: cam(4.7, 0.95, 2.6) },
-  { id: 'psi', scene: 2, shape: { kind: 'wave', t0: 0, t1: 0 }, cam: cam(TAU - 0.62, 0.32, 1.1), term: 'psi' },
-  { id: 'dt', scene: 2, shape: { kind: 'wave', t0: 0, t1: 3 }, cam: cam(TAU - 0.78, 0.28, 1.1), term: 'dt' },
-  { id: 'kin', scene: 2, shape: { kind: 'wave', t0: 3, t1: 5 }, cam: cam(TAU - 0.52, 0.22, 1.1), term: 'kin' },
-  { id: 'pot', scene: 2, shape: { kind: 'wave', t0: 5, t1: 5.4 }, cam: cam(TAU - 0.7, 0.42, 1.1), term: 'pot' },
-  { id: 'sup', scene: 2, shape: { kind: 'wave', t0: 5.4, t1: 6 }, cam: cam(TAU - 0.5, 0.26, 1.05), term: 'sup' },
+  // The wave from three quarters: from above (elevation) and nearly side-on, so the
+  // helix's turns never overlap on screen and |ψ|² hangs right below it (camera.test.ts).
+  { id: 'psi', scene: 2, shape: { kind: 'wave', t0: 0, t1: 0 }, cam: waveCam(-0.18, 0.26), term: 'psi' },
+  { id: 'dt', scene: 2, shape: { kind: 'wave', t0: 0, t1: 3 }, cam: waveCam(-0.17, 0.26), term: 'dt' },
+  { id: 'kin', scene: 2, shape: { kind: 'wave', t0: 3, t1: 5 }, cam: waveCam(-0.12, 0.24), term: 'kin' },
+  { id: 'pot', scene: 2, shape: { kind: 'wave', t0: 5, t1: 5.4 }, cam: waveCam(-0.11, 0.22), term: 'pot' },
+  { id: 'sup', scene: 2, shape: { kind: 'wave', t0: 5.4, t1: 6 }, cam: waveCam(-0.1, 0.26), via: waveCam(-0.1, 0.26), term: 'sup' },
   // Scene 3, the qubit: a Bloch sphere seen from above the equator, a little to the side.
   { id: 'q0', scene: 3, shape: fig('bloch0'), cam: cam(0.55, 0.3, 1.1), via: cam(0.75, 0.26, 1.05) },
   { id: 'qH', scene: 3, shape: fig('blochH'), cam: cam(0.9, 0.24, 1.1), via: cam(0.7, 0.3, 1.05) },
@@ -187,6 +203,24 @@ export function stageMask(v: { clipTop: number; clipBottom: number }, height: nu
 /** A fixed panel (the phone sheet) shows while the track lies behind all of it. */
 export const covers = (track: Span, box: Span) => box.bottom > box.top && track.top <= box.top + 1 && track.bottom >= box.bottom - 1
 
+/** No text panel is shown while the visible scene is shorter than this share of the screen. */
+export const PANEL_SCENE = 0.4
+
+/**
+ * Whether the text panels may show: only with the scene in place. The visible
+ * part of the stage (the track on screen) must be at least PANEL_SCENE of the
+ * screen; on phones (a sheet below the stage) the track must also cover the
+ * stage's whole zone and the sheet, so the intro has left at the top first.
+ * Entering: intro out, scene in, then the panel; leaving, the other way round.
+ */
+export function panelsShown(track: Span, stage: Span, vh: number, sheet?: Span): boolean {
+  const v = stageView(track, stage, vh)
+  const top = Math.max(0, stage.top + v.clipTop)
+  const bottom = Math.min(vh, stage.bottom - v.clipBottom, sheet ? sheet.top : Infinity)
+  if (bottom - top < PANEL_SCENE * vh) return false
+  return sheet ? covers(track, { top: stage.top, bottom: sheet.bottom }) : true
+}
+
 /** Progress through the track: scrolled viewports, +0.35 so a shape morphs while the next panel comes in. */
 export const progressAt = (scrolled: number) => Math.min(STEPS.length - 1e-6, Math.max(0, scrolled + 0.35))
 
@@ -237,8 +271,11 @@ function camAlong(s: Step, end: Cam, f: number): Cam {
 export const shapeKey = (s: Shape) => (s.kind === 'orbital' ? `o${s.index}` : s.kind === 'figure' ? `f${s.id}` : 'w')
 
 export function camLerp(a: Cam, b: Cam, f: number): Cam {
+  // The azimuth turns the short way round (never a whole turn between two steps).
+  const d = b.az - a.az
+  const short = d - 2 * Math.PI * Math.round(d / (2 * Math.PI))
   return {
-    az: lerp(a.az, b.az, f),
+    az: a.az + short * f,
     el: lerp(a.el, b.el, f),
     frame: lerp(a.frame, b.frame, f),
     fov: lerp(a.fov, b.fov, f),

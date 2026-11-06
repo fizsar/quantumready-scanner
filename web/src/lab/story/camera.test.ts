@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { stepParticles } from '../../../build/storyImages'
 import { boxCorners, direction, fit, MARGIN, project, sphereHull, type Frame } from './camera'
-import { shapeBox, STEPS } from './model'
+import { fillBase, frameAt, shapeBox, STEPS, WAVE, wavePoint, waveSeeds } from './model'
 import { field } from './wave'
 
 // Frames as the page computes them: the free area right of the text panel on
@@ -47,6 +47,59 @@ describe('framing: every step whole, centred in the free area', () => {
         expect(inside / 6000, `${step.id} particles inside`).toBeGreaterThanOrEqual(0.995)
       }
     })
+
+  it('scene 2: a clean helix (its turns never overlap on screen) with |ψ|² right below it, aligned in x, all along every step', () => {
+    const frame = FRAMES['desktop 1634×916']
+    const seeds = waveSeeds(8000, 1)
+    // One turn of the helix along x, in world units (k₀ = 2).
+    const pitch = ((2 * Math.PI) / 2) * WAVE.xScale
+    for (let i = 0; i < STEPS.length; i++) {
+      const step = STEPS[i]
+      if (step.shape.kind !== 'wave') continue
+      for (const f of [0, 0.25, 0.5, 0.75, 0.999]) {
+        const fr = frameAt(i + f)
+        if (fr.mix > 0) continue // morphing into the next scene: no helix to read
+        const fl = field(fr.t)
+        let amp = 0
+        for (let k = 0; k < fl.length; k += 2) amp = Math.max(amp, Math.hypot(fl[k], fl[k + 1]))
+        // Turns of radius r seen from azimuth az are ellipses r·|sin az| wide, a pitch·cos az apart: they must not overlap.
+        const r = WAVE.amp * amp
+        expect(2 * r * Math.abs(Math.sin(fr.cam.az)), `${step.id} @${f}: turns overlap`).toBeLessThan(pitch * Math.cos(fr.cam.az))
+        const shot = fit(shapeBox(step.shape, fl), fr.cam.az, fr.cam.el, fr.cam.frame, fr.cam.fov, frame)
+        // Per slice of x: where the helix and the fill land on screen.
+        const bins = new Map<number, { hu: number[]; hv: number[]; fu: number[]; fv: number[] }>()
+        for (let p = 0; p < 8000; p++) {
+          const w = wavePoint(seeds, p, fl)
+          if (w.alpha < 0.2) continue // only where there is light
+          const q = project(w.pos, shot, frame)!
+          const b = Math.round(w.pos[0] / 0.05)
+          if (!bins.has(b)) bins.set(b, { hu: [], hv: [], fu: [], fv: [] })
+          const e = bins.get(b)!
+          if (seeds[4 * p + 2] < 0.5) (e.hu.push(q[0]), e.hv.push(q[1]))
+          else (e.fu.push(q[0]), e.fv.push(q[1]))
+        }
+        // Aligned in x: wherever |ψ|² is lit, the helix's axis and the fill's base at that x
+        // land at the same screen x (within 1 % of the free width).
+        const width = frame.right - frame.left
+        const base = fillBase(fl)
+        let lit = 0
+        for (const [b, e] of bins) {
+          if (e.fu.length < 10) continue
+          lit++
+          const x = b * 0.05
+          const a = project([x, 0, 0], shot, frame)!
+          const c = project([x, base, 0], shot, frame)!
+          expect(Math.abs(a[0] - c[0]) / width, `${step.id} @${f} x = ${x.toFixed(2)}: fill shifted`).toBeLessThan(0.01)
+        }
+        expect(lit, `${step.id} @${f}: some |ψ|² lit`).toBeGreaterThan(5)
+        for (const [b, e] of bins) {
+          if (e.hu.length < 10 || e.fu.length < 10) continue
+          // Below it: the fill's top under the helix's lowest point (screen y grows down).
+          expect(Math.min(...e.fv), `${step.id} @${f} x ≈ ${(b * 0.05).toFixed(2)}: fill not below`).toBeGreaterThan(Math.max(...e.hv))
+        }
+      }
+    }
+  })
 
   it('the sphere hull reaches at least 96 % of the radius in every direction', () => {
     const hull = sphereHull(2)

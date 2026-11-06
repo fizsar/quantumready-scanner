@@ -32,7 +32,7 @@ import { pixelRatio } from '../capability'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS } from '../view'
 import { fit, type Box, type Frame } from './camera'
 import { WIRE, type FigureId } from './figures'
-import { DOF, fillBase, frameAt, POINT, shapeBox, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
+import { DOF, fillBase, frameAt, MAX_BLUR, MAX_POINT, POINT, shapeBox, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
 import type { StoryReply, StoryRequest } from './story.worker'
 import { field, SAMPLES, X_RANGE } from './wave'
 
@@ -71,6 +71,7 @@ uniform float uSpin;
 uniform float uTime;
 uniform sampler2D uField;
 uniform float uSize;
+uniform float uMaxPx;
 uniform float uFocus;
 uniform float uBase;
 uniform vec3 uPos;
@@ -140,7 +141,8 @@ void main() {
   float size = mix(1.0, ${f(WAVE_SIZE)}, isWave);
   float gain = mix(1.0, ${f(WAVE_GAIN)}, isWave);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = uSize * size * blur / dist;
+  // model.ts pointPx(): the blur grows a point up to MAX_BLUR, and no point is wider than uMaxPx.
+  gl_PointSize = min(uSize * size * min(blur, ${f(MAX_BLUR)}) / dist, uMaxPx);
   vAlpha = mix(aa, ab, uMix) * gain / (blur * blur);
   vColor = mix(uNeg, uPos, mix(ha, hb, uMix));
 }`
@@ -202,6 +204,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       uTime: { value: 0 },
       uField: { value: fieldTex },
       uSize: { value: 1 },
+      uMaxPx: { value: 64 },
       uFocus: { value: 5 },
       uBase: { value: -2 },
       uAlpha: { value: 0.05 },
@@ -312,6 +315,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     // then depends neither on the canvas size, nor on the DPR, nor on the distance.
     const focal = (h * dpr) / 2 / Math.tan(((camera.fov / 2) * Math.PI) / 180)
     material.uniforms.uSize.value = POINT * focal * storySize(drawn)
+    material.uniforms.uMaxPx.value = MAX_POINT * h * dpr
   }
   const setDrawn = (n: number) => {
     drawn = n

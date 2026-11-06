@@ -9,6 +9,8 @@
 //   right of the panel column in older versions);
 // - the whole viewport is empty: no visible text and no visible scene (a
 //   stage at least 30 % opaque, showing a loaded still image or a drawn canvas);
+// - a text panel (the phone sheet, a step panel) is visible while the visible
+//   scene (above the sheet, if any) is shorter than 40 % of the height;
 // and, once per page, if a panel scrolls inside, cuts an equation or breaks a
 // title inside an expression (.story-nowrap on more than one line), or the
 // scene keeps less than 40 % of a phone's height.
@@ -106,7 +108,17 @@ const AT_POSITION = `(() => {${HELPERS}
   }
   const scene = stages.some(({ e, box }) => +getComputedStyle(e).opacity >= 0.3 && (box.r - box.l) * (box.b - box.t) > 0.1 * innerWidth * innerHeight &&
     ([...e.querySelectorAll('img')].some((i) => i.complete && i.naturalWidth > 0 && shown(i)) || !!e.querySelector('canvas[data-ready="true"]')))
-  return { over, empty: words.length === 0 && !scene }
+  // Panels only with the scene in place: the visible scene (above the sheet) at least 40 % of the height.
+  const sheet = document.querySelector('.story-sheet')
+  const sheetOn = sheet && getComputedStyle(sheet).display !== 'none' && shown(sheet)
+  const panelOn = [...document.querySelectorAll('.story-sheet, .story-panel')].some((p) => {
+    if (getComputedStyle(p).display === 'none' || !shown(p)) return false
+    const b = p.getBoundingClientRect()
+    return b.width > 1 && b.height > 1 && b.bottom > 0 && b.top < innerHeight
+  })
+  const sceneH = Math.max(0, ...stages.map(({ box }) => Math.min(box.b, sheetOn ? sheet.getBoundingClientRect().top : Infinity) - box.t))
+  const early = panelOn && sceneH < 0.4 * innerHeight ? Math.round(sceneH) : null
+  return { over, empty: words.length === 0 && !scene, early }
 })()`
 
 const FIT = `(() => {${HELPERS}
@@ -153,6 +165,7 @@ for (const { engine, width, height, dpr } of profiles) {
     const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)
     const over = new Map()
     const empty = []
+    const early = []
     let positions = 0
     for (let y = 0; y <= max + 1; y += Math.round(height / 8)) {
       await page.evaluate((y) => scrollTo(0, y), Math.min(y, max))
@@ -161,6 +174,7 @@ for (const { engine, width, height, dpr } of profiles) {
       const r = await page.evaluate(AT_POSITION)
       for (const p of r.over) if (!over.has(p)) over.set(p, Math.min(y, max))
       if (r.empty) empty.push(Math.min(y, max))
+      if (r.early !== null) early.push(`${Math.min(y, max)} (scene ${r.early}px)`)
       // Safari on iOS: the toolbars appear and hide while scrolling, changing the
       // visible height. Shrink by a toolbar (90 px), check again, and restore.
       if (engine === 'webkit' && phone) {
@@ -169,16 +183,18 @@ for (const { engine, width, height, dpr } of profiles) {
         const t = await page.evaluate(AT_POSITION)
         for (const p of t.over) if (!over.has(p)) over.set(p + ' (toolbar)', Math.min(y, max))
         if (t.empty) empty.push(`${Math.min(y, max)} (toolbar)`)
+        if (t.early !== null) early.push(`${Math.min(y, max)} (toolbar, scene ${t.early}px)`)
         await page.setViewportSize({ width, height })
         await page.waitForTimeout(150)
       }
     }
     const fit = await page.evaluate(FIT)
-    const ok = over.size === 0 && empty.length === 0 && fit.length === 0
+    const ok = over.size === 0 && empty.length === 0 && early.length === 0 && fit.length === 0
     failed ||= !ok
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${engine} ${width}×${height} DPR ${dpr} ${path}: ${positions} positions` +
       (over.size ? `; text over the stage: ${[...over].slice(0, 5).map(([p, y]) => `${p} @${y}px`).join(' | ')}${over.size > 5 ? ` (+${over.size - 5})` : ''}` : '') +
       (empty.length ? `; EMPTY screen at ${empty.length} positions (${empty.slice(0, 6).join(', ')}px…)` : '') +
+      (early.length ? `; PANEL with the scene < 40 % at ${early.length} positions (${early.slice(0, 4).join(', ')}…)` : '') +
       (fit.length ? `; panels: ${fit.join(' | ')}` : ''))
     await page.close()
   }

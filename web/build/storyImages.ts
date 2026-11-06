@@ -8,7 +8,7 @@ import type { Plugin } from 'vite'
 import { ORBITALS, sample } from '../src/lab/hydrogen.ts'
 import { fit, project } from '../src/lab/story/camera.ts'
 import { buildFigure } from '../src/lab/story/figures.ts'
-import { densityWeights, DOF, orbitalHues, POINT, shapeBox, STEPS, storyAlpha, storySize, WAVE_GAIN, WAVE_SIZE, waveSeeds, wavePoint, type Step } from '../src/lab/story/model.ts'
+import { densityWeights, DOF, orbitalHues, POINT, pointPx, shapeBox, STEPS, storyAlpha, storySize, WAVE_GAIN, WAVE_SIZE, waveSeeds, wavePoint, type Step } from '../src/lab/story/model.ts'
 import { field } from '../src/lab/story/wave.ts'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SEED } from '../src/lab/view.ts'
 import { encodePNG } from './png.ts'
@@ -107,7 +107,7 @@ export function renderStep(step: Step, px = STORY_PX, n = STORY_POINTS): Uint8Ar
     if (!uv) continue
     const [u, v] = uv
     const blur = 1 + (wave ? 0 : DOF) * Math.abs(z - shot.distance)
-    const radius = (sizeK * blur) / z / 2
+    const radius = pointPx(sizeK, blur, z, px) / 2
     const a = Math.min(1, ((alpha[i] * gain) / (blur * blur)) * a0)
     const x0 = Math.max(0, Math.floor(u - radius))
     const x1 = Math.min(px - 1, Math.ceil(u + radius))

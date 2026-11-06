@@ -7,11 +7,14 @@
 //   edges, or outside it but inside the stage (behind the panel): the shape
 //   is cut or overflows;
 // - burnt: pixels burnt to white (every channel ≥ 235) among the lit ones.
-// Fails if any step is cut (more than 0.02 % of the free area) or burnt
-// (more than 2 % of its lit pixels). Also at the top of the page, where the
-// stage is entering (the engine may load after the page measured the free
-// area, with no scroll after it): there only the side bands count, the top
-// edge fades in on purpose.
+// Fails if any position is cut (more than 0.02 % of the free area) or burnt
+// (more than 2 % of its lit pixels). Positions: the top of the page as it
+// opens (the stage entering; the engine may load after the page measured the
+// free area), every step (progress i), half-way through every step (the
+// camera between its cam and via), and the way out (the end of the story at
+// 55 % of the height). The edges are those of the visible band too: entering
+// and leaving, a lit pixel at the band's top or bottom edge is a straight cut
+// (the stage must fade out there).
 //
 //   node frame-check.mjs <devtools-port> <url> [WxHxDPR,...]
 import { writeFileSync } from 'node:fs'
@@ -108,14 +111,16 @@ for (const [width, height, dpr] of sizes) {
   await sleep(6000)
   const steps = await ev(`document.querySelectorAll('.story-step').length`)
   const rows = []
-  for (let i = -1; i < steps; i++) {
-    const entry = i < 0
-    // Entry: the page as it opens (no scroll at all). Otherwise progress exactly i:
-    // the step's own shape and camera (progress = scrolled + 0.35).
-    if (!entry)
-      await ev(
-        `(() => { const t = document.querySelector('.story-track'); scrollTo(0, t.getBoundingClientRect().top + scrollY + innerHeight * Math.max(0, ${i} - 0.35)) })()`,
-      )
+  // progress = scrolled viewports + 0.35: progress i is the step's own shape and camera.
+  const positions = [{ label: 'in' }]
+  for (let i = 0; i < steps; i++) positions.push({ label: String(i).padStart(2), at: i - 0.35 }, { label: `${i}½`, at: i + 0.15 })
+  positions.push({ label: 'out', out: true })
+  for (const pos of positions) {
+    const name = pos.label.trim()
+    if (pos.out)
+      await ev(`(() => { const t = document.querySelector('.story-track'); scrollTo(0, t.getBoundingClientRect().top + scrollY + t.offsetHeight - innerHeight * 0.55) })()`)
+    else if (pos.at !== undefined)
+      await ev(`(() => { const t = document.querySelector('.story-track'); scrollTo(0, t.getBoundingClientRect().top + scrollY + innerHeight * Math.max(0, ${pos.at})) })()`)
     await sleep(1800)
     const g = await ev(`(() => {
       const r = (e) => { if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom } }
@@ -128,9 +133,13 @@ for (const [width, height, dpr] of sizes) {
       const st = document.querySelector('.story-stage')
       const fl = parseFloat(getComputedStyle(st).getPropertyValue('--free-left'))
       const fr = parseFloat(getComputedStyle(st).getPropertyValue('--free-right'))
-      // Vertically, the part of the stage on screen (--vis-top/--vis-bottom; older versions: all of it).
-      const vt = parseFloat(getComputedStyle(st).getPropertyValue('--vis-top')) || 0
-      const vb = parseFloat(getComputedStyle(st).getPropertyValue('--vis-bottom'))
+      // Vertically, the part of the stage on screen: --vis-top/--vis-bottom, or the
+      // clip-path inset() of older versions.
+      const clip = getComputedStyle(st).clipPath.match(/^inset\(([^)]*)\)/)
+      const ci = clip ? clip[1].split(/\s+/).map((x) => parseFloat(x) || 0) : [0, 0, 0, 0]
+      const vt = parseFloat(getComputedStyle(st).getPropertyValue('--vis-top')) || ci[0]
+      const vb0 = parseFloat(getComputedStyle(st).getPropertyValue('--vis-bottom'))
+      const vb = Number.isFinite(vb0) ? vb0 : clip ? stage.b - stage.t - (ci[2] ?? ci[0]) : NaN
       const t = Math.max(0, stage.t + vt)
       const b = Math.min(innerHeight, Number.isFinite(vb) ? stage.t + vb : stage.b)
       const free = sheet ? { ...stage, t, b } : {
@@ -143,7 +152,7 @@ for (const [width, height, dpr] of sizes) {
     })()`)
     const { data } = await send('Page.captureScreenshot', { format: 'png' })
     const buf = Buffer.from(data, 'base64')
-    if (process.env.SHOTS) writeFileSync(`frame-${width}x${height}x${dpr}-${entry ? 'in' : String(i).padStart(2, '0')}.png`, buf)
+    if (process.env.SHOTS) writeFileSync(`frame-${width}x${height}x${dpr}-${name.padStart(2, '0')}.png`, buf)
     const img = decodePNG(buf)
     const s = img.w / width
     const box = (q) =>
@@ -175,7 +184,7 @@ for (const [width, height, dpr] of sizes) {
         }
         lit++
         if (Math.min(img.px[o], img.px[o + 1], img.px[o + 2]) >= 235) burnt++
-        if (x < free.l + band || x >= free.r - band || (!entry && (y < free.t + band || y >= free.b - band))) {
+        if (x < free.l + band || x >= free.r - band || y < free.t + band || y >= free.b - band) {
           cut++
           if (process.env.DEBUG) edges[x < free.l + band ? 'left' : x >= free.r - band ? 'right' : y < free.t + band ? 'top' : 'bottom']++
         }
@@ -186,7 +195,7 @@ for (const [width, height, dpr] of sizes) {
     const bad = cutPct > 0.02 || burntPct > 2
     failed ||= bad
     rows.push(
-      `${entry ? 'in' : String(i).padStart(2)} ${bad ? 'FAIL' : 'ok  '} cut ${cutPct.toFixed(3)} %  burnt ${burntPct.toFixed(1)} %` +
+      `${pos.label.padStart(3)} ${bad ? 'FAIL' : 'ok  '} cut ${cutPct.toFixed(3)} %  burnt ${burntPct.toFixed(1)} %` +
         (process.env.DEBUG ? ` ${JSON.stringify(edges)} free ${JSON.stringify(free)} stage ${JSON.stringify(stage)}` : ''),
     )
   }

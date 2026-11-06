@@ -120,6 +120,16 @@
 .story-tail {
   height: 70svh;
 }
+/* Panels only with the scene in place (model.ts panelsShown): they fade in once
+   the scene fills 40 % of the screen, and go at once as it leaves. Opacity only:
+   screen readers still read them. */
+.story-track .story-panel {
+  transition: opacity 0.4s ease;
+}
+.story[data-panels='off'] .story-track .story-panel {
+  opacity: 0;
+  transition: none;
+}
 
 /* The label inside each panel: quantum numbers, energy and scale, or the equation term by term. */
 .story-cap {
@@ -221,6 +231,7 @@
     /* As tall as its tallest step: never scrolls inside (overlap-check.sh checks it). */
     overflow: hidden;
     align-content: start;
+    /* Hidden at once (a panel never lingers over a scene that is leaving); shown with a fade. */
     opacity: 0;
     visibility: hidden;
   }
@@ -239,6 +250,34 @@
   .story-sheet .story-eq math {
     font-size: 1.15rem;
   }
+  /* Short screens (iPhone SE, Safari's toolbars shown): a more compact sheet, so the
+     scene keeps at least 40 % of the height and the panel can show (model.ts panelsShown). */
+  @media (max-height: 720px) {
+    .story-sheet {
+      padding: 0.55rem var(--gutter) 0.6rem;
+    }
+    .story-sheet .story-layer {
+      gap: 0.4rem;
+    }
+    .story-sheet .story-kicker {
+      font-size: 0.75rem;
+    }
+    .story-sheet .story-h {
+      font-size: 1.1rem;
+    }
+    .story-sheet .story-body {
+      font-size: 0.98rem;
+      line-height: 1.42;
+    }
+    .story-sheet .story-legend,
+    .story-sheet .story-scale {
+      font-size: 0.85rem;
+    }
+    .story-sheet .story-eq math {
+      font-size: 1.02rem;
+      margin: 0.15rem 0;
+    }
+  }
   /* The step panels stay in the page for screen readers; the sheet shows them. */
   .story-panel {
     position: absolute;
@@ -252,6 +291,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .story-stage,
+  .story-track .story-panel,
   .story-canvas,
   .story-sheet,
   .story-eq [data-term] {
