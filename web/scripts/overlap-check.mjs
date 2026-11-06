@@ -1,12 +1,17 @@
 // The story, scrolled from top to bottom in real engines (Playwright:
-// chromium and webkit, phone profiles), an eighth of a screen at a time.
-// Fails if, at any position:
-// - visible text lies over the visible 3D stage ([data-backdrop], with its
-//   clip-path) without an opaque background (alpha ≥ 0.85) of its own;
+// chromium and webkit, phone and desktop profiles), an eighth of a screen at
+// a time. Fails if, at any position:
+// - visible text lies over the visible 3D stage ([data-backdrop]: the part on
+//   screen, --vis-top/--vis-bottom, or its clip-path in older versions)
+//   without an opaque background (alpha ≥ 0.85) of its own;
+// - on wide screens, a text box (even an opaque one) covers the free area the
+//   shape is framed in (right of the panels: --free-left/--free-right, or
+//   right of the panel column in older versions);
 // - the whole viewport is empty: no visible text and no visible scene (a
 //   stage at least 30 % opaque, showing a loaded still image or a drawn canvas);
-// and, once per page, if a panel that stays on screen scrolls inside or cuts
-// an equation, or the scene keeps less than 40 % of a phone's height.
+// and, once per page, if a panel scrolls inside, cuts an equation or breaks a
+// title inside an expression (.story-nowrap on more than one line), or the
+// scene keeps less than 40 % of a phone's height.
 // Run by overlap-check.sh.
 //
 //   node overlap-check.mjs <base-url> <engine:WxHxDPR,...> <path>...
@@ -37,17 +42,39 @@ const HELPERS = `
     }
     return false
   }
-  // The visible part of an element: its box, minus a clip-path inset(), within the viewport.
+  // The visible part of an element, within the viewport: its box, limited to the
+  // band it shows (--vis-top/--vis-bottom, from its top; the edges fade there) or
+  // minus a clip-path inset() (older versions).
   const visibleBox = (e) => {
     const r = e.getBoundingClientRect()
+    const cs = getComputedStyle(e)
     let [t, rt, b, l] = [0, 0, 0, 0]
-    const m = getComputedStyle(e).clipPath.match(/^inset\\(([^)]*)\\)/)
+    const m = cs.clipPath.match(/^inset\\(([^)]*)\\)/)
     if (m) {
       const v = m[1].split(/\\s+/).map((x) => parseFloat(x) || 0)
       ;[t, rt, b, l] = [v[0], v[1] ?? v[0], v[2] ?? v[0], v[3] ?? v[1] ?? v[0]]
     }
-    const box = { l: Math.max(0, r.left + l), t: Math.max(0, r.top + t), r: Math.min(innerWidth, r.right - rt), b: Math.min(innerHeight, r.bottom - b) }
+    // The mask's stops are pixels from the element's top: the band stays put even
+    // if the element's height changes (Safari's toolbars) before the page updates it.
+    const vt = parseFloat(cs.getPropertyValue('--vis-top'))
+    const vb = parseFloat(cs.getPropertyValue('--vis-bottom'))
+    if (Number.isFinite(vt)) t = Math.max(t, vt)
+    const bottom = Math.min(r.bottom - b, Number.isFinite(vb) ? r.top + vb : Infinity)
+    const box = { l: Math.max(0, r.left + l), t: Math.max(0, r.top + t), r: Math.min(innerWidth, r.right - rt), b: Math.min(innerHeight, bottom) }
     return box.r > box.l && box.b > box.t ? box : null
+  }
+  // Wide screens: where the shape is framed, inside a visible stage box.
+  const freeBox = (e, box) => {
+    const sheet = document.querySelector('.story-sheet')
+    if (sheet && getComputedStyle(sheet).display !== 'none') return null
+    const r = e.getBoundingClientRect()
+    const cs = getComputedStyle(e)
+    const fl = parseFloat(cs.getPropertyValue('--free-left'))
+    const fr = parseFloat(cs.getPropertyValue('--free-right'))
+    const panels = [...document.querySelectorAll('.story-panel')].filter(shown).map((p) => p.getBoundingClientRect()).filter((p) => p.width > 1)
+    const l = Number.isFinite(fl) ? r.left + fl : Math.max(box.l, ...panels.map((p) => p.right))
+    const f = { l: Math.max(box.l, l), t: box.t, r: Math.min(box.r, Number.isFinite(fr) ? r.right - fr : box.r), b: box.b }
+    return f.r > f.l && f.b > f.t ? f : null
   }
   const texts = () => {
     const out = []
@@ -69,10 +96,13 @@ const AT_POSITION = `(() => {${HELPERS}
   const stages = [...document.querySelectorAll('[data-backdrop]')].filter(shown).map((e) => ({ e, box: visibleBox(e) })).filter((s) => s.box)
   const words = texts()
   const over = []
+  const hits = (b, q) => Math.min(b.r, q.right) - Math.max(b.l, q.left) > 2 && Math.min(b.b, q.bottom) - Math.max(b.t, q.top) > 2
+  const frees = stages.map(({ e, box }) => freeBox(e, box)).filter(Boolean)
   for (const { n, el, q } of words) {
-    if (opaque(el)) continue
-    if (stages.some(({ box: b }) => Math.min(b.r, q.right) - Math.max(b.l, q.left) > 2 && Math.min(b.b, q.bottom) - Math.max(b.t, q.top) > 2))
-      over.push(tag(el) + ' "' + n.textContent.trim().slice(0, 40) + '"')
+    const what = tag(el) + ' "' + n.textContent.trim().slice(0, 40) + '"'
+    if (!opaque(el)) {
+      if (stages.some(({ box }) => hits(box, q))) over.push(what)
+    } else if (frees.some((f) => hits(f, q))) over.push('box over the shape: ' + what)
   }
   const scene = stages.some(({ e, box }) => +getComputedStyle(e).opacity >= 0.3 && (box.r - box.l) * (box.b - box.t) > 0.1 * innerWidth * innerHeight &&
     ([...e.querySelectorAll('img')].some((i) => i.complete && i.naturalWidth > 0 && shown(i)) || !!e.querySelector('canvas[data-ready="true"]')))
@@ -81,8 +111,11 @@ const AT_POSITION = `(() => {${HELPERS}
 
 const FIT = `(() => {${HELPERS}
   const out = []
-  for (const box of document.querySelectorAll('.story-sheet, .story-caption')) {
-    if (getComputedStyle(box).display === 'none') continue
+  for (const box of document.querySelectorAll('.story-sheet, .story-caption, .story-panel')) {
+    if (getComputedStyle(box).display === 'none' || !shown(box)) continue
+    // One rect per text node, so count the lines they sit on (their tops), not the rects.
+    const lines = (n) => new Set([...n.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size
+    for (const n of box.querySelectorAll('.story-nowrap')) if (lines(n) > 1) { out.push(box.className.split(' ')[0] + ' breaks "' + n.textContent.trim() + '"'); break }
     if (box.scrollHeight > box.clientHeight + 1) out.push(box.className.split(' ')[0] + ' scrolls inside: ' + box.scrollHeight + ' > ' + box.clientHeight + 'px')
     const r = box.getBoundingClientRect()
     for (const m of box.querySelectorAll('math')) {

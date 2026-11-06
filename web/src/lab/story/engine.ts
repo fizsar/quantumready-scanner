@@ -28,14 +28,17 @@ import {
   WebGLRenderer,
 } from 'three'
 import { pixelRatio } from '../capability'
-import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SIZE } from '../view'
-import { camPos, DOF, fillBase, frameAt, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
+import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS } from '../view'
+import { fit, type Box, type Frame } from './camera'
+import { DOF, fillBase, frameAt, POINT, shapeBox, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
 import type { StoryReply, StoryRequest } from './story.worker'
 import { field, SAMPLES, X_RANGE } from './wave'
 
 export interface Story {
   /** 0 … STEPS.length: integer part = step, fraction = how far into it. */
   setProgress(p: number): void
+  /** The free part of the canvas (CSS pixels, canvas coordinates): the shape is framed inside it. */
+  setFrame(free: { left: number; top: number; right: number; bottom: number }): void
   start(): void
   stop(): void
   dispose(): void
@@ -245,19 +248,37 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       material.uniforms.uBase.value = fillBase(fieldData)
       lastT = fr.t
     }
-    // The step's camera path, plus a slow sway; the atom spins slowly.
+    // The step's camera path, plus a slow sway; the atom spins slowly. The
+    // camera frames the shape (between A and B during a morph) whole, centred
+    // in the free part of the screen (camera.ts fit).
     const atom = STEPS[fr.step].scene === 1 ? 1 - mix : 0
     material.uniforms.uSpin.value = time * 0.00012 * atom
-    const cam = { ...fr.cam, az: fr.cam.az + 0.08 * Math.sin(time * 0.00009) }
-    camera.position.set(...camPos(cam))
-    camera.lookAt(...cam.target)
-    if (camera.fov !== cam.fov) {
-      camera.fov = cam.fov
-      camera.updateProjectionMatrix()
-    }
-    material.uniforms.uFocus.value = cam.dist
+    const box = lerpBox(shapeBox(a, fieldData), shapeBox(b, fieldData), mix)
+    const shot = fit(box, fr.cam.az + 0.08 * Math.sin(time * 0.00009), fr.cam.el, fr.cam.frame, fr.cam.fov, frameNow())
+    camera.position.set(...shot.position)
+    camera.lookAt(...shot.target)
+    camera.fov = fr.cam.fov
+    camera.setViewOffset(area.width, area.height, -shot.shift[0], -shot.shift[1], area.width, area.height)
+    camera.updateProjectionMatrix()
+    material.uniforms.uFocus.value = shot.distance
     return true
   }
+
+  // The drawing area and its free part, in CSS pixels.
+  const area: Frame = { width: 1, height: 1, left: 0, top: 0, right: 1, bottom: 1 }
+  let free: { left: number; top: number; right: number; bottom: number } | null = null
+  const frameNow = () => {
+    const f = free ?? { left: 0, top: 0, right: area.width, bottom: area.height }
+    area.left = Math.max(0, f.left)
+    area.top = Math.max(0, f.top)
+    area.right = Math.min(area.width, f.right)
+    area.bottom = Math.min(area.height, f.bottom)
+    return area
+  }
+  const lerpBox = (p: Box, q: Box, t: number): Box => ({
+    min: [0, 1, 2].map((k) => p.min[k] + (q.min[k] - p.min[k]) * t) as Box['min'],
+    max: [0, 1, 2].map((k) => p.max[k] + (q.max[k] - p.max[k]) * t) as Box['max'],
+  })
 
   function resize() {
     const w = canvas.clientWidth
@@ -265,15 +286,13 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     if (!w || !h) return
     renderer.setSize(w, h, false)
     camera.aspect = w / h
-    // Portrait: zoom out until the scene (the wave is the widest) fits the width.
-    camera.zoom = Math.min(1, (w / h) * 0.9)
-    // Wide screens: the text panels are on the left, so the scene moves right.
-    if (w > 900 && w / h > 1.25) camera.setViewOffset(w, h, -0.2 * w, 0, w, h)
-    else camera.clearViewOffset()
-    camera.updateProjectionMatrix()
-    // Pixels at distance 5 = SIZE × the shorter side, in drawing-buffer pixels
-    // (× the capped DPR), scaled with the zoom and for the particle count (model.ts).
-    material.uniforms.uSize.value = SIZE * Math.min(w, h) * dpr * 5 * camera.zoom * storySize(drawn)
+    area.width = w
+    area.height = h
+    // Points have a size in the world (POINT), drawn in drawing-buffer pixels:
+    // diameter = POINT × focal length (buffer px) / depth. The light per pixel
+    // then depends neither on the canvas size, nor on the DPR, nor on the distance.
+    const focal = (h * dpr) / 2 / Math.tan(((camera.fov / 2) * Math.PI) / 180)
+    material.uniforms.uSize.value = POINT * focal * storySize(drawn)
   }
   const setDrawn = (n: number) => {
     drawn = n
@@ -333,6 +352,9 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   return {
     setProgress(p) {
       progress = p
+    },
+    setFrame(f) {
+      free = f
     },
     start() {
       wanted = true

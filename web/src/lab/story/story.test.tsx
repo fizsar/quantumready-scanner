@@ -4,7 +4,13 @@ import { json, stubFetch } from '../../test/fixtures'
 import { renderAt } from '../../test/render'
 
 // The engine (the only importer of three.js here) is replaced by a spy.
-const engine = vi.hoisted(() => ({ imported: false, created: 0, fail: false, progress: [] as number[] }))
+const engine = vi.hoisted(() => ({
+  imported: false,
+  created: 0,
+  fail: false,
+  progress: [] as number[],
+  frames: [] as unknown[],
+}))
 vi.mock('./engine', () => {
   engine.imported = true
   return {
@@ -12,12 +18,22 @@ vi.mock('./engine', () => {
       engine.created++
       if (engine.fail) opts.onError()
       else opts.onReady()
-      return { setProgress: (p: number) => engine.progress.push(p), start() {}, stop() {}, dispose() {} }
+      return {
+        setProgress: (p: number) => engine.progress.push(p),
+        setFrame: (f: unknown) => engine.frames.push(f),
+        start() {},
+        stop() {},
+        dispose() {},
+      }
     },
   }
 })
 
-const media = (matches: (q: string) => boolean) => vi.stubGlobal('matchMedia', (q: string) => ({ matches: matches(q), media: q }))
+const media = (matches: (q: string) => boolean) =>
+  vi.stubGlobal('matchMedia', (q: string) => ({
+    matches: matches(q),
+    media: q,
+  }))
 const webgl2 = () =>
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(((kind: string) =>
     kind === 'webgl2' ? { getExtension: () => null } : null) as unknown as HTMLCanvasElement['getContext'])
@@ -25,12 +41,28 @@ const webgl2 = () =>
 const scrolled = (viewports: number) =>
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const top = this.classList.contains('story-track') ? -viewports * window.innerHeight : 0
-    return { top, bottom: top + 1000, left: 0, right: 0, width: 0, height: 1000, x: 0, y: top, toJSON() {} } as DOMRect
+    return {
+      top,
+      bottom: top + 1000,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 1000,
+      x: 0,
+      y: top,
+      toJSON() {},
+    } as DOMRect
   })
 const settle = () => new Promise((r) => setTimeout(r, 600))
 
 beforeEach(() => {
-  Object.assign(engine, { imported: false, created: 0, fail: false, progress: [] })
+  Object.assign(engine, {
+    imported: false,
+    created: 0,
+    fail: false,
+    progress: [],
+    frames: [],
+  })
   stubFetch(() => json({ hosts: ['fizsar.com'], port: 443 }))
 })
 afterEach(() => vi.restoreAllMocks())
@@ -40,7 +72,12 @@ describe('/lab/historia', () => {
     media((q) => q === '(prefers-reduced-motion: reduce)')
     webgl2()
     renderAt('/lab/historia')
-    expect(await screen.findByRole('heading', { level: 1, name: /De la mecánica cuántica a tu web/ })).toBeTruthy()
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: /De la mecánica cuántica a tu web/,
+      }),
+    ).toBeTruthy()
     expect(screen.getByText(/tu sistema pide reducir el movimiento/)).toBeTruthy()
     expect(document.querySelector('.story-still')?.getAttribute('src')).toBe('/lab/story-1s.png')
     expect(document.querySelector('canvas')).toBeNull()
@@ -71,6 +108,10 @@ describe('/lab/historia', () => {
     idle!()
     await waitFor(() => expect(engine.created).toBe(1))
     expect(document.querySelector('canvas.story-canvas')?.getAttribute('data-ready')).toBe('true')
+    // It arrives after the page measured the scroll and the free area: it gets
+    // both at once, with no scroll event (at the top of the page none follows).
+    expect(engine.progress.at(-1)).toBeCloseTo(2.35, 6)
+    expect(engine.frames).toHaveLength(1)
     window.dispatchEvent(new Event('scroll'))
     await waitFor(() => expect(engine.progress.at(-1)).toBeCloseTo(2.35, 6))
   })
@@ -90,11 +131,12 @@ describe('/lab/historia', () => {
     scrolled(5) // progress 5.35: the "∂ψ/∂t" step
     renderAt('/lab/historia')
     await screen.findByRole('heading', { level: 1 })
-    const state = (term: string) => document.querySelector(`.story-caption [data-current="true"] [data-term="${term}"]`)?.getAttribute('data-state')
+    const panel = () => document.getElementById('story-step-dt')!.closest('.story-panel')!
+    const state = (term: string) => panel().querySelector(`[data-term="${term}"]`)?.getAttribute('data-state')
     await waitFor(() => expect(state('dt')).toBe('active'))
     expect(state('psi')).toBe('shown')
     expect(state('kin')).toBe('hidden')
-    expect(document.querySelector('.story-caption [data-current="true"] math')?.namespaceURI).toBe('http://www.w3.org/1998/Math/MathML')
+    expect(panel().querySelector('math')?.namespaceURI).toBe('http://www.w3.org/1998/Math/MathML')
     expect(document.querySelector('.story-still')?.getAttribute('src')).toBe('/lab/story-dt.png')
   })
 
@@ -103,63 +145,95 @@ describe('/lab/historia', () => {
     renderAt('/lab/historia')
     await screen.findByRole('heading', { level: 1 })
     expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, nofollow')
-    expect(document.querySelectorAll('.story-caption [data-current="true"]')).toHaveLength(1)
-    expect(document.querySelector('.story-caption [data-current="true"]')?.textContent).toMatch(/energía E1 = −13,61 eV/)
+    expect(document.querySelector('.story-caption')).toBeNull()
+    const panel = document.getElementById('story-step-1s')!.closest('.story-panel')!
+    expect(panel.querySelector('.story-cap')?.textContent).toMatch(/energía E1 = −13,61 eV/)
+    // The expression in the title stays together.
+    expect(panel.querySelector('.story-h .story-nowrap')?.textContent).toBe('(n, l, m) = (1, 0, 0)')
     expect(screen.getAllByText(/Cohen-Tannoudji/).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toContain('Superposición e interferencia')
   })
 
-  it('the stage is clipped to the track on screen and fades in with it; the label shows once the track is behind it', async () => {
+  it('the stage shows only the track on screen, with soft edges, and fades in with it; the sheet shows once the track is behind it', async () => {
     media(() => true)
     const vh = window.innerHeight
     let track = { top: vh - 200, bottom: 9000 } // the intro fills most of the screen; the track comes in from below
     const boxes: Record<string, { top: number; bottom: number }> = {
       'story-stage': { top: 0, bottom: vh },
-      'story-caption': { top: vh - 160, bottom: vh - 20 },
+      'story-sheet': { top: vh - 160, bottom: vh },
     }
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       const key = [...this.classList].find((c) => c in boxes || c === 'story-track')
       const r = key === 'story-track' ? track : key ? boxes[key] : { top: 0, bottom: 0 }
-      return { ...r, left: 0, right: 0, width: 100, height: r.bottom - r.top, x: 0, y: r.top, toJSON() {} } as DOMRect
+      return {
+        ...r,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: r.bottom - r.top,
+        x: 0,
+        y: r.top,
+        toJSON() {},
+      } as DOMRect
     })
     renderAt('/lab/historia')
     await screen.findByRole('heading', { level: 1 })
-    const stage = () => document.querySelector<HTMLElement>('.story-stage')!.style
+    const st = () => document.querySelector<HTMLElement>('.story-stage')!.style
+    const band = () => [st().getPropertyValue('--vis-top'), st().getPropertyValue('--vis-bottom')]
+    const sheetOn = () => document.querySelector('.story-sheet')?.getAttribute('data-active')
     const scroll = async (r: { top: number; bottom: number }) => {
       track = r
       window.dispatchEvent(new Event('scroll'))
       await new Promise((ok) => requestAnimationFrame(() => setTimeout(ok)))
     }
-    // Entering: only the bottom 200 px are the track; the stage shows there only, faintly.
-    await waitFor(() => expect(stage().clipPath).toBe(`inset(${vh - 200}px 0 0px 0)`))
-    expect(Number(stage().opacity)).toBeGreaterThan(0)
-    expect(Number(stage().opacity)).toBeLessThan(1)
-    expect(stage().visibility).toBe('visible')
-    // The label is not shown until the track is behind it.
+    // Entering: only the bottom 200 px are the track; the stage shows there, faintly, fading in at its top edge.
+    await waitFor(() => expect(band()).toEqual([`${vh - 200}px`, `${vh}px`]))
+    // The browser normalizes the gradient's text; the stops are what matter (exact form: model.test.ts).
+    const stops = () => [...st().maskImage.matchAll(/(-?[\d.]+)px/g)].map((m) => Number(m[1]))
+    expect(stops()).toEqual([vh - 200, vh - 200 + 72, vh, vh])
+    expect(Number(st().opacity)).toBeGreaterThan(0)
+    expect(Number(st().opacity)).toBeLessThan(1)
+    expect(st().visibility).toBe('visible')
+    // The sheet is not shown until the track is behind it.
     await scroll({ top: vh - 100, bottom: 9000 })
-    expect(document.querySelector('.story-caption')?.getAttribute('data-active')).toBe('false')
-    // Inside: the whole screen, fully opaque, label on.
+    expect(sheetOn()).toBe('false')
+    // Inside: the whole screen, fully opaque, no fade at the screen's own edges; sheet on.
     await scroll({ top: -500, bottom: 8000 })
-    await waitFor(() => expect(stage().clipPath).toBe('inset(0px 0 0px 0)'))
-    expect(stage().opacity).toBe('1')
-    expect(document.querySelector('.story-caption')?.getAttribute('data-active')).toBe('true')
-    // Leaving: the sources come in from below; the stage stops where the track ends.
+    await waitFor(() => expect(band()).toEqual(['0px', `${vh}px`]))
+    expect(stops()).toEqual([0, 0, vh, vh])
+    expect(st().opacity).toBe('1')
+    expect(sheetOn()).toBe('true')
+    // Leaving: the sources come in from below; the stage fades out where the track ends.
     await scroll({ top: -9000, bottom: vh - 300 })
-    await waitFor(() => expect(stage().clipPath).toBe('inset(0px 0 300px 0)'))
-    expect(document.querySelector('.story-caption')?.getAttribute('data-active')).toBe('false')
+    await waitFor(() => expect(band()).toEqual(['0px', `${vh - 300}px`]))
+    expect(stops()).toEqual([0, 0, vh - 300 - 72, vh - 300])
+    expect(sheetOn()).toBe('false')
     // Past it: hidden.
     await scroll({ top: -9600, bottom: -10 })
-    await waitFor(() => expect(stage().visibility).toBe('hidden'))
+    await waitFor(() => expect(st().visibility).toBe('hidden'))
   })
 
   it('progress uses the visible height (visualViewport: iOS toolbars), not the layout viewport', async () => {
     media(() => false)
     webgl2()
     const listeners: string[] = []
-    vi.stubGlobal('visualViewport', { height: 400, addEventListener: (t: string) => listeners.push(t), removeEventListener() {} })
+    vi.stubGlobal('visualViewport', {
+      height: 400,
+      addEventListener: (t: string) => listeners.push(t),
+      removeEventListener() {},
+    })
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       const r = this.classList.contains('story-track') ? { top: -400, bottom: 9000 } : { top: 0, bottom: 0 }
-      return { ...r, left: 0, right: 0, width: 0, height: r.bottom - r.top, x: 0, y: r.top, toJSON() {} } as DOMRect
+      return {
+        ...r,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: r.bottom - r.top,
+        x: 0,
+        y: r.top,
+        toJSON() {},
+      } as DOMRect
     })
     renderAt('/lab/historia')
     await waitFor(() => expect(engine.created).toBe(1))

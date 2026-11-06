@@ -7,7 +7,7 @@ import { energy, r95 } from '../hydrogen'
 import { SEED } from '../view'
 import type { Story as Engine } from './engine'
 import { loadStory, storyStillURL } from './load'
-import { covers, orbitalOf, progressAt, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
+import { covers, orbitalOf, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
 import { TEXT } from './texts'
 import './Story.css'
 
@@ -21,17 +21,21 @@ export default function Story() {
   const mode: Mode = failed ? { kind: 'still', reason: 'no-webgl2' } : chosen
   const [index, setIndex] = useState(0)
   const [ready, setReady] = useState(false)
-  // The label (wide screens) and the sheet (phones): shown while the track is behind them.
-  const [capOn, setCapOn] = useState(false)
+  // The sheet (phones): shown while the track is behind it.
   const [sheetOn, setSheetOn] = useState(false)
   const track = useRef<HTMLDivElement>(null)
   const article = useRef<HTMLElement>(null)
   const sheet = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
-  const caption = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const engine = useRef<Engine | null>(null)
   const visible = useRef(false)
+  // The last progress and free area, for an engine that arrives after them
+  // (three.js loads after the first paint; at the top of the page no scroll follows).
+  const latest = useRef<{
+    p: number
+    free: { left: number; top: number; right: number; bottom: number } | null
+  }>({ p: 0, free: null })
 
   useEffect(() => {
     let raf = 0
@@ -43,13 +47,20 @@ export default function Story() {
       const vh = window.visualViewport?.height ?? window.innerHeight
       const r = el.getBoundingClientRect()
       const p = progressAt(-r.top / vh)
+      latest.current.p = p
       engine.current?.setProgress(p)
       setIndex(stepAt(p))
-      // The stage: clipped to the track on screen and fading in with it (model.ts stageView).
+      // The stage: limited to the track on screen, with soft edges, and fading
+      // in with it (model.ts stageView, stageMask).
       const st = stage.current
       if (st) {
-        const v = stageView(r, st.getBoundingClientRect(), vh)
-        st.style.clipPath = `inset(${v.clipTop}px 0 ${v.clipBottom}px 0)`
+        const box = st.getBoundingClientRect()
+        const v = stageView(r, box, vh)
+        const m = stageMask(v, box.bottom - box.top)
+        st.style.setProperty('--vis-top', `${m.top}px`)
+        st.style.setProperty('--vis-bottom', `${m.bottom}px`)
+        st.style.maskImage = m.image
+        st.style.setProperty('-webkit-mask-image', m.image)
         st.style.opacity = String(v.opacity)
         st.style.visibility = v.on ? 'visible' : 'hidden'
         if (v.on !== visible.current) {
@@ -57,9 +68,24 @@ export default function Story() {
           if (v.on) engine.current?.start()
           else engine.current?.stop()
         }
+        // The free part of the stage: right of the text panels on wide screens,
+        // all of it on phones (the sheet is below). The shape is framed in it.
+        const sh = sheet.current
+        const phone = !!sh && getComputedStyle(sh).display !== 'none'
+        const panel = el.querySelector('.story-panel')?.getBoundingClientRect()
+        const left = phone || !panel ? 0 : Math.min(box.width * 0.6, panel.right - box.left + FREE_GAP)
+        const free = {
+          left,
+          top: 0,
+          right: box.width - (phone ? 0 : FREE_GAP),
+          bottom: box.height,
+        }
+        latest.current.free = free
+        engine.current?.setFrame(free)
+        st.style.setProperty('--free-left', `${free.left}px`)
+        st.style.setProperty('--free-right', `${box.width - free.right}px`)
       }
       if (sheet.current) setSheetOn(covers(r, sheet.current.getBoundingClientRect()))
-      if (caption.current) setCapOn(covers(r, caption.current.getBoundingClientRect()))
     }
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(update)
@@ -107,6 +133,8 @@ export default function Story() {
             setFailed(true)
           },
         })
+        engine.current.setProgress(latest.current.p)
+        if (latest.current.free) engine.current.setFrame(latest.current.free)
         if (visible.current) engine.current.start()
       })
     })
@@ -140,24 +168,6 @@ export default function Story() {
         {mode.kind === '3d' && <canvas ref={canvas} className="story-canvas" data-ready={ready} />}
       </div>
 
-      {/* Wide screens: the label (quantum numbers or the equation) on the right.
-          Every step's label is mounted once and only the current one is visible:
-          changing step toggles an attribute, never the DOM (no relayout while scrolling). */}
-      <div ref={caption} className="story-caption" data-active={capOn}>
-        {/* One group per scene, so the box fits its scene (it resizes once, at the change of scene). */}
-        {([1, 2] as const).map((scene) => (
-          <div key={scene} className="story-cap-group" data-on={step.scene === scene}>
-            {STEPS.map((s, i) =>
-              s.scene === scene ? (
-                <div key={s.id} className="story-layer" data-current={i === index}>
-                  <Caption step={s} lang={lang} />
-                </div>
-              ) : null,
-            )}
-          </div>
-        ))}
-      </div>
-
       {/* Phones: text and 3D in separate zones, the current step in a panel below the scene. */}
       <div ref={sheet} className="story-sheet" data-active={sheetOn} aria-hidden="true">
         {STEPS.map((s, i) => (
@@ -173,6 +183,8 @@ export default function Story() {
           <section key={s.id} className="story-step" aria-labelledby={`story-step-${s.id}`}>
             <div className="story-panel">
               <StepText step={s} first={sceneStart(i)} lang={lang} headingId={`story-step-${s.id}`} />
+              {/* The label (quantum numbers, the equation) inside the panel: nothing loose over the scene. */}
+              <Caption step={s} lang={lang} />
             </div>
           </section>
         ))}
@@ -200,10 +212,13 @@ function StepText({ step, first, lang, headingId }: { step: Step; first: boolean
         {o ? (
           <>
             {o.name}
-            {o.sub && <sub>{o.sub}</sub>} · (n, l, m) = ({o.n}, {o.l}, {num(o.m)})
+            {o.sub && <sub>{o.sub}</sub>} ·{' '}
+            <span className="story-nowrap">
+              (n, l, m) = ({o.n}, {o.l}, {num(o.m)})
+            </span>
           </>
         ) : (
-          t.title
+          <Title text={t.title} />
         )}
       </h2>
       <p className="story-body">{t.body}</p>
@@ -218,6 +233,20 @@ function StepText({ step, first, lang, headingId }: { step: Step; first: boolean
   )
 }
 
+/** Space between the text panels and the scene on wide screens (CSS px). */
+const FREE_GAP = 24
+
+/** A step title; an expression before ': ' never breaks inside (e.g. "iℏ ∂ψ/∂t: how it changes"). */
+function Title({ text }: { text: string }) {
+  const i = text.indexOf(': ')
+  if (i < 0) return <>{text}</>
+  return (
+    <>
+      <span className="story-nowrap">{text.slice(0, i + 1)}</span> {text.slice(i + 2)}
+    </>
+  )
+}
+
 /** A typographic minus for negative numbers. */
 const num = (v: number) => String(v).replace('-', '−')
 
@@ -225,7 +254,12 @@ function Caption({ step, lang }: { step: Step; lang: Lang }) {
   const tx = TEXT[lang]
   const o = orbitalOf(step)
   if (o) {
-    const e = new Intl.NumberFormat(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(energy(o.n)).replace('-', '−')
+    const e = new Intl.NumberFormat(lang, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+      .format(energy(o.n))
+      .replace('-', '−')
     const r = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 }).format(r95(o))
     return (
       <div className="story-cap">
@@ -385,7 +419,8 @@ function Sources({ lang }: { lang: Lang }) {
         <a href="https://dlmf.nist.gov/14.30" rel="noopener">
           §14.30
         </a>{' '}
-        ({es ? 'Laguerre, Legendre y armónicos esféricos' : 'Laguerre, Legendre and spherical harmonics'}).
+        ({es ? 'Laguerre, Legendre y armónicos esféricos' : 'Laguerre, Legendre and spherical harmonics'}
+        ).
       </li>
       <li>
         CODATA 2022 (NIST), R∞hc:{' '}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { density, ORBITALS, sample } from '../hydrogen'
-import { BURST, burstDir, covers, densityWeights, fieldAt, fillBase, frameAt, stageView, trackShare, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
+import { BURST, burstDir, covers, densityWeights, EDGE, fieldAt, fillBase, frameAt, stageMask, stageView, trackShare, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
 import { field, MEET, psi, SAMPLES, sampleX } from './wave'
 
 describe('the story timeline', () => {
@@ -35,7 +35,7 @@ describe('the story timeline', () => {
     for (let p = 0; p < STEPS.length - 0.001; p += 0.001) {
       const a = frameAt(p).cam
       const b = frameAt(p + 0.001).cam
-      expect(Math.abs(a.az - b.az) + Math.abs(a.el - b.el) + Math.abs(a.dist - b.dist)).toBeLessThan(0.05)
+      expect(Math.abs(a.az - b.az) + Math.abs(a.el - b.el) + Math.abs(a.frame - b.frame)).toBeLessThan(0.05)
     }
   })
 
@@ -139,10 +139,12 @@ describe('spectacle', () => {
     }
   })
 
-  it('the camera dives towards the nucleus in 1s, keeps the 2p nodal plane edge-on, and opens wide into scene 2', () => {
-    expect(frameAt(0.5).cam.dist).toBeLessThan(3)
+  it('the camera closes in on the nucleus in 1s (never closer than the whole cloud), keeps the 2p nodal plane edge-on, and opens wide into scene 2', () => {
+    expect(frameAt(0.5).cam.frame).toBe(1)
+    expect(frameAt(0).cam.frame).toBeGreaterThan(1.4)
+    for (let p = 0; p < STEPS.length; p += 0.01) expect(frameAt(p).cam.frame).toBeGreaterThanOrEqual(1)
     for (const p of [1, 1.25, 1.5]) expect(Math.abs(frameAt(p).cam.el)).toBeLessThan(0.05)
-    expect(frameAt(3.5).cam.dist).toBeGreaterThan(10)
+    expect(frameAt(3.5).cam.frame).toBeGreaterThan(2)
   })
 })
 
@@ -195,6 +197,15 @@ describe('what is on screen', () => {
     expect(op(vh - 40)).toBeGreaterThan(0)
     expect(op(vh * 0.6)).toBe(1)
     expect(trackShare({ top: 200, bottom: 9000 }, vh)).toBeCloseTo(0.75, 9)
+  })
+
+  it('the stage fades out over EDGE px where the track begins or ends on screen: never a straight cut', () => {
+    expect(stageMask({ clipTop: 300, clipBottom: 0 }, vh).image).toBe(`linear-gradient(to bottom, transparent 300px, #000 ${300 + EDGE}px, #000 ${vh}px, transparent ${vh}px)`)
+    expect(stageMask({ clipTop: 0, clipBottom: 200 }, vh).image).toBe(`linear-gradient(to bottom, transparent 0px, #000 0px, #000 ${vh - 200 - EDGE}px, transparent ${vh - 200}px)`)
+    // A thin band: the two fades share it, never crossing.
+    const m = stageMask({ clipTop: 500, clipBottom: 250 }, vh)
+    expect(m).toMatchObject({ top: 500, bottom: 550 })
+    expect(m.image).toBe('linear-gradient(to bottom, transparent 500px, #000 525px, #000 525px, transparent 550px)')
   })
 
   it('a panel shows only while the track lies behind all of it', () => {

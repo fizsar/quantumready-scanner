@@ -6,17 +6,23 @@
 // One cloud of N particles. Every shape gives each particle a position, a
 // "hue" (0 = indigo, 1 = green) and a weight (its share of the light); the
 // engine morphs particle i of one shape into particle i of the next on the GPU.
-import { density, ORBITALS, rng, type Orbital } from '../hydrogen.ts'
-import { SAMPLES, sampleX } from './wave.ts'
+import { density, ORBITALS, rng, rQuantile, type Orbital } from '../hydrogen.ts'
+import { RADIUS } from '../view.ts'
+import { sphereHull, type Box, type V3 } from './camera.ts'
+import { SAMPLES, sampleX, X_RANGE } from './wave.ts'
 
 export type Shape = { kind: 'orbital'; index: number } | { kind: 'wave'; t0: number; t1: number }
 
-/** Camera on a sphere around a target: azimuth and elevation in radians. */
+/**
+ * Camera on a sphere around the shape's centre: azimuth and elevation in
+ * radians, and how far out it frames the shape: 1 = the whole shape just fits
+ * the free part of the screen (with its margin, camera.ts fit), more = wider.
+ * It never goes closer than 1, so no shape is ever cut by the screen's edges.
+ */
 export interface Cam {
   az: number
   el: number
-  dist: number
-  target: [number, number, number]
+  frame: number
   fov: number
 }
 
@@ -36,6 +42,9 @@ export const DOF = 0.2
 //    w = 1/(1 + ρ/(K⟨ρ⟩)), normalized to mean 1, so the brightest regions are
 //    compressed (tone mapping before the sum) and the faint ones keep their light.
 // 3. A per-point opacity cap.
+
+/** Diameter of a point in world units (the engine and the stills draw it at that size, whatever the screen). */
+export const POINT = 0.05
 
 /** Particle count the light is tuned for (a desktop). */
 export const N_REF = 120_000
@@ -82,25 +91,24 @@ export interface Step {
   term?: Term
 }
 
-const cam = (az: number, el: number, dist: number, target: [number, number, number] = [0, 0, 0]): Cam => ({ az, el, dist, target, fov: 38 })
+const cam = (az: number, el: number, frame: number): Cam => ({ az, el, frame, fov: 38 })
 /** Scene 2 looks at the wave from three quarters (az ≈ 2π − 0.6, after the turn from the atom). */
 const TAU = 2 * Math.PI
-const WAVE_T: [number, number, number] = [0, -1.1, 0]
 
 export const STEPS: readonly Step[] = [
-  // Into the nucleus and back out.
-  { id: '1s', scene: 1, shape: { kind: 'orbital', index: 0 }, cam: cam(0, 0.35, 5), via: cam(0.5, 0.15, 2.6) },
+  // In towards the nucleus (as close as the whole cloud allows) and back out.
+  { id: '1s', scene: 1, shape: { kind: 'orbital', index: 0 }, cam: cam(0, 0.35, 1.6), via: cam(0.5, 0.15, 1) },
   // The nodal plane edge-on (elevation ~0), turning around it.
-  { id: '2pz', scene: 1, shape: { kind: 'orbital', index: 1 }, cam: cam(0.8, 0.03, 5), via: cam(2.0, 0.03, 4.6) },
+  { id: '2pz', scene: 1, shape: { kind: 'orbital', index: 1 }, cam: cam(0.8, 0.03, 1.15), via: cam(2.0, 0.03, 1.05) },
   // Side view: the two lobes, the ring and, between them, the nodal cones.
-  { id: '3dz2', scene: 1, shape: { kind: 'orbital', index: 2 }, cam: cam(2.6, 0.04, 5.2), via: cam(3.3, 0.12, 4.8) },
+  { id: '3dz2', scene: 1, shape: { kind: 'orbital', index: 2 }, cam: cam(2.6, 0.04, 1.15), via: cam(3.3, 0.12, 1.05) },
   // From above at an angle, the eight octants; then a wide shot for the change of scene.
-  { id: '4fxyz', scene: 1, shape: { kind: 'orbital', index: 3 }, cam: cam(3.9, 0.62, 5.4), via: cam(4.7, 0.95, 11) },
-  { id: 'psi', scene: 2, shape: { kind: 'wave', t0: 0, t1: 0 }, cam: cam(TAU - 0.62, 0.32, 6.8, WAVE_T), term: 'psi' },
-  { id: 'dt', scene: 2, shape: { kind: 'wave', t0: 0, t1: 3 }, cam: cam(TAU - 0.78, 0.28, 6.4, WAVE_T), term: 'dt' },
-  { id: 'kin', scene: 2, shape: { kind: 'wave', t0: 3, t1: 5 }, cam: cam(TAU - 0.52, 0.22, 6.2, WAVE_T), term: 'kin' },
-  { id: 'pot', scene: 2, shape: { kind: 'wave', t0: 5, t1: 5.4 }, cam: cam(TAU - 0.7, 0.42, 6.6, WAVE_T), term: 'pot' },
-  { id: 'sup', scene: 2, shape: { kind: 'wave', t0: 5.4, t1: 6 }, cam: cam(TAU - 0.5, 0.26, 6.2, WAVE_T), term: 'sup' },
+  { id: '4fxyz', scene: 1, shape: { kind: 'orbital', index: 3 }, cam: cam(3.9, 0.62, 1.15), via: cam(4.7, 0.95, 2.6) },
+  { id: 'psi', scene: 2, shape: { kind: 'wave', t0: 0, t1: 0 }, cam: cam(TAU - 0.62, 0.32, 1.1), term: 'psi' },
+  { id: 'dt', scene: 2, shape: { kind: 'wave', t0: 0, t1: 3 }, cam: cam(TAU - 0.78, 0.28, 1.1), term: 'dt' },
+  { id: 'kin', scene: 2, shape: { kind: 'wave', t0: 3, t1: 5 }, cam: cam(TAU - 0.52, 0.22, 1.1), term: 'kin' },
+  { id: 'pot', scene: 2, shape: { kind: 'wave', t0: 5, t1: 5.4 }, cam: cam(TAU - 0.7, 0.42, 1.1), term: 'pot' },
+  { id: 'sup', scene: 2, shape: { kind: 'wave', t0: 5.4, t1: 6 }, cam: cam(TAU - 0.5, 0.26, 1.05), term: 'sup' },
 ]
 
 export const TERMS: readonly Term[] = ['psi', 'dt', 'kin', 'pot', 'sup']
@@ -135,7 +143,25 @@ export function stageView(track: Span, stage: Span, vh: number): { clipTop: numb
   return { clipTop, clipBottom, opacity, on: opacity > 0 }
 }
 
-/** A fixed panel (the phone sheet, the label) shows while the track lies behind all of it. */
+/** Length of the soft edge of the stage where the track begins or ends on screen (px). */
+export const EDGE = 72
+
+/**
+ * The stage's visible band (from the top of the stage, in px) and a CSS mask
+ * that fades it out over EDGE px wherever the track begins or ends on screen:
+ * never a straight cut across a shape. At the screen's own edges there is no fade.
+ */
+export function stageMask(v: { clipTop: number; clipBottom: number }, height: number): { top: number; bottom: number; image: string } {
+  const top = v.clipTop
+  const bottom = height - v.clipBottom
+  const span = Math.max(0, bottom - top)
+  const ft = top > 0 ? Math.min(EDGE, span / 2) : 0
+  const fb = v.clipBottom > 0 ? Math.min(EDGE, span / 2) : 0
+  const image = `linear-gradient(to bottom, transparent ${top}px, #000 ${top + ft}px, #000 ${bottom - fb}px, transparent ${bottom}px)`
+  return { top, bottom, image }
+}
+
+/** A fixed panel (the phone sheet) shows while the track lies behind all of it. */
 export const covers = (track: Span, box: Span) => box.bottom > box.top && track.top <= box.top + 1 && track.bottom >= box.bottom - 1
 
 /** Progress through the track: scrolled viewports, +0.35 so a shape morphs while the next panel comes in. */
@@ -193,20 +219,37 @@ export function camLerp(a: Cam, b: Cam, f: number): Cam {
   return {
     az: lerp(a.az, b.az, f),
     el: lerp(a.el, b.el, f),
-    dist: lerp(a.dist, b.dist, f),
-    target: [0, 1, 2].map((k) => lerp(a.target[k], b.target[k], f)) as [number, number, number],
+    frame: lerp(a.frame, b.frame, f),
     fov: lerp(a.fov, b.fov, f),
   }
 }
 
-/** Camera position for a Cam (y up). */
-export function camPos(c: Cam): [number, number, number] {
-  return [
-    c.target[0] + c.dist * Math.cos(c.el) * Math.sin(c.az),
-    c.target[1] + c.dist * Math.sin(c.el),
-    c.target[2] + c.dist * Math.cos(c.el) * Math.cos(c.az),
-  ]
+// ---- boxes: what the camera must keep in frame ----
+
+/** A sphere of radius r (orbitals spin about their axis: a sphere is what they fill). */
+const sphere = (r: number): Box => ({ min: [-r, -r, -r], max: [r, r, r], hull: sphereHull(r) })
+/** Share of an orbital's probability inside its box: the faint last half-percent may fall outside. */
+export const ORBITAL_SHARE = 0.995
+const orbitalBoxes = ORBITALS.map((o) => sphere((RADIUS * rQuantile(o, ORBITAL_SHARE)) / rQuantile(o, 0.95)))
+
+/** The box around the wave for a field: the helix's cylinder and the |ψ|² fill below it. */
+export function waveBox(field: Float32Array): Box {
+  let amp = 0
+  for (let i = 0; i < field.length; i += 2) amp = Math.max(amp, Math.hypot(field[i], field[i + 1]))
+  const x = X_RANGE * WAVE.xScale
+  const a = WAVE.amp * amp + 0.02
+  const base = fillBase(field)
+  // The helix turns inside a cylinder of radius a around the x axis; the fill hangs below it.
+  const hull: V3[] = []
+  for (const xx of [-x, x]) {
+    for (let k = 0; k < 16; k++) hull.push([xx, a * Math.cos((k * Math.PI) / 8), a * Math.sin((k * Math.PI) / 8)])
+    hull.push([xx, base, -0.02], [xx, base, 0.02])
+  }
+  return { min: [-x, base, -a], max: [x, a, a], hull }
 }
+
+/** The box around a shape (the wave's depends on its field at the moment). */
+export const shapeBox = (s: Shape, field?: Float32Array): Box => (s.kind === 'orbital' ? orbitalBoxes[s.index] : waveBox(field!))
 
 /**
  * Direction and strength of particle i's flight in a burst: a unit vector
