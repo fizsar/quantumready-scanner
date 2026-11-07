@@ -5,6 +5,8 @@ import 'react'
 type MathProps = React.DetailedHTMLProps<React.HTMLAttributes<MathMLElement>, MathMLElement> & {
   display?: 'block' | 'inline'
   mathvariant?: 'normal'
+  stretchy?: 'true' | 'false'
+  lspace?: string
 }
 
 declare module 'react' {
@@ -20,6 +22,7 @@ declare module 'react' {
       msub: MathProps
       msup: MathProps
       msqrt: MathProps
+      munder: MathProps
       msubsup: MathProps
       mtext: MathProps
       mspace: MathProps & { width?: string }

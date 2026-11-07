@@ -38,7 +38,7 @@
   z-index: 0;
   pointer-events: none;
   background: var(--bg);
-  /* Clip, opacity and visibility follow the scroll (Story.tsx, model.ts stageView). */
+  /* Mask (soft edges), opacity and visibility follow the scroll (Story.tsx, model.ts stageView, stageMask). */
   opacity: 0;
   visibility: hidden;
 }
@@ -49,7 +49,10 @@
   width: 100%;
   height: 100%;
 }
+/* The still image sits in the free part of the stage (right of the panels on wide screens). */
 .story-still {
+  inset: 0 var(--free-right, 0px) 0 var(--free-left, 0px);
+  width: auto;
   object-fit: contain;
 }
 .story-canvas {
@@ -62,7 +65,6 @@
 
 /* Text panels: dark, large type. */
 .story-panel,
-.story-caption,
 .story-sheet {
   background: var(--story-panel);
   border: 1px solid var(--line);
@@ -77,7 +79,7 @@
 }
 .story-h {
   margin: 0;
-  font-size: clamp(1.35rem, 1.1rem + 0.9vw, 1.9rem);
+  font-size: clamp(1.3rem, 1.05rem + 0.6vw, 1.65rem);
   line-height: 1.25;
   color: var(--text);
   overflow-wrap: anywhere;
@@ -105,8 +107,12 @@
   display: flex;
   align-items: center;
 }
+/* An expression inside a title stays on one line. */
+.story-nowrap {
+  white-space: nowrap;
+}
 .story-panel {
-  max-width: 30rem;
+  max-width: 36rem;
   padding: 1.5rem 1.75rem;
   display: grid;
   gap: 0.75rem;
@@ -114,23 +120,18 @@
 .story-tail {
   height: 70svh;
 }
-
-/* The label: quantum numbers, energy and scale, or the equation term by term. */
-.story-caption {
-  position: fixed;
-  right: var(--gutter);
-  bottom: 1.25rem;
-  z-index: 2;
-  max-width: 36rem;
-  padding: 1rem 1.25rem;
-  opacity: 0;
-  visibility: hidden;
-}
-.story-caption[data-active='true'] {
-  opacity: 1;
-  visibility: visible;
+/* Panels only with the scene in place (model.ts panelsShown): they fade in once
+   the scene fills 40 % of the screen, and go at once as it leaves. Opacity only:
+   screen readers still read them. */
+.story-track .story-panel {
   transition: opacity 0.4s ease;
 }
+.story[data-panels='off'] .story-track .story-panel {
+  opacity: 0;
+  transition: none;
+}
+
+/* The label inside each panel: quantum numbers, energy and scale, or the equation term by term. */
 .story-cap {
   display: grid;
   gap: 0.35rem;
@@ -175,15 +176,8 @@
   display: none;
 }
 
-/* Caption and sheet hold every step stacked in one grid cell; only the current
-   one is visible. Toggling visibility needs no layout. */
-.story-cap-group {
-  display: grid;
-  grid-template-areas: 'layer';
-}
-.story-cap-group[data-on='false'] {
-  display: none;
-}
+/* The sheet holds every step stacked in one grid cell; only the current one
+   is visible. Toggling visibility needs no layout. */
 .story-layer {
   grid-area: layer;
   display: grid;
@@ -222,9 +216,6 @@
   .story-stage {
     bottom: var(--sheet-h, 45svh);
   }
-  .story-caption {
-    display: none;
-  }
   .story-sheet {
     display: grid;
     grid-template-areas: 'layer';
@@ -240,6 +231,7 @@
     /* As tall as its tallest step: never scrolls inside (overlap-check.sh checks it). */
     overflow: hidden;
     align-content: start;
+    /* Hidden at once (a panel never lingers over a scene that is leaving); shown with a fade. */
     opacity: 0;
     visibility: hidden;
   }
@@ -258,6 +250,34 @@
   .story-sheet .story-eq math {
     font-size: 1.15rem;
   }
+  /* Short screens (iPhone SE, Safari's toolbars shown): a more compact sheet, so the
+     scene keeps at least 40 % of the height and the panel can show (model.ts panelsShown). */
+  @media (max-height: 720px) {
+    .story-sheet {
+      padding: 0.55rem var(--gutter) 0.6rem;
+    }
+    .story-sheet .story-layer {
+      gap: 0.4rem;
+    }
+    .story-sheet .story-kicker {
+      font-size: 0.75rem;
+    }
+    .story-sheet .story-h {
+      font-size: 1.1rem;
+    }
+    .story-sheet .story-body {
+      font-size: 0.98rem;
+      line-height: 1.42;
+    }
+    .story-sheet .story-legend,
+    .story-sheet .story-scale {
+      font-size: 0.85rem;
+    }
+    .story-sheet .story-eq math {
+      font-size: 1.02rem;
+      margin: 0.15rem 0;
+    }
+  }
   /* The step panels stay in the page for screen readers; the sheet shows them. */
   .story-panel {
     position: absolute;
@@ -271,8 +291,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .story-stage,
+  .story-track .story-panel,
   .story-canvas,
-  .story-caption,
   .story-sheet,
   .story-eq [data-term] {
     transition: none;

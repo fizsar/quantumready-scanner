@@ -168,6 +168,9 @@ export function sample(o: Orbital, count: number, seed = 1): Sample {
 /** Radius (a₀) inside which the electron is found with 95 % probability. */
 export const r95 = (o: Pick<Orbital, 'n' | 'l'>) => radialQuantile(o)(0.95)
 
+/** Radius (a₀) inside which the electron is found with probability u. */
+export const rQuantile = (o: Pick<Orbital, 'n' | 'l'>, u: number) => radialQuantile(o)(u)
+
 /** u ↦ r with P(radius < r) = u, from the cumulative distribution of r² R_nl² (trapezoids). */
 function radialQuantile(o: Pick<Orbital, 'n' | 'l'>): (u: number) => number {
   const top = rMax(o.n)

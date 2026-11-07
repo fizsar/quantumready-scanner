@@ -5,10 +5,11 @@
 // with the scroll. Imported dynamically, and only in 3D mode: nothing here is
 // in the initial bundle.
 //
-// Shapes come from model.ts: static ones (the orbitals) live in buffers, each
-// particle with a hue and a light weight; the wave is computed in the vertex
-// shader from a 512-texel field texture that the CPU refreshes from wave.ts
-// (the tested physics) when t changes.
+// Shapes come from model.ts: static ones (the orbitals, the figures of scenes
+// 3–5) live in buffers, each particle with a hue and a light weight; the wave
+// is computed in the vertex shader from a 512-texel field texture that the CPU
+// refreshes from wave.ts (the tested physics) when t changes. On the circuit's
+// wires some particles flow (the shader moves them along x with the time).
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -28,14 +29,18 @@ import {
   WebGLRenderer,
 } from 'three'
 import { pixelRatio } from '../capability'
-import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SIZE } from '../view'
-import { camPos, DOF, fillBase, frameAt, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
+import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS } from '../view'
+import { fit, type Box, type Frame } from './camera'
+import { WIRE, type FigureId } from './figures'
+import { DOF, fillBase, frameAt, MAX_BLUR, MAX_POINT, POINT, shapeBox, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
 import type { StoryReply, StoryRequest } from './story.worker'
 import { field, SAMPLES, X_RANGE } from './wave'
 
 export interface Story {
   /** 0 … STEPS.length: integer part = step, fraction = how far into it. */
   setProgress(p: number): void
+  /** The free part of the canvas (CSS pixels, canvas coordinates): the shape is framed inside it. */
+  setFrame(free: { left: number; top: number; right: number; bottom: number }): void
   start(): void
   stop(): void
   dispose(): void
@@ -49,6 +54,8 @@ export interface StoryOptions {
 }
 
 const f = (v: number) => v.toFixed(6)
+/** One pass of the flowing particles along the circuit's wires (ms). */
+const FLOW_MS = 5000
 const vertex = /* glsl */ `
 in vec3 aPosB;
 in vec2 aLookA;
@@ -61,8 +68,10 @@ uniform float uBurst;
 uniform float uScaleA;
 uniform float uScaleB;
 uniform float uSpin;
+uniform float uTime;
 uniform sampler2D uField;
 uniform float uSize;
+uniform float uMaxPx;
 uniform float uFocus;
 uniform float uBase;
 uniform vec3 uPos;
@@ -98,6 +107,16 @@ vec3 orbital(vec3 q, float scale) {
   return vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
 }
 
+// A figure (figures.ts): as built, in world units. A negative weight flows
+// along the wire, from x0 to x1 and round again (one pass every FLOW_MS).
+vec3 figure(vec3 q, vec2 look, out float hue, out float alpha) {
+  hue = look.x;
+  alpha = abs(look.y);
+  if (look.y >= 0.0) return q;
+  float u = fract((q.x - ${f(WIRE.x0)}) / ${f(WIRE.x1 - WIRE.x0)} + uTime / ${f(FLOW_MS)});
+  return vec3(${f(WIRE.x0)} + u * ${f(WIRE.x1 - WIRE.x0)}, q.y, q.z);
+}
+
 // model.ts burstDir(), in GLSL.
 float h(float k) { return fract(sin(float(gl_VertexID + 1) * k) * 43758.5453); }
 vec3 burstDir() {
@@ -110,19 +129,20 @@ vec3 burstDir() {
 void main() {
   vec3 pa; float ha; float aa;
   vec3 pb; float hb; float ab;
-  if (uKindA == 1) wave(pa, ha, aa); else { pa = orbital(position, uScaleA); ha = aLookA.x; aa = aLookA.y; }
-  if (uKindB == 1) wave(pb, hb, ab); else { pb = orbital(aPosB, uScaleB); hb = aLookB.x; ab = aLookB.y; }
+  if (uKindA == 1) wave(pa, ha, aa); else if (uKindA == 2) pa = figure(position, aLookA, ha, aa); else { pa = orbital(position, uScaleA); ha = aLookA.x; aa = aLookA.y; }
+  if (uKindB == 1) wave(pb, hb, ab); else if (uKindB == 2) pb = figure(aPosB, aLookB, hb, ab); else { pb = orbital(aPosB, uScaleB); hb = aLookB.x; ab = aLookB.y; }
   // Fly apart and back together during a morph.
   vec3 p = mix(pa, pb, uMix) + uBurst * sin(3.14159265 * uMix) * burstDir();
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = -mv.z;
   // Orbitals: depth of field, normal points. The wave: crisp and fine.
-  float isWave = mix(float(uKindA), float(uKindB), uMix);
+  float isWave = mix(uKindA == 1 ? 1.0 : 0.0, uKindB == 1 ? 1.0 : 0.0, uMix);
   float blur = 1.0 + ${f(DOF)} * (1.0 - isWave) * abs(dist - uFocus);
   float size = mix(1.0, ${f(WAVE_SIZE)}, isWave);
   float gain = mix(1.0, ${f(WAVE_GAIN)}, isWave);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = uSize * size * blur / dist;
+  // model.ts pointPx(): the blur grows a point up to MAX_BLUR, and no point is wider than uMaxPx.
+  gl_PointSize = min(uSize * size * min(blur, ${f(MAX_BLUR)}) / dist, uMaxPx);
   vAlpha = mix(aa, ab, uMix) * gain / (blur * blur);
   vColor = mix(uNeg, uPos, mix(ha, hb, uMix));
 }`
@@ -181,8 +201,10 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       uScaleA: { value: 1 },
       uScaleB: { value: 1 },
       uSpin: { value: 0 },
+      uTime: { value: 0 },
       uField: { value: fieldTex },
       uSize: { value: 1 },
+      uMaxPx: { value: 64 },
       uFocus: { value: 5 },
       uBase: { value: -2 },
       uAlpha: { value: 0.05 },
@@ -196,6 +218,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   scene.add(cloud)
 
   const orbitals: { pos: BufferAttribute; look: BufferAttribute; scale: number }[] = []
+  const figures = new Map<FigureId, { pos: BufferAttribute; look: BufferAttribute; scale: number }>()
   let seeds: BufferAttribute | null = null
   let drawn = opts.points
   canvas.dataset.points = String(opts.points)
@@ -204,6 +227,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   worker.onmessage = (e: MessageEvent<StoryReply>) => {
     const m = e.data
     if (m.kind === 'orbital') orbitals[m.index] = { pos: new BufferAttribute(m.positions, 3), look: new BufferAttribute(m.looks, 2), scale: RADIUS / m.r95 }
+    else if (m.kind === 'figure') figures.set(m.id, { pos: new BufferAttribute(m.positions, 3), look: new BufferAttribute(m.looks, 2), scale: 1 })
     else seeds = new BufferAttribute(m.seeds, 4)
     bound = ''
   }
@@ -213,12 +237,12 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   let bound = ''
   let lastT = Number.NaN
   /** Whether a shape's data has arrived from the worker. */
-  const ready = (s: Shape) => (s.kind === 'orbital' ? !!orbitals[s.index] : !!seeds)
+  const ready = (s: Shape) => (s.kind === 'orbital' ? !!orbitals[s.index] : s.kind === 'figure' ? figures.has(s.id) : !!seeds)
   const bind = (side: 'A' | 'B', s: Shape) => {
-    const o = s.kind === 'orbital' ? orbitals[s.index] : orbitals[0]
+    const o = s.kind === 'orbital' ? orbitals[s.index] : s.kind === 'figure' ? figures.get(s.id)! : orbitals[0]
     geometry.setAttribute(side === 'A' ? 'position' : 'aPosB', o.pos)
     geometry.setAttribute(side === 'A' ? 'aLookA' : 'aLookB', o.look)
-    material.uniforms[`uKind${side}`].value = s.kind === 'wave' ? 1 : 0
+    material.uniforms[`uKind${side}`].value = s.kind === 'wave' ? 1 : s.kind === 'figure' ? 2 : 0
     material.uniforms[`uScale${side}`].value = o.scale
   }
 
@@ -230,7 +254,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     if (!ready(b)) [b, mix, burst] = [a, 0, 0]
     if (!ready(a)) [a, b, mix, burst] = [STEPS[0].shape, STEPS[0].shape, 0, 0]
     // Rebind only when the pair of shapes (or the data that arrived) changes.
-    const key = `${shapeKey(a)}${shapeKey(b)}${seeds ? 's' : ''}${orbitals.length}`
+    const key = `${shapeKey(a)}${shapeKey(b)}${seeds ? 's' : ''}${orbitals.length}.${figures.size}`
     if (key !== bound) {
       geometry.setAttribute('aSeed', seeds ?? new BufferAttribute(new Float32Array(drawn * 4), 4))
       bind('A', a)
@@ -245,19 +269,38 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       material.uniforms.uBase.value = fillBase(fieldData)
       lastT = fr.t
     }
-    // The step's camera path, plus a slow sway; the atom spins slowly.
+    // The step's camera path, plus a slow sway; the atom spins slowly. The
+    // camera frames the shape (between A and B during a morph) whole, centred
+    // in the free part of the screen (camera.ts fit).
     const atom = STEPS[fr.step].scene === 1 ? 1 - mix : 0
     material.uniforms.uSpin.value = time * 0.00012 * atom
-    const cam = { ...fr.cam, az: fr.cam.az + 0.08 * Math.sin(time * 0.00009) }
-    camera.position.set(...camPos(cam))
-    camera.lookAt(...cam.target)
-    if (camera.fov !== cam.fov) {
-      camera.fov = cam.fov
-      camera.updateProjectionMatrix()
-    }
-    material.uniforms.uFocus.value = cam.dist
+    material.uniforms.uTime.value = time % FLOW_MS // small: float32 keeps its precision
+    const box = lerpBox(shapeBox(a, fieldData), shapeBox(b, fieldData), mix)
+    const shot = fit(box, fr.cam.az + 0.08 * Math.sin(time * 0.00009), fr.cam.el, fr.cam.frame, fr.cam.fov, frameNow())
+    camera.position.set(...shot.position)
+    camera.lookAt(...shot.target)
+    camera.fov = fr.cam.fov
+    camera.setViewOffset(area.width, area.height, -shot.shift[0], -shot.shift[1], area.width, area.height)
+    camera.updateProjectionMatrix()
+    material.uniforms.uFocus.value = shot.distance
     return true
   }
+
+  // The drawing area and its free part, in CSS pixels.
+  const area: Frame = { width: 1, height: 1, left: 0, top: 0, right: 1, bottom: 1 }
+  let free: { left: number; top: number; right: number; bottom: number } | null = null
+  const frameNow = () => {
+    const f = free ?? { left: 0, top: 0, right: area.width, bottom: area.height }
+    area.left = Math.max(0, f.left)
+    area.top = Math.max(0, f.top)
+    area.right = Math.min(area.width, f.right)
+    area.bottom = Math.min(area.height, f.bottom)
+    return area
+  }
+  const lerpBox = (p: Box, q: Box, t: number): Box => ({
+    min: [0, 1, 2].map((k) => p.min[k] + (q.min[k] - p.min[k]) * t) as Box['min'],
+    max: [0, 1, 2].map((k) => p.max[k] + (q.max[k] - p.max[k]) * t) as Box['max'],
+  })
 
   function resize() {
     const w = canvas.clientWidth
@@ -265,15 +308,14 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     if (!w || !h) return
     renderer.setSize(w, h, false)
     camera.aspect = w / h
-    // Portrait: zoom out until the scene (the wave is the widest) fits the width.
-    camera.zoom = Math.min(1, (w / h) * 0.9)
-    // Wide screens: the text panels are on the left, so the scene moves right.
-    if (w > 900 && w / h > 1.25) camera.setViewOffset(w, h, -0.2 * w, 0, w, h)
-    else camera.clearViewOffset()
-    camera.updateProjectionMatrix()
-    // Pixels at distance 5 = SIZE × the shorter side, in drawing-buffer pixels
-    // (× the capped DPR), scaled with the zoom and for the particle count (model.ts).
-    material.uniforms.uSize.value = SIZE * Math.min(w, h) * dpr * 5 * camera.zoom * storySize(drawn)
+    area.width = w
+    area.height = h
+    // Points have a size in the world (POINT), drawn in drawing-buffer pixels:
+    // diameter = POINT × focal length (buffer px) / depth. The light per pixel
+    // then depends neither on the canvas size, nor on the DPR, nor on the distance.
+    const focal = (h * dpr) / 2 / Math.tan(((camera.fov / 2) * Math.PI) / 180)
+    material.uniforms.uSize.value = POINT * focal * storySize(drawn)
+    material.uniforms.uMaxPx.value = MAX_POINT * h * dpr
   }
   const setDrawn = (n: number) => {
     drawn = n
@@ -333,6 +375,9 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   return {
     setProgress(p) {
       progress = p
+    },
+    setFrame(f) {
+      free = f
     },
     start() {
       wanted = true

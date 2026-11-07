@@ -6,22 +6,42 @@
 // One cloud of N particles. Every shape gives each particle a position, a
 // "hue" (0 = indigo, 1 = green) and a weight (its share of the light); the
 // engine morphs particle i of one shape into particle i of the next on the GPU.
-import { density, ORBITALS, rng, type Orbital } from '../hydrogen.ts'
-import { SAMPLES, sampleX } from './wave.ts'
+import { density, ORBITALS, rng, rQuantile, type Orbital } from '../hydrogen.ts'
+import { RADIUS } from '../view.ts'
+import { sphereHull, type Box, type V3 } from './camera.ts'
+import { figureBox, type FigureId } from './figures.ts'
+import { SAMPLES, sampleX, X_RANGE } from './wave.ts'
 
-export type Shape = { kind: 'orbital'; index: number } | { kind: 'wave'; t0: number; t1: number }
+/** What the particles form: an orbital, the wave, or a figure of scenes 3–5 (figures.ts). */
+export type Shape = { kind: 'orbital'; index: number } | { kind: 'wave'; t0: number; t1: number } | { kind: 'figure'; id: FigureId }
 
-/** Camera on a sphere around a target: azimuth and elevation in radians. */
+/**
+ * Camera on a sphere around the shape's centre: azimuth and elevation in
+ * radians, and how far out it frames the shape: 1 = the whole shape just fits
+ * the free part of the screen (with its margin, camera.ts fit), more = wider.
+ * It never goes closer than 1, so no shape is ever cut by the screen's edges.
+ */
 export interface Cam {
   az: number
   el: number
-  dist: number
-  target: [number, number, number]
+  frame: number
   fov: number
 }
 
 /** Depth of field: point size grows and opacity falls with the distance from the focus (orbitals only). */
 export const DOF = 0.2
+/** The blur grows a point to at most this many times its size (its light still falls as 1/blur²). */
+export const MAX_BLUR = 1.6
+/** No point is ever wider than this share of the drawing area's height (a particle near the camera). */
+export const MAX_POINT = 0.03
+
+/**
+ * A point's diameter in drawing-buffer pixels: its world size (base = POINT ×
+ * focal length × storySize) at its depth, grown by the blur up to MAX_BLUR, and
+ * never more than MAX_POINT of the height. The engine's vertex shader does the same.
+ */
+export const pointPx = (base: number, blur: number, depth: number, bufferHeight: number) =>
+  Math.min((base * Math.min(blur, MAX_BLUR)) / depth, MAX_POINT * bufferHeight)
 
 // ---- light ----
 //
@@ -36,6 +56,9 @@ export const DOF = 0.2
 //    w = 1/(1 + ρ/(K⟨ρ⟩)), normalized to mean 1, so the brightest regions are
 //    compressed (tone mapping before the sum) and the faint ones keep their light.
 // 3. A per-point opacity cap.
+
+/** Diameter of a point in world units (the engine and the stills draw it at that size, whatever the screen). */
+export const POINT = 0.05
 
 /** Particle count the light is tuned for (a desktop). */
 export const N_REF = 120_000
@@ -70,9 +93,12 @@ export function densityWeights(o: Pick<Orbital, 'n' | 'l' | 'm'>, positions: Flo
 /** Terms of the Schrödinger equation that scene 2 reveals one by one. */
 export type Term = 'psi' | 'dt' | 'kin' | 'pot' | 'sup'
 
+export type Scene = 1 | 2 | 3 | 4 | 5
+export const SCENES: readonly Scene[] = [1, 2, 3, 4, 5]
+
 export interface Step {
   id: string
-  scene: 1 | 2
+  scene: Scene
   shape: Shape
   /** Where the camera is when the step starts (and its still image). */
   cam: Cam
@@ -82,25 +108,46 @@ export interface Step {
   term?: Term
 }
 
-const cam = (az: number, el: number, dist: number, target: [number, number, number] = [0, 0, 0]): Cam => ({ az, el, dist, target, fov: 38 })
+const cam = (az: number, el: number, frame: number): Cam => ({ az, el, frame, fov: 38 })
+/** Scene 2: a longer lens (less perspective: the helix stays regular from end to end). */
+const waveCam = (az: number, el: number): Cam => ({ az: TAU + az, el, frame: 1.08, fov: 16 })
+const fig = (id: FigureId): Shape => ({ kind: 'figure', id })
 /** Scene 2 looks at the wave from three quarters (az ≈ 2π − 0.6, after the turn from the atom). */
 const TAU = 2 * Math.PI
-const WAVE_T: [number, number, number] = [0, -1.1, 0]
 
 export const STEPS: readonly Step[] = [
-  // Into the nucleus and back out.
-  { id: '1s', scene: 1, shape: { kind: 'orbital', index: 0 }, cam: cam(0, 0.35, 5), via: cam(0.5, 0.15, 2.6) },
+  // In towards the nucleus (as close as the whole cloud allows) and back out.
+  { id: '1s', scene: 1, shape: { kind: 'orbital', index: 0 }, cam: cam(0, 0.35, 1.6), via: cam(0.5, 0.15, 1) },
   // The nodal plane edge-on (elevation ~0), turning around it.
-  { id: '2pz', scene: 1, shape: { kind: 'orbital', index: 1 }, cam: cam(0.8, 0.03, 5), via: cam(2.0, 0.03, 4.6) },
+  { id: '2pz', scene: 1, shape: { kind: 'orbital', index: 1 }, cam: cam(0.8, 0.03, 1.15), via: cam(2.0, 0.03, 1.05) },
   // Side view: the two lobes, the ring and, between them, the nodal cones.
-  { id: '3dz2', scene: 1, shape: { kind: 'orbital', index: 2 }, cam: cam(2.6, 0.04, 5.2), via: cam(3.3, 0.12, 4.8) },
+  { id: '3dz2', scene: 1, shape: { kind: 'orbital', index: 2 }, cam: cam(2.6, 0.04, 1.15), via: cam(3.3, 0.12, 1.05) },
   // From above at an angle, the eight octants; then a wide shot for the change of scene.
-  { id: '4fxyz', scene: 1, shape: { kind: 'orbital', index: 3 }, cam: cam(3.9, 0.62, 5.4), via: cam(4.7, 0.95, 11) },
-  { id: 'psi', scene: 2, shape: { kind: 'wave', t0: 0, t1: 0 }, cam: cam(TAU - 0.62, 0.32, 6.8, WAVE_T), term: 'psi' },
-  { id: 'dt', scene: 2, shape: { kind: 'wave', t0: 0, t1: 3 }, cam: cam(TAU - 0.78, 0.28, 6.4, WAVE_T), term: 'dt' },
-  { id: 'kin', scene: 2, shape: { kind: 'wave', t0: 3, t1: 5 }, cam: cam(TAU - 0.52, 0.22, 6.2, WAVE_T), term: 'kin' },
-  { id: 'pot', scene: 2, shape: { kind: 'wave', t0: 5, t1: 5.4 }, cam: cam(TAU - 0.7, 0.42, 6.6, WAVE_T), term: 'pot' },
-  { id: 'sup', scene: 2, shape: { kind: 'wave', t0: 5.4, t1: 6 }, cam: cam(TAU - 0.5, 0.26, 6.2, WAVE_T), term: 'sup' },
+  { id: '4fxyz', scene: 1, shape: { kind: 'orbital', index: 3 }, cam: cam(3.9, 0.62, 1.15), via: cam(4.7, 0.95, 2.6) },
+  // The wave from three quarters: from above (elevation) and nearly side-on, so the
+  // helix's turns never overlap on screen and |ψ|² hangs right below it (camera.test.ts).
+  { id: 'psi', scene: 2, shape: { kind: 'wave', t0: 0, t1: 0 }, cam: waveCam(-0.18, 0.26), term: 'psi' },
+  { id: 'dt', scene: 2, shape: { kind: 'wave', t0: 0, t1: 3 }, cam: waveCam(-0.17, 0.26), term: 'dt' },
+  { id: 'kin', scene: 2, shape: { kind: 'wave', t0: 3, t1: 5 }, cam: waveCam(-0.12, 0.24), term: 'kin' },
+  { id: 'pot', scene: 2, shape: { kind: 'wave', t0: 5, t1: 5.4 }, cam: waveCam(-0.11, 0.22), term: 'pot' },
+  { id: 'sup', scene: 2, shape: { kind: 'wave', t0: 5.4, t1: 6 }, cam: waveCam(-0.1, 0.26), via: waveCam(-0.1, 0.26), term: 'sup' },
+  // Scene 3, the qubit: a Bloch sphere seen from above the equator, a little to the side.
+  { id: 'q0', scene: 3, shape: fig('bloch0'), cam: cam(0.55, 0.3, 1.1), via: cam(0.75, 0.26, 1.05) },
+  { id: 'qH', scene: 3, shape: fig('blochH'), cam: cam(0.9, 0.24, 1.1), via: cam(0.7, 0.3, 1.05) },
+  { id: 'qM', scene: 3, shape: fig('blochM'), cam: cam(0.55, 0.22, 1.1) },
+  { id: 'bell', scene: 3, shape: fig('bell'), cam: cam(0.18, 0.2, 1.05), via: cam(0.3, 0.24, 1.05) },
+  // Scene 4, the computer: the circuit head-on, then the register from above at an angle.
+  { id: 'circ', scene: 4, shape: fig('circuit'), cam: cam(0.08, 0.06, 1.05), via: cam(0.18, 0.1, 1.05) },
+  { id: 'reg3', scene: 4, shape: fig('reg3'), cam: cam(0.25, 0.3, 1.05) },
+  { id: 'reg6', scene: 4, shape: fig('reg6'), cam: cam(0.45, 0.55, 1.05) },
+  { id: 'reg10', scene: 4, shape: fig('reg10'), cam: cam(0.6, 0.7, 1.05) },
+  // Scene 5, Shor: the plots head-on, the cubes and the curve slightly from the side.
+  { id: 'shorF', scene: 5, shape: fig('shorF'), cam: cam(0.06, 0.05, 1.05) },
+  { id: 'qft', scene: 5, shape: fig('shorQFT'), cam: cam(-0.06, 0.06, 1.05) },
+  { id: 'key', scene: 5, shape: fig('key'), cam: cam(0.3, 0.3, 1.05) },
+  { id: 'factors', scene: 5, shape: fig('factors'), cam: cam(0.4, 0.25, 1.05) },
+  { id: 'curve', scene: 5, shape: fig('curve'), cam: cam(0.12, 0.08, 1.05) },
+  { id: 'broken', scene: 5, shape: fig('curveBroken'), cam: cam(0.3, 0.15, 1.1) },
 ]
 
 export const TERMS: readonly Term[] = ['psi', 'dt', 'kin', 'pot', 'sup']
@@ -135,8 +182,44 @@ export function stageView(track: Span, stage: Span, vh: number): { clipTop: numb
   return { clipTop, clipBottom, opacity, on: opacity > 0 }
 }
 
-/** A fixed panel (the phone sheet, the label) shows while the track lies behind all of it. */
+/** Length of the soft edge of the stage where the track begins or ends on screen (px). */
+export const EDGE = 72
+
+/**
+ * The stage's visible band (from the top of the stage, in px) and a CSS mask
+ * that fades it out over EDGE px wherever the track begins or ends on screen:
+ * never a straight cut across a shape. At the screen's own edges there is no fade.
+ */
+export function stageMask(v: { clipTop: number; clipBottom: number }, height: number): { top: number; bottom: number; image: string } {
+  const top = v.clipTop
+  const bottom = height - v.clipBottom
+  const span = Math.max(0, bottom - top)
+  const ft = top > 0 ? Math.min(EDGE, span / 2) : 0
+  const fb = v.clipBottom > 0 ? Math.min(EDGE, span / 2) : 0
+  const image = `linear-gradient(to bottom, transparent ${top}px, #000 ${top + ft}px, #000 ${bottom - fb}px, transparent ${bottom}px)`
+  return { top, bottom, image }
+}
+
+/** A fixed panel (the phone sheet) shows while the track lies behind all of it. */
 export const covers = (track: Span, box: Span) => box.bottom > box.top && track.top <= box.top + 1 && track.bottom >= box.bottom - 1
+
+/** No text panel is shown while the visible scene is shorter than this share of the screen. */
+export const PANEL_SCENE = 0.4
+
+/**
+ * Whether the text panels may show: only with the scene in place. The visible
+ * part of the stage (the track on screen) must be at least PANEL_SCENE of the
+ * screen; on phones (a sheet below the stage) the track must also cover the
+ * stage's whole zone and the sheet, so the intro has left at the top first.
+ * Entering: intro out, scene in, then the panel; leaving, the other way round.
+ */
+export function panelsShown(track: Span, stage: Span, vh: number, sheet?: Span): boolean {
+  const v = stageView(track, stage, vh)
+  const top = Math.max(0, stage.top + v.clipTop)
+  const bottom = Math.min(vh, stage.bottom - v.clipBottom, sheet ? sheet.top : Infinity)
+  if (bottom - top < PANEL_SCENE * vh) return false
+  return sheet ? covers(track, { top: stage.top, bottom: sheet.bottom }) : true
+}
 
 /** Progress through the track: scrolled viewports, +0.35 so a shape morphs while the next panel comes in. */
 export const progressAt = (scrolled: number) => Math.min(STEPS.length - 1e-6, Math.max(0, scrolled + 0.35))
@@ -150,7 +233,7 @@ export function stepAt(p: number) {
 const smooth = (f: number) => f * f * (3 - 2 * f)
 const lerp = (a: number, b: number, f: number) => a + (b - a) * f
 
-/** How far particles fly apart in the middle of a morph (world units): a gentle stir between orbitals, a burst from the atom to the wave. */
+/** How far particles fly apart in the middle of a morph (world units): a gentle stir within a scene, a burst from one scene to the next. */
 export const BURST = { orbital: 0.3, scene: 2.4 }
 
 /**
@@ -168,14 +251,12 @@ export function frameAt(p: number): { a: Shape; b: Shape; mix: number; burst: nu
   const cur = STEPS[i]
   const next = STEPS[Math.min(i + 1, last)]
   const cam = camAlong(cur, i === last ? cur.cam : next.cam, f)
-  if (cur.shape.kind === 'wave') {
-    const t = lerp(cur.shape.t0, cur.shape.t1, f)
-    return { a: cur.shape, b: cur.shape, mix: 0, burst: 0, t, cam, step: i }
-  }
+  // A wave runs its time range through the whole step, morphing or not.
+  const tCur = cur.shape.kind === 'wave' ? lerp(cur.shape.t0, cur.shape.t1, f) : 0
   if (i === last || shapeKey(next.shape) === shapeKey(cur.shape))
-    return { a: cur.shape, b: cur.shape, mix: 0, burst: 0, t: 0, cam, step: i }
+    return { a: cur.shape, b: cur.shape, mix: 0, burst: 0, t: tCur, cam, step: i }
   const m = smooth(Math.min(1, Math.max(0, (f - 0.5) * 2)))
-  const t = next.shape.kind === 'wave' ? next.shape.t0 : 0
+  const t = next.shape.kind === 'wave' ? next.shape.t0 : tCur
   const burst = next.scene !== cur.scene ? BURST.scene : BURST.orbital
   return { a: cur.shape, b: next.shape, mix: m, burst, t, cam, step: i }
 }
@@ -187,26 +268,47 @@ function camAlong(s: Step, end: Cam, f: number): Cam {
 }
 
 /** A short key per shape: equal keys draw the same particles (the wave's time aside). */
-export const shapeKey = (s: Shape) => (s.kind === 'orbital' ? `o${s.index}` : 'w')
+export const shapeKey = (s: Shape) => (s.kind === 'orbital' ? `o${s.index}` : s.kind === 'figure' ? `f${s.id}` : 'w')
 
 export function camLerp(a: Cam, b: Cam, f: number): Cam {
+  // The azimuth turns the short way round (never a whole turn between two steps).
+  const d = b.az - a.az
+  const short = d - 2 * Math.PI * Math.round(d / (2 * Math.PI))
   return {
-    az: lerp(a.az, b.az, f),
+    az: a.az + short * f,
     el: lerp(a.el, b.el, f),
-    dist: lerp(a.dist, b.dist, f),
-    target: [0, 1, 2].map((k) => lerp(a.target[k], b.target[k], f)) as [number, number, number],
+    frame: lerp(a.frame, b.frame, f),
     fov: lerp(a.fov, b.fov, f),
   }
 }
 
-/** Camera position for a Cam (y up). */
-export function camPos(c: Cam): [number, number, number] {
-  return [
-    c.target[0] + c.dist * Math.cos(c.el) * Math.sin(c.az),
-    c.target[1] + c.dist * Math.sin(c.el),
-    c.target[2] + c.dist * Math.cos(c.el) * Math.cos(c.az),
-  ]
+// ---- boxes: what the camera must keep in frame ----
+
+/** A sphere of radius r (orbitals spin about their axis: a sphere is what they fill). */
+const sphere = (r: number): Box => ({ min: [-r, -r, -r], max: [r, r, r], hull: sphereHull(r) })
+/** Share of an orbital's probability inside its box: the faint last half-percent may fall outside. */
+export const ORBITAL_SHARE = 0.995
+const orbitalBoxes = ORBITALS.map((o) => sphere((RADIUS * rQuantile(o, ORBITAL_SHARE)) / rQuantile(o, 0.95)))
+
+/** The box around the wave for a field: the helix's cylinder and the |ψ|² fill below it. */
+export function waveBox(field: Float32Array): Box {
+  let amp = 0
+  for (let i = 0; i < field.length; i += 2) amp = Math.max(amp, Math.hypot(field[i], field[i + 1]))
+  const x = X_RANGE * WAVE.xScale
+  const a = WAVE.amp * amp + 0.02
+  const base = fillBase(field)
+  // The helix turns inside a cylinder of radius a around the x axis; the fill hangs below it.
+  const hull: V3[] = []
+  for (const xx of [-x, x]) {
+    for (let k = 0; k < 16; k++) hull.push([xx, a * Math.cos((k * Math.PI) / 8), a * Math.sin((k * Math.PI) / 8)])
+    hull.push([xx, base, -0.02], [xx, base, 0.02])
+  }
+  return { min: [-x, base, -a], max: [x, a, a], hull }
 }
+
+/** The box around a shape (the wave's depends on its field at the moment). */
+export const shapeBox = (s: Shape, field?: Float32Array): Box =>
+  s.kind === 'orbital' ? orbitalBoxes[s.index] : s.kind === 'figure' ? figureBox(s.id) : waveBox(field!)
 
 /**
  * Direction and strength of particle i's flight in a burst: a unit vector

@@ -6,9 +6,11 @@
 // dist/lab/story-<step>.png and served by the dev server at the same path.
 import type { Plugin } from 'vite'
 import { ORBITALS, sample } from '../src/lab/hydrogen.ts'
-import { camPos, densityWeights, DOF, orbitalHues, STEPS, storyAlpha, storySize, WAVE_GAIN, WAVE_SIZE, waveSeeds, wavePoint, type Step } from '../src/lab/story/model.ts'
+import { fit, project } from '../src/lab/story/camera.ts'
+import { buildFigure } from '../src/lab/story/figures.ts'
+import { densityWeights, DOF, orbitalHues, POINT, pointPx, shapeBox, STEPS, storyAlpha, storySize, WAVE_GAIN, WAVE_SIZE, waveSeeds, wavePoint, type Step } from '../src/lab/story/model.ts'
 import { field } from '../src/lab/story/wave.ts'
-import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SEED, SIZE } from '../src/lab/view.ts'
+import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS, SEED } from '../src/lab/view.ts'
 import { encodePNG } from './png.ts'
 
 export const STORY_PX = 640
@@ -17,7 +19,6 @@ export const STORY_POINTS = 40_000
 type V3 = [number, number, number]
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 const norm = (a: V3): V3 => {
   const l = Math.hypot(...a)
   return [a[0] / l, a[1] / l, a[2] / l]
@@ -40,6 +41,14 @@ export function stepParticles(step: Step, n = STORY_POINTS): { pos: Float32Array
       pos[3 * i + 2] = -s.positions[3 * i + 1] * scale
       hue[i] = h[i]
       alpha[i] = w[i]
+    }
+  } else if (step.shape.kind === 'figure') {
+    // As built for the engine; flowing particles (negative weight) at their place on the wire.
+    const b = buildFigure(step.shape.id, n, SEED)
+    pos.set(b.positions)
+    for (let i = 0; i < n; i++) {
+      hue[i] = b.looks[2 * i]
+      alpha[i] = Math.abs(b.looks[2 * i + 1])
     }
   } else {
     const seeds = waveSeeds(n, SEED)
@@ -77,27 +86,28 @@ export function storyPalette(): Uint8Array {
 /** Palette indices of the step's still image (square, the step's camera, no view offset). */
 export function renderStep(step: Step, px = STORY_PX, n = STORY_POINTS): Uint8Array {
   const { pos, hue, alpha } = stepParticles(step, n)
-  const cam = step.cam
-  const eye = camPos(cam)
-  const fwd = norm(sub(cam.target, eye))
-  const right = norm(cross(fwd, [0, 1, 0]))
-  const up = cross(right, fwd)
-  const tan = Math.tan(((cam.fov / 2) * Math.PI) / 180)
+  // The same framing as the engine (camera.ts fit), the whole square free.
+  const frame = { width: px, height: px, left: 0, top: 0, right: px, bottom: px }
+  const f = step.shape.kind === 'wave' ? field(step.shape.t1) : undefined
+  const shot = fit(shapeBox(step.shape, f), step.cam.az, step.cam.el, step.cam.frame, step.cam.fov, frame)
+  const fwd = norm(sub(shot.target, shot.position))
   const weight = new Float32Array(px * px)
   const hueSum = new Float32Array(px * px)
   const a0 = storyAlpha(n)
   const wave = step.shape.kind === 'wave'
-  const sizeK = storySize(n) * (wave ? WAVE_SIZE : 1)
+  // World-sized points, as the engine: diameter = POINT × focal / depth.
+  const sizeK = POINT * shot.focal * storySize(n) * (wave ? WAVE_SIZE : 1)
   const gain = wave ? WAVE_GAIN : 1
   for (let i = 0; i < n; i++) {
     if (alpha[i] <= 0) continue
-    const d = sub([pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]], eye)
-    const z = dot(d, fwd)
+    const p: V3 = [pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]]
+    const z = dot(sub(p, shot.position), fwd)
     if (z <= 0.1) continue
-    const u = ((dot(d, right) / (z * tan) + 1) / 2) * px
-    const v = ((1 - dot(d, up) / (z * tan)) / 2) * px
-    const blur = 1 + (wave ? 0 : DOF) * Math.abs(z - cam.dist)
-    const radius = (SIZE * px * 5 * sizeK * blur) / z / 2
+    const uv = project(p, shot, frame)
+    if (!uv) continue
+    const [u, v] = uv
+    const blur = 1 + (wave ? 0 : DOF) * Math.abs(z - shot.distance)
+    const radius = pointPx(sizeK, blur, z, px) / 2
     const a = Math.min(1, ((alpha[i] * gain) / (blur * blur)) * a0)
     const x0 = Math.max(0, Math.floor(u - radius))
     const x1 = Math.min(px - 1, Math.ceil(u + radius))

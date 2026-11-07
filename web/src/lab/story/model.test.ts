@@ -1,12 +1,61 @@
 import { describe, expect, it } from 'vitest'
 import { density, ORBITALS, sample } from '../hydrogen'
-import { BURST, burstDir, covers, densityWeights, fieldAt, fillBase, frameAt, stageView, trackShare, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
+import { BURST, burstDir, covers, densityWeights, EDGE, fieldAt, fillBase, frameAt, MAX_BLUR, MAX_POINT, panelsShown, pointPx, stageMask, stageView, trackShare, N_REF, progressAt, STEPS, stepAt, storyAlpha, storySize, termState, TERMS, WAVE, wavePoint, waveSeeds } from './model'
 import { field, MEET, psi, SAMPLES, sampleX } from './wave'
 
 describe('the story timeline', () => {
-  it('scene 1 is the four orbitals, scene 2 reveals the five terms in order', () => {
-    expect(STEPS.map((s) => s.id)).toEqual(['1s', '2pz', '3dz2', '4fxyz', 'psi', 'dt', 'kin', 'pot', 'sup'])
+  it('scene 1 is the four orbitals, scene 2 reveals the five terms in order, scenes 3–5 follow', () => {
+    expect(STEPS.map((s) => s.id)).toEqual(
+      ['1s', '2pz', '3dz2', '4fxyz', 'psi', 'dt', 'kin', 'pot', 'sup', 'q0', 'qH', 'qM', 'bell', 'circ', 'reg3', 'reg6', 'reg10', 'shorF', 'qft', 'key', 'factors', 'curve', 'broken'],
+    )
+    expect(STEPS.map((s) => s.scene)).toEqual([1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5])
     expect(STEPS.filter((s) => s.scene === 2).map((s) => s.term)).toEqual([...TERMS])
+    // Every step of scenes 3–5 is a figure, each a different one.
+    const figs = STEPS.filter((s) => s.scene >= 3).map((s) => (s.shape.kind === 'figure' ? s.shape.id : null))
+    expect(figs).not.toContain(null)
+    expect(new Set(figs).size).toBe(figs.length)
+  })
+
+  it('from the wave to the qubit: the wave keeps running while it morphs, with the burst of a change of scene', () => {
+    const sup = STEPS.findIndex((s) => s.id === 'sup')
+    expect(frameAt(sup + 0.3)).toMatchObject({ a: { kind: 'wave' }, mix: 0 })
+    const fr = frameAt(sup + 0.9)
+    expect(fr).toMatchObject({ a: { kind: 'wave' }, b: { kind: 'figure', id: 'bloch0' }, burst: BURST.scene })
+    expect(fr.mix).toBeGreaterThan(0.5)
+    expect(fr.t).toBeCloseTo(5.4 + 0.6 * 0.9, 9)
+    // Within a scene, a gentle stir.
+    expect(frameAt(sup + 1.9).burst).toBe(BURST.orbital)
+  })
+
+  it('panels only with the scene in place: phones (sheet below the stage) and desktops', () => {
+    const vh = 852
+    const stage = { top: 0, bottom: 470 } // phone: the stage above the sheet
+    const sheet = { top: 470, bottom: 852 }
+    // Entering: the track's top still inside the stage zone (the intro above): no sheet,
+    // even with most of the zone already covered.
+    expect(panelsShown({ top: 300, bottom: 9000 }, stage, vh, sheet)).toBe(false)
+    expect(panelsShown({ top: 40, bottom: 9000 }, stage, vh, sheet)).toBe(false)
+    // The scene fills its zone: the sheet comes in.
+    expect(panelsShown({ top: 0, bottom: 9000 }, stage, vh, sheet)).toBe(true)
+    expect(panelsShown({ top: -5000, bottom: 900 }, stage, vh, sheet)).toBe(true)
+    // Leaving: the track's end above the sheet's bottom: the sheet goes first.
+    expect(panelsShown({ top: -5000, bottom: 840 }, stage, vh, sheet)).toBe(false)
+    // A stage shorter than 40 % of the screen never gets a panel.
+    expect(panelsShown({ top: -100, bottom: 9000 }, { top: 0, bottom: 300 }, vh, { top: 300, bottom: 852 })).toBe(false)
+    // Desktop: the stage is the whole screen; panels from 40 % of visible scene.
+    const full = { top: 0, bottom: 900 }
+    expect(panelsShown({ top: 560, bottom: 9000 }, full, 900)).toBe(false) // 340 px of scene
+    expect(panelsShown({ top: 530, bottom: 9000 }, full, 900)).toBe(true) // 370 px
+    expect(panelsShown({ top: -9000, bottom: 340 }, full, 900)).toBe(false)
+    expect(panelsShown({ top: -9000, bottom: 370 }, full, 900)).toBe(true)
+  })
+
+  it('point size: the blur grows a point by MAX_BLUR at most, and no point is wider than MAX_POINT of the height', () => {
+    expect(pointPx(10, 1, 2, 1000)).toBe(5)
+    expect(pointPx(10, 5, 2, 1000)).toBeCloseTo((10 * MAX_BLUR) / 2, 12)
+    expect(pointPx(10, 5, 0.01, 1000)).toBeCloseTo(MAX_POINT * 1000, 12)
+    expect(MAX_BLUR).toBeLessThanOrEqual(2)
+    expect(MAX_POINT).toBeLessThanOrEqual(0.04)
   })
 
   it('a change of shape holds for the first half of the step and morphs in the second', () => {
@@ -21,9 +70,10 @@ describe('the story timeline', () => {
     expect(frameAt(5).t).toBe(0)
     expect(frameAt(5.5).t).toBeCloseTo(1.5, 9)
     expect(frameAt(6).t).toBe(3)
-    expect(frameAt(STEPS.length).t).toBeCloseTo(MEET, 4)
+    const end = STEPS.findIndex((s) => s.id === 'sup') + 1
+    expect(frameAt(end - 1e-7).t).toBeCloseTo(MEET, 4)
     let prev = -1
-    for (let p = 4; p < STEPS.length; p += 0.01) {
+    for (let p = 4; p < end; p += 0.01) {
       const t = frameAt(p).t
       expect(t).toBeGreaterThanOrEqual(prev - 1e-9)
       prev = t
@@ -35,7 +85,21 @@ describe('the story timeline', () => {
     for (let p = 0; p < STEPS.length - 0.001; p += 0.001) {
       const a = frameAt(p).cam
       const b = frameAt(p + 0.001).cam
-      expect(Math.abs(a.az - b.az) + Math.abs(a.el - b.el) + Math.abs(a.dist - b.dist)).toBeLessThan(0.05)
+      // The azimuth as an angle: the same direction ± 2π is no jump.
+      const daz = Math.abs(Math.atan2(Math.sin(a.az - b.az), Math.cos(a.az - b.az)))
+      expect(daz + Math.abs(a.el - b.el) + Math.abs(a.frame - b.frame)).toBeLessThan(0.05)
+    }
+  })
+
+  it('between two steps the camera turns the short way round', () => {
+    for (let i = 0; i < STEPS.length - 1; i++) {
+      let turned = 0
+      for (let f = 0; f < 1; f += 0.01) {
+        const a = frameAt(i + f).cam.az
+        const b = frameAt(i + f + 0.01).cam.az
+        turned += Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)))
+      }
+      expect(turned, STEPS[i].id).toBeLessThan(Math.PI + 1e-6)
     }
   })
 
@@ -139,10 +203,12 @@ describe('spectacle', () => {
     }
   })
 
-  it('the camera dives towards the nucleus in 1s, keeps the 2p nodal plane edge-on, and opens wide into scene 2', () => {
-    expect(frameAt(0.5).cam.dist).toBeLessThan(3)
+  it('the camera closes in on the nucleus in 1s (never closer than the whole cloud), keeps the 2p nodal plane edge-on, and opens wide into scene 2', () => {
+    expect(frameAt(0.5).cam.frame).toBe(1)
+    expect(frameAt(0).cam.frame).toBeGreaterThan(1.4)
+    for (let p = 0; p < STEPS.length; p += 0.01) expect(frameAt(p).cam.frame).toBeGreaterThanOrEqual(1)
     for (const p of [1, 1.25, 1.5]) expect(Math.abs(frameAt(p).cam.el)).toBeLessThan(0.05)
-    expect(frameAt(3.5).cam.dist).toBeGreaterThan(10)
+    expect(frameAt(3.5).cam.frame).toBeGreaterThan(2)
   })
 })
 
@@ -195,6 +261,15 @@ describe('what is on screen', () => {
     expect(op(vh - 40)).toBeGreaterThan(0)
     expect(op(vh * 0.6)).toBe(1)
     expect(trackShare({ top: 200, bottom: 9000 }, vh)).toBeCloseTo(0.75, 9)
+  })
+
+  it('the stage fades out over EDGE px where the track begins or ends on screen: never a straight cut', () => {
+    expect(stageMask({ clipTop: 300, clipBottom: 0 }, vh).image).toBe(`linear-gradient(to bottom, transparent 300px, #000 ${300 + EDGE}px, #000 ${vh}px, transparent ${vh}px)`)
+    expect(stageMask({ clipTop: 0, clipBottom: 200 }, vh).image).toBe(`linear-gradient(to bottom, transparent 0px, #000 0px, #000 ${vh - 200 - EDGE}px, transparent ${vh - 200}px)`)
+    // A thin band: the two fades share it, never crossing.
+    const m = stageMask({ clipTop: 500, clipBottom: 250 }, vh)
+    expect(m).toMatchObject({ top: 500, bottom: 550 })
+    expect(m.image).toBe('linear-gradient(to bottom, transparent 500px, #000 525px, #000 525px, transparent 550px)')
   })
 
   it('a panel shows only while the track lies behind all of it', () => {
