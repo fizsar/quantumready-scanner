@@ -11,6 +11,7 @@
 // stay inside the figure, with weight 0 (invisible), ready for the next morph.
 import { rng } from '../hydrogen.ts'
 import { boxCorners, type Box, type V3 } from './camera.ts'
+import { GRI_2025 } from './mosca.ts'
 import { apply, bell, bloch, blochOf, collapse, f, H, probabilities, Q, qftDistribution, qubit, reduced, SHOR, uniform, zeros } from './quantum.ts'
 
 export type FigureId =
@@ -28,8 +29,31 @@ export type FigureId =
   | 'factors'
   | 'curve'
   | 'curveBroken'
+  | 'harvest'
+  | 'stored'
+  | 'decrypted'
+  | 'mosca'
 
-export const FIGURES: readonly FigureId[] = ['bloch0', 'blochH', 'blochM', 'bell', 'circuit', 'reg3', 'reg6', 'reg10', 'shorF', 'shorQFT', 'key', 'factors', 'curve', 'curveBroken']
+export const FIGURES: readonly FigureId[] = [
+  'bloch0',
+  'blochH',
+  'blochM',
+  'bell',
+  'circuit',
+  'reg3',
+  'reg6',
+  'reg10',
+  'shorF',
+  'shorQFT',
+  'key',
+  'factors',
+  'curve',
+  'curveBroken',
+  'harvest',
+  'stored',
+  'decrypted',
+  'mosca',
+]
 
 /** Share of all particles per unit of area (world units²): about the light of an average orbital. */
 export const DENSITY = 1 / 18
@@ -349,6 +373,88 @@ function curveParts(broken: boolean): Part[] {
   return parts
 }
 
+// ---- Scene 6: harvest now, decrypt later; Mosca's inequality ----
+
+/** Captured packets in a store: a stack of disks (rings), the packets inside, or flying out once decrypted. */
+function storeParts(c: V3, rad: number, open: boolean): Part[] {
+  const parts: Part[] = []
+  const h = 0.6 * rad
+  for (let k = 0; k <= 4; k++) parts.push(ring(add(c, [0, -h + (k * 2 * h) / 4, 0]), rad, X, Z, 0.55, 0.25))
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2 + Math.PI / 4
+    const v: V3 = [rad * Math.cos(a), 0, rad * Math.sin(a)]
+    parts.push(seg(add(c, [v[0], -h, v[2]]), add(c, [v[0], h, v[2]]), 0.4, 0.25))
+  }
+  // 12 packets: inside, in three layers; once decrypted, out above the store, each split in two.
+  for (let i = 0; i < 12; i++) {
+    const a = (i * 2 * Math.PI) / 4 + Math.floor(i / 4) * 0.6
+    if (!open) parts.push(dot(add(c, [0.5 * rad * Math.cos(a), -h * 0.6 + Math.floor(i / 4) * h * 0.6, 0.5 * rad * Math.sin(a)]), 0.06, 1.4, 1))
+    else {
+      const out: V3 = add(c, [1.3 * rad * Math.cos(a), h + 0.35 + 0.25 * Math.floor(i / 4), 1.3 * rad * Math.sin(a)])
+      parts.push(dot(add(out, [-0.06, 0, 0]), 0.045, 1.6, 1), dot(add(out, [0.06, 0.04, 0]), 0.045, 1.6, 0.7))
+    }
+  }
+  return parts
+}
+
+/** Today's traffic: packets flowing from a client to a server; a tap copies them into a store. */
+function harvestParts(): Part[] {
+  const y = WIRE.y
+  const store: V3 = [0, -1.3, 0]
+  return [
+    dot([WIRE.x0, y, 0], 0.07, 1.8, 0.6),
+    dot([WIRE.x1, y, 0], 0.07, 1.8, 0.6),
+    seg([WIRE.x0, y, 0], [WIRE.x1, y, 0], 0.35, 0.25),
+    { ...seg([WIRE.x0, y, 0], [WIRE.x1, y, 0], 1.3, 1, 0.08), flow: true },
+    seg([0, y, 0], [0, store[1] + 0.6 * 0.8, 0], 0.9, 1, 0.04),
+    ...storeParts(store, 0.8, false),
+  ]
+}
+
+/** Years of the timeline: 0 … 30, along x. */
+export const YEARS = 30
+const yearX = (t: number, x0 = -3, x1 = 3) => x0 + ((x1 - x0) * t) / YEARS
+
+/** The store kept for years: a timeline beside it, a tick every 5 years. */
+function storedParts(): Part[] {
+  const x0 = -0.4
+  const x1 = 3.4
+  const parts = storeParts([-1.8, 0, 0], 0.9, false)
+  parts.push(seg([x0, -0.7, 0], [x1, -0.7, 0], 0.5, 0.3))
+  for (let t = 0; t <= YEARS; t += 5) parts.push(seg([yearX(t, x0, x1), -0.7, 0], [yearX(t, x0, x1), -0.5, 0], 0.6, 0.3))
+  return parts
+}
+
+/** Default slider values of the inequality (years): the bars drawn under the timeline. */
+export const MOSCA_DEFAULT = { x: 10, y: 5 } as const
+/** Height of a likelihood of 1 above the axis (world units). */
+export const MOSCA_H = 2.4
+
+/**
+ * The inequality on a 0–30-year axis: below it, x then y (the default values);
+ * above it, z as the survey gives it: at each horizon the range between the
+ * lower- and upper-end averages (an error bar), or a single dot where the
+ * report states only one end.
+ */
+function moscaParts(): Part[] {
+  const parts: Part[] = [seg([yearX(0), 0, 0], [yearX(YEARS), 0, 0], 0.5, 0.3)]
+  for (let t = 5; t <= YEARS; t += 5) parts.push(seg([yearX(t), 0, 0], [yearX(t), -0.12, 0], 0.6, 0.3))
+  for (const a of GRI_2025) {
+    const x = yearX(a.years)
+    if (a.low !== null && a.high !== null) {
+      parts.push(seg([x, a.low * MOSCA_H, 0], [x, a.high * MOSCA_H, 0], 1.5, 1, 0.1))
+      parts.push(seg([x - 0.1, a.low * MOSCA_H, 0], [x + 0.1, a.low * MOSCA_H, 0], 1.3, 1), seg([x - 0.1, a.high * MOSCA_H, 0], [x + 0.1, a.high * MOSCA_H, 0], 1.3, 1))
+    } else {
+      const v = (a.low ?? a.high)!
+      parts.push(dot([x, v * MOSCA_H, 0], 0.07, 1.6, 0.8))
+    }
+  }
+  const { x, y } = MOSCA_DEFAULT
+  parts.push(seg([yearX(0), -0.5, 0], [yearX(x), -0.5, 0], 1.4, 1, 0.12))
+  parts.push(seg([yearX(x), -0.5, 0], [yearX(x + y), -0.5, 0], 1.4, 0.15, 0.12))
+  return parts
+}
+
 function parts(id: FigureId): Part[] {
   switch (id) {
     case 'bloch0':
@@ -379,6 +485,14 @@ function parts(id: FigureId): Part[] {
       return curveParts(false)
     case 'curveBroken':
       return curveParts(true)
+    case 'harvest':
+      return harvestParts()
+    case 'stored':
+      return storedParts()
+    case 'decrypted':
+      return storeParts([-0.2, -0.3, 0], 0.9, true)
+    case 'mosca':
+      return moscaParts()
   }
 }
 /** The outcome shown when the qubit (H|0⟩) is measured: 1, the south pole (half the time it is 0). */

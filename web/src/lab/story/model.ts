@@ -93,8 +93,8 @@ export function densityWeights(o: Pick<Orbital, 'n' | 'l' | 'm'>, positions: Flo
 /** Terms of the Schrödinger equation that scene 2 reveals one by one. */
 export type Term = 'psi' | 'dt' | 'kin' | 'pot' | 'sup'
 
-export type Scene = 1 | 2 | 3 | 4 | 5
-export const SCENES: readonly Scene[] = [1, 2, 3, 4, 5]
+export type Scene = 1 | 2 | 3 | 4 | 5 | 6
+export const SCENES: readonly Scene[] = [1, 2, 3, 4, 5, 6]
 
 export interface Step {
   id: string
@@ -148,6 +148,11 @@ export const STEPS: readonly Step[] = [
   { id: 'factors', scene: 5, shape: fig('factors'), cam: cam(0.4, 0.25, 1.05) },
   { id: 'curve', scene: 5, shape: fig('curve'), cam: cam(0.12, 0.08, 1.05) },
   { id: 'broken', scene: 5, shape: fig('curveBroken'), cam: cam(0.3, 0.15, 1.1) },
+  // Scene 6, harvest now, decrypt later: the traffic and the store from slightly above, then the inequality head-on.
+  { id: 'harvest', scene: 6, shape: fig('harvest'), cam: cam(0.15, 0.22, 1.05) },
+  { id: 'stored', scene: 6, shape: fig('stored'), cam: cam(0.3, 0.25, 1.05) },
+  { id: 'decrypted', scene: 6, shape: fig('decrypted'), cam: cam(0.35, 0.35, 1.05) },
+  { id: 'mosca', scene: 6, shape: fig('mosca'), cam: cam(0.04, 0.05, 1.05) },
 ]
 
 export const TERMS: readonly Term[] = ['psi', 'dt', 'kin', 'pot', 'sup']

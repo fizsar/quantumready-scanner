@@ -75,8 +75,13 @@ describe('framing: every step whole, centred in the free area', () => {
           const b = Math.round(w.pos[0] / 0.05)
           if (!bins.has(b)) bins.set(b, { hu: [], hv: [], fu: [], fv: [] })
           const e = bins.get(b)!
-          if (seeds[4 * p + 2] < 0.5) (e.hu.push(q[0]), e.hv.push(q[1]))
-          else (e.fu.push(q[0]), e.fv.push(q[1]))
+          if (seeds[4 * p + 2] < 0.5) {
+            e.hu.push(q[0])
+            e.hv.push(q[1])
+          } else {
+            e.fu.push(q[0])
+            e.fv.push(q[1])
+          }
         }
         // Aligned in x: wherever |ψ|² is lit, the helix's axis and the fill's base at that x
         // land at the same screen x (within 1 % of the free width).

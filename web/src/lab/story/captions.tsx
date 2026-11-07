@@ -1,6 +1,6 @@
-// The label of each step of scenes 3–5, inside its panel: the formula in
+// The label of each step of scenes 3–6, inside its panel: the formula in
 // MathML and one line of numbers, every one of them computed here from
-// quantum.ts and figures.ts (nothing typed by hand but the sourced estimate).
+// quantum.ts and figures.ts (nothing typed by hand but the sourced estimates).
 import { memo, type ReactNode } from 'react'
 import type { Lang } from '../../api'
 import { curvePoints, CURVE_P, MEASURED } from './figures'
@@ -8,7 +8,7 @@ import type { Step } from './model'
 import { apply, bell, bloch, blochOf, collapse, f, factorsFrom, GIDNEY_2025, H, order, periodFrom, probabilities, purity, Q, qftDistribution, reduced, SHOR, uniform, zeros, zz } from './quantum'
 
 const fmt = (lang: Lang, v: number, digits = 3) => new Intl.NumberFormat(lang, { maximumFractionDigits: digits }).format(Math.abs(v) < 1e-12 ? 0 : v).replace('-', '−')
-const vec = (lang: Lang, v: number[]) => `(${v.map((x) => fmt(lang, x)).join('; ')})`
+const vec = (lang: Lang, v: readonly number[]) => `(${v.map((x) => fmt(lang, x)).join('; ')})`
 
 const ket = (s: string) => (
   <mrow>
@@ -278,6 +278,32 @@ export const FigureCaption = memo(function FigureCaption({ step, lang }: { step:
       }
       break
     }
+    case 'harvest':
+      formula = <Formula label="c = Enc(k, m)">{enc('c', 'Enc', 'k', 'm')}</Formula>
+      line = es ? 'se copia c; sin la clave k no se puede leer' : 'c is copied; without the key k it cannot be read'
+      break
+    case 'stored':
+      formula = <Formula label="k ← X25519">{assign('k', 'X25519')}</Formula>
+      line = es ? 'k se acordó con X25519 (o RSA): Shor la recupera (escena 5)' : 'k was agreed with X25519 (or RSA): Shor recovers it (scene 5)'
+      break
+    case 'decrypted':
+      formula = <Formula label="m = Dec(k, c)">{enc('m', 'Dec', 'k', 'c')}</Formula>
+      line = es ? 'con k, m se lee años después de enviarse' : 'with k, m is read years after it was sent'
+      break
+    case 'mosca':
+      formula = (
+        <Formula label="x + y > z">
+          <mi>x</mi>
+          <mo>+</mo>
+          <mi>y</mi>
+          <mo>&gt;</mo>
+          <mi>z</mi>
+          <mo>⇒</mo>
+          <mtext>{es ? 'riesgo' : 'risk'}</mtext>
+        </Formula>
+      )
+      line = es ? 'z no es una fecha: es incierto (encuesta del GRI, 2025)' : 'z is not a date: it is uncertain (GRI survey, 2025)'
+      break
   }
   return (
     <div className="story-cap story-eq">
@@ -286,6 +312,33 @@ export const FigureCaption = memo(function FigureCaption({ step, lang }: { step:
     </div>
   )
 })
+
+/** A display formula with its spoken label. */
+const Formula = ({ label, children }: { label: string; children: ReactNode }) => (
+  <math display="block" aria-label={label}>
+    {children}
+  </math>
+)
+/** out = Fn(key, in). */
+const enc = (out: string, fn: string, key: string, input: string) => (
+  <>
+    <mi>{out}</mi>
+    <mo>=</mo>
+    <mi mathvariant="normal">{fn}</mi>
+    <mo stretchy="false">(</mo>
+    <mi>{key}</mi>
+    <mo>,</mo>
+    <mi>{input}</mi>
+    <mo stretchy="false">)</mo>
+  </>
+)
+const assign = (v: string, from: string) => (
+  <>
+    <mi>{v}</mi>
+    <mo>←</mo>
+    <mtext>{from}</mtext>
+  </>
+)
 
 const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹'
 const SUB = '₀₁₂₃₄₅₆₇₈₉'

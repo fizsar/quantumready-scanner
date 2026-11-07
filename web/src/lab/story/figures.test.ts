@@ -44,12 +44,12 @@ describe('figures: what the particles draw comes from quantum.ts', () => {
     }
   })
 
-  it('only the circuit has flowing particles, and they lie on its two wires', () => {
+  it('only the circuit and the captured traffic have flowing particles, and they lie on the wire(s)', () => {
     for (const id of FIGURES) {
       const { positions, looks } = get(id)
       for (let i = 0; i < N; i++)
         if (looks[2 * i + 1] < 0) {
-          expect(id).toBe('circuit')
+          expect(['circuit', 'harvest']).toContain(id)
           expect(Math.abs(Math.abs(positions[3 * i + 1]) - WIRE.y)).toBeLessThan(0.1)
           expect(positions[3 * i]).toBeGreaterThanOrEqual(WIRE.x0 - 0.1)
           expect(positions[3 * i]).toBeLessThanOrEqual(WIRE.x1 + 0.1)

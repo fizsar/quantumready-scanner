@@ -4,11 +4,12 @@ import { BURST, burstDir, covers, densityWeights, EDGE, fieldAt, fillBase, frame
 import { field, MEET, psi, SAMPLES, sampleX } from './wave'
 
 describe('the story timeline', () => {
-  it('scene 1 is the four orbitals, scene 2 reveals the five terms in order, scenes 3–5 follow', () => {
-    expect(STEPS.map((s) => s.id)).toEqual(
-      ['1s', '2pz', '3dz2', '4fxyz', 'psi', 'dt', 'kin', 'pot', 'sup', 'q0', 'qH', 'qM', 'bell', 'circ', 'reg3', 'reg6', 'reg10', 'shorF', 'qft', 'key', 'factors', 'curve', 'broken'],
-    )
-    expect(STEPS.map((s) => s.scene)).toEqual([1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5])
+  it('scene 1 is the four orbitals, scene 2 reveals the five terms in order, scenes 3–6 follow', () => {
+    expect(STEPS.map((s) => s.id)).toEqual([
+      ...['1s', '2pz', '3dz2', '4fxyz', 'psi', 'dt', 'kin', 'pot', 'sup', 'q0', 'qH', 'qM', 'bell', 'circ', 'reg3', 'reg6', 'reg10', 'shorF', 'qft', 'key', 'factors', 'curve', 'broken'],
+      ...['harvest', 'stored', 'decrypted', 'mosca'],
+    ])
+    expect(STEPS.map((s) => s.scene)).toEqual([1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6])
     expect(STEPS.filter((s) => s.scene === 2).map((s) => s.term)).toEqual([...TERMS])
     // Every step of scenes 3–5 is a figure, each a different one.
     const figs = STEPS.filter((s) => s.scene >= 3).map((s) => (s.shape.kind === 'figure' ? s.shape.id : null))

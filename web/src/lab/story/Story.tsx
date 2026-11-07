@@ -7,8 +7,10 @@ import { energy, r95 } from '../hydrogen'
 import { SEED } from '../view'
 import type { Story as Engine } from './engine'
 import { FigureCaption } from './captions'
+import { MOSCA_DEFAULT } from './figures'
 import { loadStory, storyStillURL } from './load'
 import { orbitalOf, panelsShown, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
+import { MoscaWidget, type MoscaValue } from './MoscaWidget'
 import { TEXT } from './texts'
 import './Story.css'
 
@@ -24,6 +26,9 @@ export default function Story() {
   const [ready, setReady] = useState(false)
   // The sheet (phones): shown while the track is behind it.
   const [sheetOn, setSheetOn] = useState(false)
+  // Scene 6: the inequality's sliders (one state for the panel's and the sheet's widget).
+  const [mosca, setMosca] = useState<MoscaValue>({ ...MOSCA_DEFAULT })
+  const phone = usePhone()
   const track = useRef<HTMLDivElement>(null)
   const article = useRef<HTMLElement>(null)
   const sheet = useRef<HTMLDivElement>(null)
@@ -174,11 +179,16 @@ export default function Story() {
       </div>
 
       {/* Phones: text and 3D in separate zones, the current step in a panel below the scene. */}
-      <div ref={sheet} className="story-sheet" data-active={sheetOn} aria-hidden="true">
+      {/* Its text is a copy of the step panels (which screen readers read), so it is
+          hidden from them; only an interactive control (scene 6) is not, on phones. */}
+      <div ref={sheet} className="story-sheet" data-active={sheetOn}>
         {STEPS.map((s, i) => (
-          <div key={s.id} className="story-layer" data-current={i === index}>
-            <StepText step={s} first={sceneStart(i)} lang={lang} />
-            <Caption step={s} lang={lang} />
+          <div key={s.id} className="story-layer" data-current={i === index} data-step={s.id}>
+            <div className="story-layer-copy" aria-hidden="true">
+              <StepText step={s} first={sceneStart(i)} lang={lang} />
+              <Caption step={s} lang={lang} />
+            </div>
+            {phone && s.id === 'mosca' && <MoscaWidget value={mosca} onChange={setMosca} lang={lang} active />}
           </div>
         ))}
       </div>
@@ -190,6 +200,7 @@ export default function Story() {
               <StepText step={s} first={sceneStart(i)} lang={lang} headingId={`story-step-${s.id}`} />
               {/* The label (quantum numbers, the equation) inside the panel: nothing loose over the scene. */}
               <Caption step={s} lang={lang} />
+              {s.id === 'mosca' && <MoscaWidget value={mosca} onChange={setMosca} lang={lang} active={!phone} />}
             </div>
           </section>
         ))}
@@ -201,6 +212,7 @@ export default function Story() {
         <p>{tx.method}</p>
         <p>{tx.units}</p>
         <p>{tx.methodQuantum}</p>
+        <p>{tx.methodPq}</p>
         <Sources lang={lang} />
       </section>
     </article>
@@ -237,6 +249,21 @@ function StepText({ step, first, lang, headingId }: { step: Step; first: boolean
       </p>
     </>
   )
+}
+
+/** Phones: the layout with the sheet below the scene (Story.css, the same breakpoint). */
+const PHONE = '(max-width: 40rem)'
+function usePhone() {
+  const query = () => (typeof window.matchMedia === 'function' ? window.matchMedia(PHONE) : null)
+  const [phone, setPhone] = useState(() => !!query()?.matches)
+  useEffect(() => {
+    const m = query()
+    if (!m || typeof m.addEventListener !== 'function') return
+    const on = () => setPhone(m.matches)
+    m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [])
+  return phone
 }
 
 /** Space between the text panels and the scene on wide screens (CSS px). */
@@ -462,6 +489,20 @@ function Sources({ lang }: { lang: Lang }) {
       <li>
         M. Roetteler, M. Naehrig, K. M. Svore, K. Lauter, «Quantum Resource Estimates for Computing Elliptic Curve Discrete Logarithms», ASIACRYPT 2017:{' '}
         {es ? '2330 cúbits lógicos para una curva de 256 bits.' : '2330 logical qubits for a 256-bit curve.'}
+      </li>
+      <li>
+        M. Mosca, «Cybersecurity in an Era with Quantum Computers: Will We Be Ready?», <cite>IEEE Security &amp; Privacy</cite> 16(5), 38–41 (2018){' '}
+        {es ? '(la desigualdad x + y > z).' : '(the inequality x + y > z).'}
+      </li>
+      <li>
+        M. Mosca, M. Piani (evolutionQ),{' '}
+        <a href="https://globalriskinstitute.org/publication/quantum-threat-timeline-report-2025b/" rel="noopener">
+          <cite>Quantum Threat Timeline Report 2025</cite>
+        </a>
+        , Global Risk Institute, {es ? 'marzo de 2026' : 'March 2026'}:{' '}
+        {es
+          ? '26 expertos estiman la probabilidad de un ordenador cuántico capaz de factorizar un número de 2048 bits en menos de 24 horas; medias entre la interpretación «pesimista» y la «optimista» de sus respuestas: 28–49 % en 10 años, 51–70 % en 15 (y ~15 % en 5 años en la optimista, ~69 % en 20 en la pesimista).'
+          : '26 experts estimate the likelihood of a quantum computer able to factor a 2048-bit number in less than 24 hours; averages between the “pessimistic” and “optimistic” readings of their answers: 28–49% within 10 years, 51–70% within 15 (and ~15% within 5 years in the optimistic one, ~69% within 20 in the pessimistic one).'}
       </li>
       <li>
         CODATA 2022 (NIST), R∞hc:{' '}
