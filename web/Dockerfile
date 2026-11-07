@@ -15,6 +15,13 @@ ARG COMMIT=unknown
 LABEL org.opencontainers.image.source="https://github.com/fizsar/quantumready-saas" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT}"
+# The pinned base still ships musl 1.2.6-r2 and zlib 1.3.2-r0, with fixable HIGH
+# vulnerabilities (CVE-2026-107891, CVE-2026-85091; Trivy in release.yml): install
+# the fixed versions, pinned (zlib 1.4-r0: the one Alpine 3.24 now carries, same
+# libz.so.1). Drop this when the base image's digest carries them.
+USER root
+RUN apk add --no-cache 'musl=1.2.6-r3' 'musl-utils=1.2.6-r3' 'zlib=1.4-r0'
+USER 101
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/dist /usr/share/nginx/html
