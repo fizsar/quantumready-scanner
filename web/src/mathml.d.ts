@@ -4,7 +4,7 @@ import 'react'
 
 type MathProps = React.DetailedHTMLProps<React.HTMLAttributes<MathMLElement>, MathMLElement> & {
   display?: 'block' | 'inline'
-  mathvariant?: 'normal'
+  mathvariant?: 'normal' | 'bold'
   stretchy?: 'true' | 'false'
   lspace?: string
 }

@@ -93,8 +93,8 @@ export function densityWeights(o: Pick<Orbital, 'n' | 'l' | 'm'>, positions: Flo
 /** Terms of the Schrödinger equation that scene 2 reveals one by one. */
 export type Term = 'psi' | 'dt' | 'kin' | 'pot' | 'sup'
 
-export type Scene = 1 | 2 | 3 | 4 | 5 | 6
-export const SCENES: readonly Scene[] = [1, 2, 3, 4, 5, 6]
+export type Scene = 1 | 2 | 3 | 4 | 5 | 6 | 7
+export const SCENES: readonly Scene[] = [1, 2, 3, 4, 5, 6, 7]
 
 export interface Step {
   id: string
@@ -153,6 +153,12 @@ export const STEPS: readonly Step[] = [
   { id: 'stored', scene: 6, shape: fig('stored'), cam: cam(0.3, 0.25, 1.05) },
   { id: 'decrypted', scene: 6, shape: fig('decrypted'), cam: cam(0.35, 0.35, 1.05) },
   { id: 'mosca', scene: 6, shape: fig('mosca'), cam: cam(0.04, 0.05, 1.05) },
+  // Scene 7, lattices and ML-KEM: flat figures, nearly head-on.
+  { id: 'lattice', scene: 7, shape: fig('lattice'), cam: cam(0.06, 0.08, 1.05) },
+  { id: 'cvp', scene: 7, shape: fig('latticeBad'), cam: cam(-0.06, 0.08, 1.05) },
+  { id: 'lwe', scene: 7, shape: fig('lwe'), cam: cam(0.1, 0.1, 1.05) },
+  { id: 'mlkem', scene: 7, shape: fig('mlkem'), cam: cam(0.12, 0.12, 1.05) },
+  { id: 'hybrid', scene: 7, shape: fig('hybrid'), cam: cam(0.05, 0.06, 1.05) },
 ]
 
 export const TERMS: readonly Term[] = ['psi', 'dt', 'kin', 'pot', 'sup']

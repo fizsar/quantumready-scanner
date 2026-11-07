@@ -1,9 +1,12 @@
-// The label of each step of scenes 3–6, inside its panel: the formula in
+// The label of each step of scenes 3–7, inside its panel: the formula in
 // MathML and one line of numbers, every one of them computed here from
-// quantum.ts and figures.ts (nothing typed by hand but the sourced estimates).
+// quantum.ts, lattice.ts, mlkem.ts and figures.ts (nothing typed by hand but
+// the sourced estimates).
 import { memo, type ReactNode } from 'react'
 import type { Lang } from '../../api'
 import { curvePoints, CURVE_P, MEASURED } from './figures'
+import { A, B_ERR, B_EXACT, BAD, babai, closest, det, dist, gauss, GOOD, LWE, TARGET, TOY_SPACE } from './lattice'
+import { HYBRID, hex, ML_KEM, N as KEM_N, Q as KEM_Q, sizes, spaceDigits, total, X25519 } from './mlkem'
 import type { Step } from './model'
 import { apply, bell, bloch, blochOf, collapse, f, factorsFrom, GIDNEY_2025, H, order, periodFrom, probabilities, purity, Q, qftDistribution, reduced, SHOR, uniform, zeros, zz } from './quantum'
 
@@ -304,6 +307,148 @@ export const FigureCaption = memo(function FigureCaption({ step, lang }: { step:
       )
       line = es ? 'z no es una fecha: es incierto (encuesta del GRI, 2025)' : 'z is not a date: it is uncertain (GRI survey, 2025)'
       break
+    case 'lattice': {
+      const c = closest(GOOD, TARGET)
+      formula = (
+        <Formula label="L = {a b1 + c b2 : a, c integers}">
+          <mi>L</mi>
+          <mo>=</mo>
+          <mo>{'{'}</mo>
+          <mi>a</mi>
+          <msub>
+            <mi>b</mi>
+            <mn>1</mn>
+          </msub>
+          <mo>+</mo>
+          <mi>c</mi>
+          <msub>
+            <mi>b</mi>
+            <mn>2</mn>
+          </msub>
+          <mo>:</mo>
+          <mi>a</mi>
+          <mo>,</mo>
+          <mi>c</mi>
+          <mo>∈</mo>
+          <mi mathvariant="normal">ℤ</mi>
+          <mo>{'}'}</mo>
+        </Formula>
+      )
+      line = es
+        ? `b₁ = ${vec(lang, GOOD[0])}, b₂ = ${vec(lang, GOOD[1])}, det = ${det(GOOD)} · t = ${vec(lang, TARGET)} → más cercano ${vec(lang, c)}, a ${n(dist(c, TARGET), 2)}`
+        : `b₁ = ${vec(lang, GOOD[0])}, b₂ = ${vec(lang, GOOD[1])}, det = ${det(GOOD)} · t = ${vec(lang, TARGET)} → closest ${vec(lang, c)}, at ${n(dist(c, TARGET), 2)}`
+      break
+    }
+    case 'latticeBad': {
+      const c = closest(GOOD, TARGET)
+      const w = babai(BAD, TARGET)
+      formula = (
+        <Formula label="b1' = 5 b1 + 2 b2, b2' = 2 b1 + b2">
+          <msubsup>
+            <mi>b</mi>
+            <mn>1</mn>
+            <mo>′</mo>
+          </msubsup>
+          <mo>=</mo>
+          <mn>5</mn>
+          <msub>
+            <mi>b</mi>
+            <mn>1</mn>
+          </msub>
+          <mo>+</mo>
+          <mn>2</mn>
+          <msub>
+            <mi>b</mi>
+            <mn>2</mn>
+          </msub>
+          <mo>,</mo>
+          <msubsup>
+            <mi>b</mi>
+            <mn>2</mn>
+            <mo>′</mo>
+          </msubsup>
+          <mo>=</mo>
+          <mn>2</mn>
+          <msub>
+            <mi>b</mi>
+            <mn>1</mn>
+          </msub>
+          <mo>+</mo>
+          <msub>
+            <mi>b</mi>
+            <mn>2</mn>
+          </msub>
+        </Formula>
+      )
+      line = es
+        ? `${vec(lang, BAD[0])}, ${vec(lang, BAD[1])}, det = ${det(BAD)}: la misma red · redondeo → ${vec(lang, w)}, a ${n(dist(w, TARGET), 2)} (${Math.floor(dist(w, TARGET) / dist(c, TARGET))} veces más lejos)`
+        : `${vec(lang, BAD[0])}, ${vec(lang, BAD[1])}, det = ${det(BAD)}: the same lattice · rounding → ${vec(lang, w)}, at ${n(dist(w, TARGET), 2)} (${Math.floor(dist(w, TARGET) / dist(c, TARGET))} times farther)`
+      break
+    }
+    case 'lwe': {
+      const exact = gauss(A, B_EXACT, LWE.q)
+      const wrong = gauss(A, B_ERR, LWE.q)
+      formula = (
+        <Formula label="b = A s + e (mod q)">
+          <mi mathvariant="bold">b</mi>
+          <mo>=</mo>
+          <mi mathvariant="bold">A</mi>
+          <mi mathvariant="bold">s</mi>
+          <mo>+</mo>
+          <mi mathvariant="bold">e</mi>
+          <mspace width="0.4em" />
+          <mo stretchy="false">(</mo>
+          <mi>mod</mi>
+          <mspace width="0.2em" />
+          <mn>{LWE.q}</mn>
+          <mo stretchy="false">)</mo>
+        </Formula>
+      )
+      line = es
+        ? `n = ${LWE.n}, m = ${LWE.m} · sin e, Gauss da ${vec(lang, exact)} = s · con e, ${vec(lang, wrong)} · a la fuerza, ${n(TOY_SPACE, 0)} candidatos`
+        : `n = ${LWE.n}, m = ${LWE.m} · without e, Gauss gives ${vec(lang, exact)} = s · with e, ${vec(lang, wrong)} · by brute force, ${n(TOY_SPACE, 0)} candidates`
+      break
+    }
+    case 'mlkem': {
+      const p = ML_KEM['768']
+      const z = sizes(p)
+      formula = (
+        <Formula label={`n = ${KEM_N}, k = ${p.k}, q = ${KEM_Q}`}>
+          <mi>n</mi>
+          <mo>=</mo>
+          <mn>{KEM_N}</mn>
+          <mo>,</mo>
+          <mi>k</mi>
+          <mo>=</mo>
+          <mn>{p.k}</mn>
+          <mo>,</mo>
+          <mi>q</mi>
+          <mo>=</mo>
+          <mn>{KEM_Q}</mn>
+        </Formula>
+      )
+      line = es
+        ? `clave pública ${n(z.ek, 0)} B, cifrado ${n(z.ct, 0)} B · X25519: ${X25519.pub} B · secretos posibles: un número de ${spaceDigits(p)} cifras`
+        : `public key ${n(z.ek, 0)} B, ciphertext ${n(z.ct, 0)} B · X25519: ${X25519.pub} B · possible secrets: a ${spaceDigits(p)}-digit number`
+      break
+    }
+    case 'hybrid': {
+      const [ek, xc] = HYBRID.client
+      const [ct, xs] = HYBRID.server
+      formula = (
+        <Formula label="key_share = ek ‖ X25519">
+          <mtext>key_share</mtext>
+          <mo>=</mo>
+          <mtext>ek</mtext>
+          <mo>‖</mo>
+          <mtext>X25519</mtext>
+        </Formula>
+      )
+      line = es
+        ? `cliente ${ek.bytes} + ${xc.bytes} = ${total(HYBRID.client)} B · servidor ${ct.bytes} + ${xs.bytes} = ${total(HYBRID.server)} B · secreto ${total(HYBRID.secret)} B · grupo ${HYBRID.codepoint} (${hex(HYBRID.codepoint)})`
+        : `client ${ek.bytes} + ${xc.bytes} = ${total(HYBRID.client)} B · server ${ct.bytes} + ${xs.bytes} = ${total(HYBRID.server)} B · secret ${total(HYBRID.secret)} B · group ${HYBRID.codepoint} (${hex(HYBRID.codepoint)})`
+      break
+    }
   }
   return (
     <div className="story-cap story-eq">

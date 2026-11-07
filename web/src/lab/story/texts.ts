@@ -32,6 +32,7 @@ export const TEXT: Record<Lang, StoryText> = {
       4: 'Escena 4 · El ordenador cuántico',
       5: 'Escena 5 · El algoritmo de Shor',
       6: 'Escena 6 · Cosechar ahora, descifrar después',
+      7: 'Escena 7 · Retículos y ML-KEM',
     },
     steps: {
       '1s': { title: '1s', body: 'El estado fundamental. Cada punto es un lugar donde podría estar el electrón. Con l = 0, la nube es esférica.' },
@@ -61,6 +62,11 @@ export const TEXT: Record<Lang, StoryText> = {
       stored: { title: 'Guardar años', body: 'Lo guarda. RSA y X25519 protegen el contenido mientras no exista un ordenador cuántico capaz de romperlos.' },
       decrypted: { title: 'Descifrar después', body: 'Cuando exista, Shor recupera las claves y se lee todo lo guardado. Lo que envías hoy puede tener que seguir siendo secreto entonces.' },
       mosca: { title: 'La desigualdad de Mosca', body: 'x: años que tus datos deben seguir secretos; y: años que tarda tu migración; z: años hasta el ordenador cuántico.' },
+      lattice: { title: 'Un retículo', body: 'Todos los puntos a·b₁ + c·b₂ con a y c enteros. Con una base corta y casi perpendicular, el punto de la red más cercano se encuentra redondeando.' },
+      cvp: { title: 'La misma red, otra base', body: 'Con una base larga y casi paralela, el mismo redondeo falla. En cientos de dimensiones no se conoce cómo obtener una base buena a partir de una mala.' },
+      lwe: { title: 'Aprender con errores', body: 'b = A·s + e mod q. Sin el error e, Gauss da s. Con un error pequeño, la misma cuenta da otra cosa: el error se amplifica.' },
+      mlkem: { title: 'ML-KEM-768', body: 'El estándar del NIST (FIPS 203) se basa en ese problema: 3 polinomios de 256 coeficientes mod 3329. Claves de más de 1 KB, frente a 32 B.' },
+      hybrid: { title: 'X25519MLKEM768', body: 'TLS 1.3 combina las dos claves: para romperlo hay que romper ambas. Es lo que QuantumReady busca en tu servidor.' },
     },
     legend: {
       1: ['verde: ψ > 0', 'índigo: ψ < 0'],
@@ -69,6 +75,7 @@ export const TEXT: Record<Lang, StoryText> = {
       4: ['verde: cúbits y amplitudes', 'índigo: hilos'],
       5: ['verde: valores y puntos', 'índigo: ejes'],
       6: ['verde: datos', 'índigo: almacén y ejes'],
+      7: ['verde: bases y ML-KEM', 'índigo: la red y X25519'],
     },
     energy: 'energía',
     scale: (r) => `el 95 % de la probabilidad está dentro de r = ${r} a₀`,
@@ -86,7 +93,7 @@ export const TEXT: Record<Lang, StoryText> = {
     methodQuantum:
       'Escenas 3 a 5: vectores de estado exactos (sin atajos) con las puertas H y CNOT; el vector de Bloch de cada cúbit sale de su matriz densidad reducida (traza parcial), que en el estado de Bell es I/2: vector nulo y pureza ½. Shor con N = 15, a = 7 y un registro de n = 8 cúbits (N² ≤ 2⁸ < 2N²): la distribución tras la QFT se calcula exacta, r sale por fracciones continuas y los factores, con el mcd. La curva es la ecuación de X25519 (RFC 7748) sobre el cuerpo de 101 elementos en lugar de 2²⁵⁵ − 19, para que sus puntos se vean. Los tests comprueban cada número que se dibuja o se muestra.',
     methodPq:
-      'Escena 6: la desigualdad de Mosca (x + y > z) con z tomado de la encuesta del Global Risk Institute de 2025: solo las medias que el informe da en su texto, como rangos entre la interpretación «pesimista» y la «optimista» de las respuestas; la probabilidad de un ordenador cuántico antes de x + y años es al menos la de cualquier horizonte más corto, y nunca se da una fecha.',
+      'Escena 6: la desigualdad de Mosca (x + y > z) con z tomado de la encuesta del Global Risk Institute de 2025: solo las medias que el informe da en su texto, como rangos entre la interpretación «pesimista» y la «optimista» de las respuestas; la probabilidad de un ordenador cuántico antes de x + y años es al menos la de cualquier horizonte más corto, y nunca se da una fecha. Escena 7: un retículo con dos bases del mismo determinante (una se obtiene de la otra con una matriz entera de determinante 1), el punto más cercano por búsqueda exhaustiva y el redondeo de Babai con cada base; LWE de juguete con n = 4, m = 6 y q = 97, resuelto con eliminación de Gauss mod q; los tamaños de ML-KEM salen de las fórmulas de FIPS 203 y se comprueban con su tabla para los tres conjuntos de parámetros.',
   },
   en: {
     title: 'From quantum mechanics to your website · lab',
@@ -98,6 +105,7 @@ export const TEXT: Record<Lang, StoryText> = {
       4: 'Scene 4 · The quantum computer',
       5: 'Scene 5 · Shor’s algorithm',
       6: 'Scene 6 · Harvest now, decrypt later',
+      7: 'Scene 7 · Lattices and ML-KEM',
     },
     steps: {
       '1s': { title: '1s', body: 'The ground state. Each point is a place the electron could be. With l = 0, the cloud is spherical.' },
@@ -127,6 +135,11 @@ export const TEXT: Record<Lang, StoryText> = {
       stored: { title: 'Keep it for years', body: 'They keep it. RSA and X25519 protect the content only until a quantum computer able to break them exists.' },
       decrypted: { title: 'Decrypt later', body: 'Once it does, Shor recovers the keys and everything stored can be read. What you send today may still need to be secret then.' },
       mosca: { title: 'Mosca’s inequality', body: 'x: years your data must stay secret; y: years your migration takes; z: years until the quantum computer.' },
+      lattice: { title: 'A lattice', body: 'Every point a·b₁ + c·b₂ with a and c integers. With a short, nearly perpendicular basis, the closest lattice point is found by rounding.' },
+      cvp: { title: 'The same lattice, another basis', body: 'With a long, nearly parallel basis, the same rounding fails. In hundreds of dimensions nobody knows how to get a good basis from a bad one.' },
+      lwe: { title: 'Learning with errors', body: 'b = A·s + e mod q. Without the error e, Gauss gives s. With a small error, the same computation gives something else: the error grows.' },
+      mlkem: { title: 'ML-KEM-768', body: 'NIST’s standard (FIPS 203) rests on that problem: 3 polynomials of 256 coefficients mod 3329. Keys over 1 KB, against 32 B.' },
+      hybrid: { title: 'X25519MLKEM768', body: 'TLS 1.3 combines both keys: breaking it means breaking both. It is what QuantumReady looks for on your server.' },
     },
     legend: {
       1: ['green: ψ > 0', 'indigo: ψ < 0'],
@@ -135,6 +148,7 @@ export const TEXT: Record<Lang, StoryText> = {
       4: ['green: qubits and amplitudes', 'indigo: wires'],
       5: ['green: values and points', 'indigo: axes'],
       6: ['green: data', 'indigo: store and axes'],
+      7: ['green: bases and ML-KEM', 'indigo: the lattice and X25519'],
     },
     energy: 'energy',
     scale: (r) => `95% of the probability lies within r = ${r} a₀`,
@@ -152,6 +166,6 @@ export const TEXT: Record<Lang, StoryText> = {
     methodQuantum:
       'Scenes 3 to 5: exact state vectors (no shortcuts) with the H and CNOT gates; each qubit’s Bloch vector comes from its reduced density matrix (partial trace), which in the Bell state is I/2: zero vector, purity ½. Shor with N = 15, a = 7 and a register of n = 8 qubits (N² ≤ 2⁸ < 2N²): the distribution after the QFT is computed exactly, r follows from continued fractions and the factors from the gcd. The curve is X25519’s equation (RFC 7748) over the field of 101 elements instead of 2²⁵⁵ − 19, so that its points can be seen. The tests check every number that is drawn or shown.',
     methodPq:
-      'Scene 6: Mosca’s inequality (x + y > z) with z taken from the Global Risk Institute’s 2025 survey: only the averages the report states in its text, as ranges between the “pessimistic” and “optimistic” readings of the answers; the likelihood of a quantum computer before x + y years is at least that of any shorter horizon, and no date is ever given.',
+      'Scene 6: Mosca’s inequality (x + y > z) with z taken from the Global Risk Institute’s 2025 survey: only the averages the report states in its text, as ranges between the “pessimistic” and “optimistic” readings of the answers; the likelihood of a quantum computer before x + y years is at least that of any shorter horizon, and no date is ever given. Scene 7: a lattice with two bases of the same determinant (one is the other times an integer matrix of determinant 1), the closest point by exhaustive search and Babai’s rounding with each basis; a toy LWE with n = 4, m = 6 and q = 97, solved by Gaussian elimination mod q; ML-KEM’s sizes come from FIPS 203’s formulas and are checked against its table for all three parameter sets.',
   },
 }

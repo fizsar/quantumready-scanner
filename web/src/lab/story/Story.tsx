@@ -505,6 +505,34 @@ function Sources({ lang }: { lang: Lang }) {
           : '26 experts estimate the likelihood of a quantum computer able to factor a 2048-bit number in less than 24 hours; averages between the “pessimistic” and “optimistic” readings of their answers: 28–49% within 10 years, 51–70% within 15 (and ~15% within 5 years in the optimistic one, ~69% within 20 in the pessimistic one).'}
       </li>
       <li>
+        L. Babai, «On Lovász’ lattice reduction and the nearest lattice point problem», <cite>Combinatorica</cite> 6(1), 1–13 (1986).
+      </li>
+      <li>
+        O. Regev, «On lattices, learning with errors, random linear codes, and cryptography», <cite>J. ACM</cite> 56(6), art. 34 (2009).
+      </li>
+      <li>
+        NIST,{' '}
+        <a href="https://doi.org/10.6028/NIST.FIPS.203" rel="noopener">
+          FIPS 203
+        </a>
+        , <cite>Module-Lattice-Based Key-Encapsulation Mechanism Standard</cite>, {es ? 'agosto de 2024' : 'August 2024'} ({es ? 'parámetros y tamaños, tablas 2 y 3' : 'parameters and sizes, Tables 2 and 3'}).
+      </li>
+      <li>
+        K. Kwiatkowski, P. Kampanakis, B. E. Westerbaan, D. Stebila,{' '}
+        <a href="https://www.rfc-editor.org/rfc/rfc10024" rel="noopener">
+          RFC 10024
+        </a>
+        , <cite>Post-Quantum Traditional (PQ/T) Hybrid Key Agreement Mechanisms for TLS 1.3</cite>, {es ? 'agosto de 2026' : 'August 2026'}{' '}
+        {es ? '(antes draft-ietf-tls-ecdhe-mlkem-05): X25519MLKEM768, §4.' : '(formerly draft-ietf-tls-ecdhe-mlkem-05): X25519MLKEM768, §4.'}
+      </li>
+      <li>
+        IANA,{' '}
+        <a href="https://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml#tls-parameters-8" rel="noopener">
+          TLS Supported Groups
+        </a>
+        : X25519MLKEM768 = 4588 (0x11EC), Recommended: Y ({es ? 'consultado el 7 de noviembre de 2026' : 'checked on 7 November 2026'}).
+      </li>
+      <li>
         CODATA 2022 (NIST), R∞hc:{' '}
         <a href="https://physics.nist.gov/cgi-bin/cuu/Value?rydhcev" rel="noopener">
           physics.nist.gov

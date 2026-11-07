@@ -206,6 +206,23 @@ describe('/lab/historia', () => {
     for (const s of ['IEEE Security & Privacy 16(5), 38–41 (2018)', 'Quantum Threat Timeline Report 2025', '26 expertos', 'menos de 24 horas']) expect(sources, s).toContain(s)
   })
 
+  it('scene 7: each panel shows the numbers computed by lattice.ts and mlkem.ts, and the sources (Spanish)', async () => {
+    media(() => true)
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    const cap = (id: string) => document.getElementById(`story-step-${id}`)!.closest('.story-panel')!.querySelector('.story-cap')!
+    const line = (id: string) => cap(id).querySelector('.story-scale')!.textContent
+    expect(line('lattice')).toBe('b₁ = (3; 1), b₂ = (1; 2), det = 5 · t = (3,6; 2,4) → más cercano (4; 3), a 0,72')
+    expect(line('cvp')).toBe('(17; 9), (7; 4), det = 5: la misma red · redondeo → (14; 8), a 11,81 (16 veces más lejos)')
+    expect(line('lwe')).toBe('n = 4, m = 6 · sin e, Gauss da (23; 71; 8; 54) = s · con e, (7; 42; 39; 86) · a la fuerza, 88.529.281 candidatos')
+    expect(line('mlkem')).toBe('clave pública 1184 B, cifrado 1088 B · X25519: 32 B · secretos posibles: un número de 537 cifras')
+    expect(line('hybrid')).toBe('cliente 1184 + 32 = 1216 B · servidor 1088 + 32 = 1120 B · secreto 64 B · grupo 4588 (0x11EC)')
+    for (const id of ['lattice', 'cvp', 'lwe', 'mlkem', 'hybrid']) expect(cap(id).querySelector('math')?.namespaceURI, id).toBe('http://www.w3.org/1998/Math/MathML')
+    expect(screen.getAllByText('Escena 7 · Retículos y ML-KEM').length).toBeGreaterThan(0)
+    const sources = document.querySelector('.story-sources')!.textContent!
+    for (const s of ['FIPS 203', 'RFC 10024', 'draft-ietf-tls-ecdhe-mlkem-05', '4588 (0x11EC)', 'Combinatorica 6(1)', 'J. ACM 56(6)']) expect(sources, s).toContain(s)
+  })
+
   it('scene 6: the sliders have labels and spoken values, and the verdict is announced as they move (desktop: one active widget)', async () => {
     media(() => false)
     renderAt('/lab/historia')
