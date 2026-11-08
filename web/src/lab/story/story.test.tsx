@@ -215,7 +215,7 @@ describe('/lab/historia', () => {
     expect(line('lattice')).toBe('b₁ = (3; 1), b₂ = (1; 2), det = 5 · t = (3,6; 2,4) → más cercano (4; 3), a 0,72')
     expect(line('cvp')).toBe('(17; 9), (7; 4), det = 5: la misma red · redondeo → (14; 8), a 11,81 (16 veces más lejos)')
     expect(line('lwe')).toBe('n = 4, m = 6 · sin e, Gauss da (23; 71; 8; 54) = s · con e, (7; 42; 39; 86) · a la fuerza, 88.529.281 candidatos')
-    expect(line('mlkem')).toBe('clave pública 1184 B, cifrado 1088 B · X25519: 32 B · secretos posibles: un número de 537 cifras')
+    expect(line('mlkem')).toBe('clave pública 1184 B, cifrado 1088 B · X25519: 32 B · secretos posibles: como máximo un número de 537 cifras')
     expect(line('hybrid')).toBe('cliente 1184 + 32 = 1216 B · servidor 1088 + 32 = 1120 B · secreto 64 B · grupo 4588 (0x11EC)')
     for (const id of ['lattice', 'cvp', 'lwe', 'mlkem', 'hybrid']) expect(cap(id).querySelector('math')?.namespaceURI, id).toBe('http://www.w3.org/1998/Math/MathML')
     expect(screen.getAllByText('Escena 7 · Retículos y ML-KEM').length).toBeGreaterThan(0)

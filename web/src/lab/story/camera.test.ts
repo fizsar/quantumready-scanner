@@ -48,7 +48,8 @@ describe('framing: every step whole, centred in the free area', () => {
       }
     })
 
-  it('scene 2: a clean helix (its turns never overlap on screen) with |ψ|² right below it, aligned in x, all along every step', () => {
+  // Deterministic but heavy (every step of scene 2, thousands of points): its own time limit, not the default 5 s.
+  it('scene 2: a clean helix (its turns never overlap on screen) with |ψ|² right below it, aligned in x, all along every step', { timeout: 20_000 }, () => {
     const frame = FRAMES['desktop 1634×916']
     const seeds = waveSeeds(8000, 1)
     // One turn of the helix along x, in world units (k₀ = 2).

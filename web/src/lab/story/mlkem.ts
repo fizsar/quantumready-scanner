@@ -68,11 +68,12 @@ export const HYBRID = (() => {
 export const total = (parts: readonly { bytes: number }[]) => parts.reduce((t, p) => t + p.bytes, 0)
 
 /**
- * Decimal digits of (2η₁ + 1)^(k·n): how many secret vectors there are when each
- * of the k·n coefficients is small, in {−η₁, …, η₁} (FIPS 203 samples them
- * from the centred binomial distribution CBD_η₁). Not a security level (the best
- * attacks are lattice reduction, far below brute force): only a sense of why
- * trying them all is out of the question.
+ * Decimal digits of (2η₁ + 1)^(k·n): an upper bound on the secret vectors when
+ * each of the k·n coefficients is small, in {−η₁, …, η₁}. Only a bound: FIPS 203
+ * samples them from the centred binomial distribution CBD_η₁, so the values are
+ * not equally likely (0 most of all) and the effective number is smaller. Not a
+ * security level either (the best attacks are lattice reduction, far below brute
+ * force): only a sense of why trying them all is out of the question.
  */
 export const spaceDigits = (p: MlKem) => Math.floor(p.k * N * Math.log10(2 * p.eta1 + 1)) + 1
 export const hex = (v: number) => `0x${v.toString(16).toUpperCase().padStart(4, '0')}`

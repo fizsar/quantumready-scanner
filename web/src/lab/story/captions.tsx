@@ -428,8 +428,8 @@ export const FigureCaption = memo(function FigureCaption({ step, lang }: { step:
         </Formula>
       )
       line = es
-        ? `clave pública ${n(z.ek, 0)} B, cifrado ${n(z.ct, 0)} B · X25519: ${X25519.pub} B · secretos posibles: un número de ${spaceDigits(p)} cifras`
-        : `public key ${n(z.ek, 0)} B, ciphertext ${n(z.ct, 0)} B · X25519: ${X25519.pub} B · possible secrets: a ${spaceDigits(p)}-digit number`
+        ? `clave pública ${n(z.ek, 0)} B, cifrado ${n(z.ct, 0)} B · X25519: ${X25519.pub} B · secretos posibles: como máximo un número de ${spaceDigits(p)} cifras`
+        : `public key ${n(z.ek, 0)} B, ciphertext ${n(z.ct, 0)} B · X25519: ${X25519.pub} B · possible secrets: at most a ${spaceDigits(p)}-digit number`
       break
     }
     case 'hybrid': {

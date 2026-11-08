@@ -68,7 +68,7 @@ describe('scene 7: LWE, b = A·s + e (mod q)', () => {
     for (const e of E) expect(Math.abs(e)).toBeLessThanOrEqual(1)
   })
 
-  it('brute force: 97⁴ = 88 529 281 candidates in the toy; ML-KEM-768’s small secrets, 5^768: a 537-digit number', () => {
+  it('brute force: 97⁴ = 88 529 281 candidates in the toy; ML-KEM-768’s small secrets, at most 5^768: a 537-digit number', () => {
     expect(TOY_SPACE).toBe(88_529_281)
     expect(2 * ML_KEM['768'].eta1 + 1).toBe(5)
     expect(spaceDigits(ML_KEM['768'])).toBe(537)
