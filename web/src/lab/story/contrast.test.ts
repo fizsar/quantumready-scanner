@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { contrast, hex, hexToken, over, rgbaToken, type RGB } from '../../contrast'
 
 // Read from disk: vitest's CSS handling empties `?raw` imports of .css files. Tests run in web/.
 const indexCss = readFileSync(resolve('src/index.css'), 'utf8')
@@ -11,32 +12,8 @@ const storyCss = readFileSync(resolve('src/lab/story/Story.css'), 'utf8')
 // a panel there can be anything the 3D draws, and additive blending can reach
 // white, so the panel colour is composited over white (the worst case) and
 // every text colour used on the panels is checked against that.
-type RGB = [number, number, number]
-const hex = (h: string): RGB => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as RGB
-const token = (name: string) => {
-  const m = indexCss.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))
-  if (!m) throw new Error(`no --${name} in index.css`)
-  return hex(m[1])
-}
-const luminance = ([r, g, b]: RGB) => {
-  const c = (v: number) => {
-    const s = v / 255
-    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
-  }
-  return 0.2126 * c(r) + 0.7152 * c(g) + 0.0722 * c(b)
-}
-const contrast = (a: RGB, b: RGB) => {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
-  return (hi + 0.05) / (lo + 0.05)
-}
-const over = (rgba: [number, number, number, number], back: RGB): RGB =>
-  [0, 1, 2].map((i) => rgba[i] * rgba[3] + back[i] * (1 - rgba[3])) as RGB
-
-const panel = (() => {
-  const m = storyCss.match(/--story-panel:\s*rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/)
-  if (!m) throw new Error('no --story-panel in Story.css')
-  return m.slice(1).map(Number) as [number, number, number, number]
-})()
+const token = (name: string) => hexToken(indexCss, name)
+const panel = rgbaToken(storyCss, 'story-panel')
 
 describe('contrast of the story texts (WCAG AA)', () => {
   const WHITE: RGB = [255, 255, 255]
