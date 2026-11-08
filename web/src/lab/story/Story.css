@@ -188,6 +188,40 @@
 .story-layer[data-current='true'] {
   visibility: visible;
 }
+/* The copied text of a sheet step keeps the layer's layout (only aria-hidden). */
+.story-layer-copy {
+  display: contents;
+}
+
+/* Scene 6: the inequality's sliders. */
+.story-mosca {
+  display: grid;
+  gap: 0.35rem;
+}
+.story-mosca-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr 4.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+.story-mosca-var {
+  color: var(--green);
+  font-weight: 700;
+}
+.story-mosca-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--green);
+}
+.story-mosca-row output {
+  text-align: right;
+  color: var(--text);
+}
+.story-mosca-out {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
 
 .story-sources {
   position: relative;
@@ -277,6 +311,20 @@
       font-size: 1.02rem;
       margin: 0.15rem 0;
     }
+  }
+  /* Scene 6 on phones: the sliders take the place of the legend and the note
+     (both stay in the step panel, which screen readers read): the sheet, as tall
+     as its tallest step, keeps the scene at 40 % of the height. */
+  .story-sheet [data-step='mosca'] .story-legend,
+  .story-sheet [data-step='mosca'] .story-scale {
+    display: none;
+  }
+  .story-sheet .story-mosca-row,
+  .story-sheet .story-mosca-out {
+    font-size: 0.88rem;
+  }
+  .story-sheet .story-mosca-row {
+    grid-template-columns: 6.5rem 1fr 4rem;
   }
   /* The step panels stay in the page for screen readers; the sheet shows them. */
   .story-panel {

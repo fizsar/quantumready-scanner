@@ -11,6 +11,9 @@
 // stay inside the figure, with weight 0 (invisible), ready for the next morph.
 import { rng } from '../hydrogen.ts'
 import { boxCorners, type Box, type V3 } from './camera.ts'
+import { A, B_ERR, BAD, babai, closest, E, GOOD, LWE, pointsIn, S, TARGET, WINDOW, type Basis, type P2 } from './lattice.ts'
+import { HYBRID, ML_KEM, N as KEM_N, sizes, X25519 } from './mlkem.ts'
+import { GRI_2025 } from './mosca.ts'
 import { apply, bell, bloch, blochOf, collapse, f, H, probabilities, Q, qftDistribution, qubit, reduced, SHOR, uniform, zeros } from './quantum.ts'
 
 export type FigureId =
@@ -28,8 +31,41 @@ export type FigureId =
   | 'factors'
   | 'curve'
   | 'curveBroken'
+  | 'harvest'
+  | 'stored'
+  | 'decrypted'
+  | 'mosca'
+  | 'lattice'
+  | 'latticeBad'
+  | 'lwe'
+  | 'mlkem'
+  | 'hybrid'
 
-export const FIGURES: readonly FigureId[] = ['bloch0', 'blochH', 'blochM', 'bell', 'circuit', 'reg3', 'reg6', 'reg10', 'shorF', 'shorQFT', 'key', 'factors', 'curve', 'curveBroken']
+export const FIGURES: readonly FigureId[] = [
+  'bloch0',
+  'blochH',
+  'blochM',
+  'bell',
+  'circuit',
+  'reg3',
+  'reg6',
+  'reg10',
+  'shorF',
+  'shorQFT',
+  'key',
+  'factors',
+  'curve',
+  'curveBroken',
+  'harvest',
+  'stored',
+  'decrypted',
+  'mosca',
+  'lattice',
+  'latticeBad',
+  'lwe',
+  'mlkem',
+  'hybrid',
+]
 
 /** Share of all particles per unit of area (world units²): about the light of an average orbital. */
 export const DENSITY = 1 / 18
@@ -349,6 +385,190 @@ function curveParts(broken: boolean): Part[] {
   return parts
 }
 
+// ---- Scene 6: harvest now, decrypt later; Mosca's inequality ----
+
+/** A filled rectangle in the xy plane (a bar, a matrix cell). */
+const rect = (x: number, y: number, w: number, h: number, emph: number, hue: number): Part => ({
+  area: Math.abs(w * h),
+  emph,
+  hue,
+  at: (r, g) => [x + w * r(), y + h * r(), (g() * LINE) / 3],
+})
+
+/** Captured packets in a store: a stack of disks (rings), the packets inside, or flying out once decrypted. */
+function storeParts(c: V3, rad: number, open: boolean): Part[] {
+  const parts: Part[] = []
+  const h = 0.6 * rad
+  for (let k = 0; k <= 4; k++) parts.push(ring(add(c, [0, -h + (k * 2 * h) / 4, 0]), rad, X, Z, 0.55, 0.25))
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2 + Math.PI / 4
+    const v: V3 = [rad * Math.cos(a), 0, rad * Math.sin(a)]
+    parts.push(seg(add(c, [v[0], -h, v[2]]), add(c, [v[0], h, v[2]]), 0.4, 0.25))
+  }
+  // 12 packets: inside, in three layers; once decrypted, out above the store, each split in two.
+  for (let i = 0; i < 12; i++) {
+    const a = (i * 2 * Math.PI) / 4 + Math.floor(i / 4) * 0.6
+    if (!open) parts.push(dot(add(c, [0.5 * rad * Math.cos(a), -h * 0.6 + Math.floor(i / 4) * h * 0.6, 0.5 * rad * Math.sin(a)]), 0.06, 1.4, 1))
+    else {
+      const out: V3 = add(c, [1.3 * rad * Math.cos(a), h + 0.35 + 0.25 * Math.floor(i / 4), 1.3 * rad * Math.sin(a)])
+      parts.push(dot(add(out, [-0.06, 0, 0]), 0.045, 1.6, 1), dot(add(out, [0.06, 0.04, 0]), 0.045, 1.6, 0.7))
+    }
+  }
+  return parts
+}
+
+/** Today's traffic: packets flowing from a client to a server; a tap copies them into a store. */
+function harvestParts(): Part[] {
+  const y = WIRE.y
+  const store: V3 = [0, -1.3, 0]
+  return [
+    dot([WIRE.x0, y, 0], 0.07, 1.8, 0.6),
+    dot([WIRE.x1, y, 0], 0.07, 1.8, 0.6),
+    seg([WIRE.x0, y, 0], [WIRE.x1, y, 0], 0.35, 0.25),
+    { ...seg([WIRE.x0, y, 0], [WIRE.x1, y, 0], 1.3, 1, 0.08), flow: true },
+    seg([0, y, 0], [0, store[1] + 0.6 * 0.8, 0], 0.9, 1, 0.04),
+    ...storeParts(store, 0.8, false),
+  ]
+}
+
+/** Years of the timeline: 0 … 30, along x. */
+export const YEARS = 30
+const yearX = (t: number, x0 = -3, x1 = 3) => x0 + ((x1 - x0) * t) / YEARS
+
+/** The store kept for years: a timeline beside it, a tick every 5 years. */
+function storedParts(): Part[] {
+  const x0 = -0.4
+  const x1 = 3.4
+  const parts = storeParts([-1.8, 0, 0], 0.9, false)
+  parts.push(seg([x0, -0.7, 0], [x1, -0.7, 0], 0.5, 0.3))
+  for (let t = 0; t <= YEARS; t += 5) parts.push(seg([yearX(t, x0, x1), -0.7, 0], [yearX(t, x0, x1), -0.5, 0], 0.6, 0.3))
+  return parts
+}
+
+/** Default slider values of the inequality (years): the bars drawn under the timeline. */
+export const MOSCA_DEFAULT = { x: 10, y: 5 } as const
+/** Height of a likelihood of 1 above the axis (world units). */
+export const MOSCA_H = 2.4
+
+/**
+ * The inequality on a 0–30-year axis: below it, x then y (the default values);
+ * above it, z as the survey gives it: at each horizon the range between the
+ * lower- and upper-end averages (an error bar), or a single dot where the
+ * report states only one end.
+ */
+function moscaParts(): Part[] {
+  const parts: Part[] = [seg([yearX(0), 0, 0], [yearX(YEARS), 0, 0], 0.5, 0.3)]
+  for (let t = 5; t <= YEARS; t += 5) parts.push(seg([yearX(t), 0, 0], [yearX(t), -0.12, 0], 0.6, 0.3))
+  for (const a of GRI_2025) {
+    const x = yearX(a.years)
+    if (a.low !== null && a.high !== null) {
+      parts.push(seg([x, a.low * MOSCA_H, 0], [x, a.high * MOSCA_H, 0], 1.5, 1, 0.1))
+      parts.push(seg([x - 0.1, a.low * MOSCA_H, 0], [x + 0.1, a.low * MOSCA_H, 0], 1.3, 1), seg([x - 0.1, a.high * MOSCA_H, 0], [x + 0.1, a.high * MOSCA_H, 0], 1.3, 1))
+    } else {
+      const v = (a.low ?? a.high)!
+      parts.push(dot([x, v * MOSCA_H, 0], 0.07, 1.6, 0.8))
+    }
+  }
+  const { x, y } = MOSCA_DEFAULT
+  parts.push(seg([yearX(0), -0.5, 0], [yearX(x), -0.5, 0], 1.4, 1, 0.12))
+  parts.push(seg([yearX(x), -0.5, 0], [yearX(x + y), -0.5, 0], 1.4, 0.15, 0.12))
+  return parts
+}
+
+// ---- Scene 7: lattices, LWE, ML-KEM, the hybrid ----
+
+/** World units per lattice unit; the window's centre goes to the origin. */
+export const LAT_SCALE = 0.24
+const latAt = (p: P2): V3 => [(p[0] - (WINDOW.x0 + WINDOW.x1) / 2) * LAT_SCALE, (p[1] - (WINDOW.y0 + WINDOW.y1) / 2) * LAT_SCALE, 0]
+
+/** The lattice, one basis drawn from the origin, the target and the closest point; with the bad basis, Babai's answer too. */
+function latticeParts(basis: Basis): Part[] {
+  const parts: Part[] = pointsIn(GOOD, WINDOW.x0, WINDOW.x1, WINDOW.y0, WINDOW.y1).map((p) => dot(latAt(p), 0.04, 1.1, 0.35))
+  const o = latAt([0, 0])
+  for (const b of basis) {
+    parts.push(seg(o, latAt(b), 1.5, 1, 0.06))
+    parts.push(dot(latAt(b), 0.07, 1.8, 1))
+  }
+  const t = latAt(TARGET)
+  const c = latAt(closest(GOOD, TARGET))
+  parts.push(dot(t, 0.07, 2, 0.6))
+  parts.push(ring(c, 0.12, X, Y, 1.4, 1))
+  parts.push(seg(t, c, 1.2, 1, 0.03))
+  if (basis === BAD) {
+    const w = latAt(babai(BAD, TARGET))
+    parts.push(ring(w, 0.12, X, Y, 1.4, 0))
+    parts.push(seg(t, w, 0.9, 0.1, 0.03))
+  }
+  return parts
+}
+
+/** LWE as cells: A (m×n), s (n), e (m) and b = A·s + e (m), each cell lit by its value (mod q; e from −1 to 1). */
+export const CELL = 0.36
+export interface Cell {
+  x: number
+  y: number
+  size: number
+  value: number
+  hue: number
+}
+export function lweCells(): Cell[] {
+  const cells: Cell[] = []
+  const gap = CELL * 0.12
+  const col = (x: number, values: number[], hue: (v: number) => number) =>
+    values.forEach((v, i) => cells.push({ x, y: ((LWE.m - 1) / 2 - i) * CELL - CELL / 2 + gap / 2, size: CELL - gap, value: v, hue: hue(v) }))
+  const byValue = (v: number) => v / (LWE.q - 1)
+  const w = (LWE.n + 5) * CELL
+  let x = -w / 2 - CELL
+  for (let j = 0; j < LWE.n; j++, x += CELL) col(x, A.map((row) => row[j]), byValue)
+  x += CELL
+  col(x, S, byValue)
+  x += 2 * CELL
+  col(x, E, (v) => (v + 1) / 2)
+  x += 2 * CELL
+  col(x, B_ERR, byValue)
+  return cells
+}
+const lweParts = (): Part[] => lweCells().map((c) => rect(c.x, c.y, c.size, c.size, 1.1, c.hue))
+
+/** ML-KEM-768: k = 3 polynomials of n = 256 coefficients (768 dots on three rings), and its sizes beside X25519's. */
+export const BYTES_W = 3.6
+function mlkemParts(): Part[] {
+  const p = ML_KEM['768']
+  const parts: Part[] = []
+  const c: V3 = [-1.9, 0, 0]
+  for (let k = 0; k < p.k; k++)
+    for (let i = 0; i < KEM_N; i++) {
+      const a = (i * 2 * Math.PI) / KEM_N
+      const r = 0.55 + 0.32 * k
+      parts.push(dot(add(c, [r * Math.cos(a), r * Math.sin(a), 0]), 0.018, 1.3, 1 - 0.25 * k))
+    }
+  const s = sizes(p)
+  const bar = (y: number, bytes: number, hue: number) => parts.push(rect(-0.5, y, (BYTES_W * bytes) / s.ek, 0.24, 1.2, hue))
+  bar(0.55, s.ek, 1)
+  bar(0.05, s.ct, 0.8)
+  bar(-0.45, X25519.pub, 0.3)
+  return parts
+}
+
+/** X25519MLKEM768 on the wire: client share, server share and shared secret, ML-KEM part first, at one scale. */
+export const HYBRID_W = 5.2
+function hybridParts(): Part[] {
+  const parts: Part[] = []
+  const scale = HYBRID_W / (HYBRID.client[0].bytes + HYBRID.client[1].bytes)
+  const row = (y: number, ps: readonly { part: string; bytes: number }[]) => {
+    let x = -HYBRID_W / 2
+    for (const q of ps) {
+      const w = Math.max(q.bytes * scale, 0.05)
+      parts.push(rect(x, y, w, 0.28, 1.2, q.part.startsWith('ML-KEM') ? 1 : 0.3))
+      x += w + 0.05
+    }
+  }
+  row(0.7, HYBRID.client)
+  row(0.05, HYBRID.server)
+  row(-0.6, HYBRID.secret)
+  return parts
+}
+
 function parts(id: FigureId): Part[] {
   switch (id) {
     case 'bloch0':
@@ -379,6 +599,24 @@ function parts(id: FigureId): Part[] {
       return curveParts(false)
     case 'curveBroken':
       return curveParts(true)
+    case 'harvest':
+      return harvestParts()
+    case 'stored':
+      return storedParts()
+    case 'decrypted':
+      return storeParts([-0.2, -0.3, 0], 0.9, true)
+    case 'mosca':
+      return moscaParts()
+    case 'lattice':
+      return latticeParts(GOOD)
+    case 'latticeBad':
+      return latticeParts(BAD)
+    case 'lwe':
+      return lweParts()
+    case 'mlkem':
+      return mlkemParts()
+    case 'hybrid':
+      return hybridParts()
   }
 }
 /** The outcome shown when the qubit (H|0⟩) is measured: 1, the south pole (half the time it is 0). */

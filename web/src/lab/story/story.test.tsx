@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { json, stubFetch } from '../../test/fixtures'
 import { renderAt } from '../../test/render'
@@ -191,6 +191,80 @@ describe('/lab/historia', () => {
     expect(line('qH')).toBe('θ = π/2, φ = 0: P(0) = 0.5 · P(1) = 0.5')
     expect(line('factors')).toBe('gcd(48, 15) = 3 · gcd(50, 15) = 5 · 3 × 5 = 15')
     expect(line('broken')).toBe('RSA-2048: < 1,000,000 noisy qubits, < 7 days, at 0.1% gate error, 1 µs cycle and 10 µs reaction')
+  })
+
+  it('scene 6: the panels’ formulas, the note on z, the scene heading and the sources (Spanish)', async () => {
+    media(() => true)
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    const cap = (id: string) => document.getElementById(`story-step-${id}`)!.closest('.story-panel')!.querySelector('.story-cap')!
+    const line = (id: string) => cap(id).querySelector('.story-scale')!.textContent
+    expect(line('mosca')).toBe('z no es una fecha: es incierto (encuesta del GRI, 2025)')
+    for (const id of ['harvest', 'stored', 'decrypted', 'mosca']) expect(cap(id).querySelector('math')?.namespaceURI, id).toBe('http://www.w3.org/1998/Math/MathML')
+    expect(screen.getAllByText('Escena 6 · Cosechar ahora, descifrar después').length).toBeGreaterThan(0)
+    const sources = document.querySelector('.story-sources')!.textContent!
+    for (const s of ['IEEE Security & Privacy 16(5), 38–41 (2018)', 'Quantum Threat Timeline Report 2025', '26 expertos', 'menos de 24 horas']) expect(sources, s).toContain(s)
+  })
+
+  it('scene 7: each panel shows the numbers computed by lattice.ts and mlkem.ts, and the sources (Spanish)', async () => {
+    media(() => true)
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    const cap = (id: string) => document.getElementById(`story-step-${id}`)!.closest('.story-panel')!.querySelector('.story-cap')!
+    const line = (id: string) => cap(id).querySelector('.story-scale')!.textContent
+    expect(line('lattice')).toBe('b₁ = (3; 1), b₂ = (1; 2), det = 5 · t = (3,6; 2,4) → más cercano (4; 3), a 0,72')
+    expect(line('cvp')).toBe('(17; 9), (7; 4), det = 5: la misma red · redondeo → (14; 8), a 11,81 (16 veces más lejos)')
+    expect(line('lwe')).toBe('n = 4, m = 6 · sin e, Gauss da (23; 71; 8; 54) = s · con e, (7; 42; 39; 86) · a la fuerza, 88.529.281 candidatos')
+    expect(line('mlkem')).toBe('clave pública 1184 B, cifrado 1088 B · X25519: 32 B · secretos posibles: como máximo un número de 537 cifras')
+    expect(line('hybrid')).toBe('cliente 1184 + 32 = 1216 B · servidor 1088 + 32 = 1120 B · secreto 64 B · grupo 4588 (0x11EC)')
+    for (const id of ['lattice', 'cvp', 'lwe', 'mlkem', 'hybrid']) expect(cap(id).querySelector('math')?.namespaceURI, id).toBe('http://www.w3.org/1998/Math/MathML')
+    expect(screen.getAllByText('Escena 7 · Retículos y ML-KEM').length).toBeGreaterThan(0)
+    const sources = document.querySelector('.story-sources')!.textContent!
+    for (const s of ['FIPS 203', 'RFC 10024', 'draft-ietf-tls-ecdhe-mlkem-05', '4588 (0x11EC)', 'Combinatorica 6(1)', 'J. ACM 56(6)']) expect(sources, s).toContain(s)
+  })
+
+  it('scene 6: the sliders have labels and spoken values, and the verdict is announced as they move (desktop: one active widget)', async () => {
+    media(() => false)
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    const widgets = document.querySelectorAll('.story-mosca')
+    expect(widgets).toHaveLength(1) // no copy in the sheet on wide screens
+    const w = widgets[0] as HTMLElement
+    expect(w.hasAttribute('inert')).toBe(false)
+    expect(w.getAttribute('aria-hidden')).toBeNull()
+    const x = screen.getByRole('slider', { name: /x secreto/ })
+    const y = screen.getByRole('slider', { name: /y migración/ })
+    expect([x.getAttribute('min'), x.getAttribute('max'), y.getAttribute('max')]).toEqual(['0', '30', '20'])
+    expect(x.getAttribute('aria-valuetext')).toBe('10 años')
+    const out = w.querySelector('.story-mosca-out')!
+    expect(out.getAttribute('aria-live')).toBe('polite')
+    expect(out.textContent).toBe('x + y = 15 años: en 15 años, los expertos ven un 51–70 % de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.')
+    fireEvent.change(x, { target: { value: '2' } })
+    fireEvent.change(y, { target: { value: '2' } })
+    expect(x.getAttribute('aria-valuetext')).toBe('2 años')
+    expect(out.textContent).toBe('x + y = 4 años: en 5 años la media no pasa del 15 %; en 10, 28–49 % (GRI 2025).')
+    fireEvent.change(x, { target: { value: '20' } })
+    expect(out.textContent).toBe('x + y = 22 años: en 15 años, los expertos ven un 51–70 % de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo. A 20, al menos el 69 %.')
+  })
+
+  it('scene 6 on phones: the active widget is the sheet’s (not hidden from assistive technology); the panel’s copy is inert and hidden', async () => {
+    media((q) => q === '(max-width: 40rem)')
+    renderAt('/lab/historia', 'en')
+    await screen.findByRole('heading', { level: 1 })
+    const sheetW = document.querySelector('.story-sheet .story-mosca') as HTMLElement
+    const panelW = document.querySelector('.story-track .story-mosca') as HTMLElement
+    expect(sheetW.hasAttribute('inert')).toBe(false)
+    expect(sheetW.closest('[aria-hidden="true"]')).toBeNull()
+    expect(sheetW.querySelector('.story-mosca-out')!.getAttribute('aria-live')).toBe('polite')
+    expect(panelW.hasAttribute('inert')).toBe(true)
+    expect(panelW.getAttribute('aria-hidden')).toBe('true')
+    expect(panelW.querySelector('.story-mosca-out')!.getAttribute('aria-live')).toBeNull()
+    // Every other piece of the sheet stays hidden from assistive technology (a copy of the panels).
+    for (const copy of document.querySelectorAll('.story-sheet .story-layer-copy')) expect(copy.getAttribute('aria-hidden')).toBe('true')
+    // One state: moving the sheet's slider moves the panel's too.
+    fireEvent.change(sheetW.querySelector('input')!, { target: { value: '25' } })
+    expect((panelW.querySelector('input') as HTMLInputElement).value).toBe('25')
+    expect(sheetW.querySelector('.story-mosca-out')!.textContent).toBe('x + y = 30 years: within 15 years, experts put a capable quantum computer at 51–70% (GRI 2025). At risk. At 20, at least 69%.')
   })
 
   it('the stage shows only the track on screen, with soft edges, and fades in with it; the sheet shows once the track is behind it', async () => {
