@@ -501,8 +501,8 @@ function Sources({ lang }: { lang: Lang }) {
         </a>
         , Global Risk Institute, {es ? 'marzo de 2026' : 'March 2026'}:{' '}
         {es
-          ? '26 expertos estiman la probabilidad de un ordenador cuántico capaz de factorizar un número de 2048 bits en menos de 24 horas; medias entre la interpretación «pesimista» y la «optimista» de sus respuestas: 28–49\u00a0% en 10 años, 51–70\u00a0% en 15 (y ~15\u00a0% en 5 años en la optimista, ~69\u00a0% en 20 en la pesimista).'
-          : '26 experts estimate the likelihood of a quantum computer able to factor a 2048-bit number in less than 24 hours; averages between the “pessimistic” and “optimistic” readings of their answers: 28–49% within 10 years, 51–70% within 15 (and ~15% within 5 years in the optimistic one, ~69% within 20 in the pessimistic one).'}
+          ? '26 expertos estiman la probabilidad de un ordenador cuántico capaz de factorizar un número de 2048 bits en menos de 24 horas; medias entre la interpretación «pesimista» y la «optimista» de sus respuestas: 28–\u206049\u00a0% en 10 años, 51–\u206070\u00a0% en 15 (y ~15\u00a0% en 5 años en la optimista, ~69\u00a0% en 20 en la pesimista).'
+          : '26 experts estimate the likelihood of a quantum computer able to factor a 2048-bit number in less than 24 hours; averages between the “pessimistic” and “optimistic” readings of their answers: 28–\u206049% within 10 years, 51–\u206070% within 15 (and ~15% within 5 years in the optimistic one, ~69% within 20 in the pessimistic one).'}
       </li>
       <li>
         L. Babai, «On Lovász’ lattice reduction and the nearest lattice point problem», <cite>Combinatorica</cite> 6(1), 1–13 (1986).

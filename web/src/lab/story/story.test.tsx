@@ -238,13 +238,13 @@ describe('/lab/historia', () => {
     expect(x.getAttribute('aria-valuetext')).toBe('10 años')
     const out = w.querySelector('.story-mosca-out')!
     expect(out.getAttribute('aria-live')).toBe('polite')
-    expect(out.textContent).toBe('x + y = 15 años: en 15 años, los expertos ven un 51–70\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.')
+    expect(out.textContent).toBe('x + y = 15 años: en 15 años, los expertos ven un 51–\u206070\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.')
     fireEvent.change(x, { target: { value: '2' } })
     fireEvent.change(y, { target: { value: '2' } })
     expect(x.getAttribute('aria-valuetext')).toBe('2 años')
-    expect(out.textContent).toBe('x + y = 4 años: en 5 años la media no pasa del 15\u00a0%; en 10, 28–49\u00a0% (GRI 2025).')
+    expect(out.textContent).toBe('x + y = 4 años: en 5 años la media no pasa del 15\u00a0%; en 10, 28–\u206049\u00a0% (GRI 2025).')
     fireEvent.change(x, { target: { value: '20' } })
-    expect(out.textContent).toBe('x + y = 22 años: en 15 años, los expertos ven un 51–70\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo. A 20, al menos el 69\u00a0%.')
+    expect(out.textContent).toBe('x + y = 22 años: en 15 años, los expertos ven un 51–\u206070\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo. A 20, al menos el 69\u00a0%.')
   })
 
   it('scene 6 on phones: the active widget is the sheet’s (not hidden from assistive technology); the panel’s copy is inert and hidden', async () => {
@@ -264,7 +264,7 @@ describe('/lab/historia', () => {
     // One state: moving the sheet's slider moves the panel's too.
     fireEvent.change(sheetW.querySelector('input')!, { target: { value: '25' } })
     expect((panelW.querySelector('input') as HTMLInputElement).value).toBe('25')
-    expect(sheetW.querySelector('.story-mosca-out')!.textContent).toBe('x + y = 30 years: within 15 years, experts put a capable quantum computer at 51–70% (GRI 2025). At risk. At 20, at least 69%.')
+    expect(sheetW.querySelector('.story-mosca-out')!.textContent).toBe('x + y = 30 years: within 15 years, experts put a capable quantum computer at 51–\u206070% (GRI 2025). At risk. At 20, at least 69%.')
   })
 
   it('the stage shows only the track on screen, with soft edges, and fades in with it; the sheet shows once the track is behind it', async () => {
