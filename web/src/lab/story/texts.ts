@@ -78,7 +78,7 @@ export const TEXT: Record<Lang, StoryText> = {
       7: ['verde: bases y ML-KEM', 'índigo: la red y X25519'],
     },
     energy: 'energía',
-    scale: (r) => `el 95 % de la probabilidad está dentro de r = ${r} a₀`,
+    scale: (r) => `el 95\u00a0% de la probabilidad está dentro de r = ${r} a₀`,
     units: 'Unidades con ℏ = m = 1; σ = 1,5, k₀ = ±2, x₀ = ∓12.',
     still: {
       'reduced-motion': 'Imágenes fijas: tu sistema pide reducir el movimiento.',

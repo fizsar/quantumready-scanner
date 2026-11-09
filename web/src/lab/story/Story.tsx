@@ -482,7 +482,7 @@ function Sources({ lang }: { lang: Lang }) {
         </a>{' '}
         (2025):{' '}
         {es
-          ? 'menos de un millón de cúbits ruidosos y menos de una semana, suponiendo un 0,1 % de error por puerta, un ciclo de 1 µs y 10 µs de tiempo de reacción. Antes, C. Gidney y M. Ekerå, '
+          ? 'menos de un millón de cúbits ruidosos y menos de una semana, suponiendo un 0,1\u00a0% de error por puerta, un ciclo de 1 µs y 10 µs de tiempo de reacción. Antes, C. Gidney y M. Ekerå, '
           : 'under a million noisy qubits and under a week, assuming 0.1% gate error, a 1 µs cycle and 10 µs reaction time. Earlier, C. Gidney and M. Ekerå, '}
         <cite>Quantum</cite> 5, 433 (2021): {es ? '20 millones de cúbits y 8 horas.' : '20 million qubits and 8 hours.'}
       </li>
@@ -501,7 +501,7 @@ function Sources({ lang }: { lang: Lang }) {
         </a>
         , Global Risk Institute, {es ? 'marzo de 2026' : 'March 2026'}:{' '}
         {es
-          ? '26 expertos estiman la probabilidad de un ordenador cuántico capaz de factorizar un número de 2048 bits en menos de 24 horas; medias entre la interpretación «pesimista» y la «optimista» de sus respuestas: 28–49 % en 10 años, 51–70 % en 15 (y ~15 % en 5 años en la optimista, ~69 % en 20 en la pesimista).'
+          ? '26 expertos estiman la probabilidad de un ordenador cuántico capaz de factorizar un número de 2048 bits en menos de 24 horas; medias entre la interpretación «pesimista» y la «optimista» de sus respuestas: 28–49\u00a0% en 10 años, 51–70\u00a0% en 15 (y ~15\u00a0% en 5 años en la optimista, ~69\u00a0% en 20 en la pesimista).'
           : '26 experts estimate the likelihood of a quantum computer able to factor a 2048-bit number in less than 24 hours; averages between the “pessimistic” and “optimistic” readings of their answers: 28–49% within 10 years, 51–70% within 15 (and ~15% within 5 years in the optimistic one, ~69% within 20 in the pessimistic one).'}
       </li>
       <li>

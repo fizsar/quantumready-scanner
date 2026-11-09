@@ -172,7 +172,7 @@ describe('/lab/historia', () => {
     expect(line('qft')).toBe('picos en y = 0, 64, 128, 192, P = 0,25 · r = 4')
     expect(line('factors')).toBe('mcd(48, 15) = 3 · mcd(50, 15) = 5 · 3 × 5 = 15')
     expect(line('curve')).toBe(`sobre 𝔽₁₀₁: ${curvePoints().length + 1} puntos (con el del infinito)`)
-    expect(line('broken')).toBe('RSA-2048: < 1.000.000 cúbits ruidosos, < 7 días, con 0,1 % de error por puerta, ciclo de 1 µs y 10 µs de reacción')
+    expect(line('broken')).toBe('RSA-2048: < 1.000.000 cúbits ruidosos, < 7 días, con 0,1\u00a0% de error por puerta, ciclo de 1 µs y 10 µs de reacción')
     // The formula of each step in MathML.
     for (const id of ['q0', 'bell', 'circ', 'reg6', 'shorF', 'qft', 'key', 'factors', 'curve'])
       expect(cap(id).querySelector('math')?.namespaceURI, id).toBe('http://www.w3.org/1998/Math/MathML')
@@ -238,13 +238,13 @@ describe('/lab/historia', () => {
     expect(x.getAttribute('aria-valuetext')).toBe('10 años')
     const out = w.querySelector('.story-mosca-out')!
     expect(out.getAttribute('aria-live')).toBe('polite')
-    expect(out.textContent).toBe('x + y = 15 años: en 15 años, los expertos ven un 51–70 % de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.')
+    expect(out.textContent).toBe('x + y = 15 años: en 15 años, los expertos ven un 51–70\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.')
     fireEvent.change(x, { target: { value: '2' } })
     fireEvent.change(y, { target: { value: '2' } })
     expect(x.getAttribute('aria-valuetext')).toBe('2 años')
-    expect(out.textContent).toBe('x + y = 4 años: en 5 años la media no pasa del 15 %; en 10, 28–49 % (GRI 2025).')
+    expect(out.textContent).toBe('x + y = 4 años: en 5 años la media no pasa del 15\u00a0%; en 10, 28–49\u00a0% (GRI 2025).')
     fireEvent.change(x, { target: { value: '20' } })
-    expect(out.textContent).toBe('x + y = 22 años: en 15 años, los expertos ven un 51–70 % de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo. A 20, al menos el 69 %.')
+    expect(out.textContent).toBe('x + y = 22 años: en 15 años, los expertos ven un 51–70\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo. A 20, al menos el 69\u00a0%.')
   })
 
   it('scene 6 on phones: the active widget is the sheet’s (not hidden from assistive technology); the panel’s copy is inert and hidden', async () => {

@@ -276,7 +276,7 @@ export const FigureCaption = memo(function FigureCaption({ step, lang }: { step:
       else {
         const g = GIDNEY_2025
         line = es
-          ? `RSA-2048: < ${n(g.qubits, 0)} cúbits ruidosos, < ${g.days} días, con ${n(g.gateError * 100, 1)} % de error por puerta, ciclo de ${g.cycleMicros} µs y ${g.reactionMicros} µs de reacción`
+          ? `RSA-2048: < ${n(g.qubits, 0)} cúbits ruidosos, < ${g.days} días, con ${n(g.gateError * 100, 1)}\u00a0% de error por puerta, ciclo de ${g.cycleMicros} µs y ${g.reactionMicros} µs de reacción`
           : `RSA-2048: < ${n(g.qubits, 0)} noisy qubits, < ${g.days} days, at ${n(g.gateError * 100, 1)}% gate error, ${g.cycleMicros} µs cycle and ${g.reactionMicros} µs reaction`
       }
       break
