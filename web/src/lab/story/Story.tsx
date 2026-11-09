@@ -24,8 +24,6 @@ export default function Story() {
   const mode: Mode = failed ? { kind: 'still', reason: 'no-webgl2' } : chosen
   const [index, setIndex] = useState(0)
   const [ready, setReady] = useState(false)
-  // The sheet (phones): shown while the track is behind it.
-  const [sheetOn, setSheetOn] = useState(false)
   // Scene 6: the inequality's sliders (one state for the panel's and the sheet's widget).
   const [mosca, setMosca] = useState<MoscaValue>({ ...MOSCA_DEFAULT })
   const phone = usePhone()
@@ -90,9 +88,12 @@ export default function Story() {
         engine.current?.setFrame(free)
         // Text panels only with the scene in place: entering, the intro leaves, the
         // scene fills its zone, then the panel comes in; leaving, the other way round.
+        // The sheet (phones) follows in the same frame, written to the DOM like
+        // data-panels: through React state it lagged a render behind, and for a
+        // moment it showed over no scene (WebKit, a toolbar appearing at the exit).
         const on = panelsShown(r, box, vh, phone ? sh!.getBoundingClientRect() : undefined)
         article.current?.setAttribute('data-panels', on ? 'on' : 'off')
-        setSheetOn(phone && on)
+        sh?.setAttribute('data-active', String(phone && on))
         st.style.setProperty('--free-left', `${free.left}px`)
         st.style.setProperty('--free-right', `${box.width - free.right}px`)
       }
@@ -181,7 +182,8 @@ export default function Story() {
       {/* Phones: text and 3D in separate zones, the current step in a panel below the scene. */}
       {/* Its text is a copy of the step panels (which screen readers read), so it is
           hidden from them; only an interactive control (scene 6) is not, on phones. */}
-      <div ref={sheet} className="story-sheet" data-active={sheetOn}>
+      {/* data-active is set by the scroll handler, in the frame data-panels changes. */}
+      <div ref={sheet} className="story-sheet">
         {STEPS.map((s, i) => (
           <div key={s.id} className="story-layer" data-current={i === index} data-step={s.id}>
             <div className="story-layer-copy" aria-hidden="true">

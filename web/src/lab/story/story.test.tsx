@@ -326,6 +326,38 @@ describe('/lab/historia', () => {
     await waitFor(() => expect(st().visibility).toBe('hidden'))
   })
 
+  it('the sheet changes in the same frame as data-panels: never shown over no scene, not even for a render', async () => {
+    media(() => true)
+    const vh = window.innerHeight
+    let track = { top: vh - 200, bottom: 9000 }
+    const boxes: Record<string, { top: number; bottom: number }> = {
+      'story-stage': { top: 0, bottom: vh },
+      'story-sheet': { top: vh - 160, bottom: vh },
+    }
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const key = [...this.classList].find((c) => c in boxes || c === 'story-track')
+      const r = key === 'story-track' ? track : key ? boxes[key] : { top: 0, bottom: 0 }
+      return { ...r, left: 0, right: 100, width: 100, height: r.bottom - r.top, x: 0, y: r.top, toJSON() {} } as DOMRect
+    })
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    // Read both attributes in the animation frame right after the page's update,
+    // before React could render anything.
+    const sameFrame = (r: { top: number; bottom: number }) =>
+      new Promise<[string | null, string | null]>((ok) => {
+        track = r
+        window.dispatchEvent(new Event('scroll'))
+        requestAnimationFrame(() =>
+          ok([document.querySelector('.story')!.getAttribute('data-panels'), document.querySelector('.story-sheet')!.getAttribute('data-active')]),
+        )
+      })
+    // In, out at the end (as when Safari's toolbar shortens the track), in again, entering.
+    for (const r of [{ top: -500, bottom: 8000 }, { top: -9000, bottom: vh - 300 }, { top: -500, bottom: 8000 }, { top: vh - 100, bottom: 9000 }]) {
+      const [panels, active] = await sameFrame(r)
+      expect(active, `track ${r.top}..${r.bottom}`).toBe(panels === 'on' ? 'true' : 'false')
+    }
+  })
+
   it('progress uses the visible height (visualViewport: iOS toolbars), not the layout viewport', async () => {
     media(() => false)
     webgl2()
