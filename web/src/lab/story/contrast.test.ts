@@ -5,14 +5,14 @@ import { describe, expect, it } from 'vitest'
 import { contrast, hex, hexToken, over, rgbaToken, type RGB } from '../../contrast'
 
 // Read from disk: vitest's CSS handling empties `?raw` imports of .css files. Tests run in web/.
-const indexCss = readFileSync(resolve('src/index.css'), 'utf8')
+const tokensCss = readFileSync(resolve('src/tokens.css'), 'utf8')
 const storyCss = readFileSync(resolve('src/lab/story/Story.css'), 'utf8')
 
 // WCAG 2.2 AA (1.4.3): text at least 4.5:1 against what is behind it. Behind
 // a panel there can be anything the 3D draws, and additive blending can reach
 // white, so the panel colour is composited over white (the worst case) and
 // every text colour used on the panels is checked against that.
-const token = (name: string) => hexToken(indexCss, name)
+const token = (name: string) => hexToken(tokensCss, name)
 const panel = rgbaToken(storyCss, 'story-panel')
 
 describe('contrast of the story texts (WCAG AA)', () => {

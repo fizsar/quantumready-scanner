@@ -4,10 +4,12 @@ import { contrast, hexToken, over, rgbaToken, type RGB, type RGBA } from './cont
 import { cssFiles, read } from './cssFiles'
 
 const indexCss = read('src/index.css')
+const tokensCss = read('src/tokens.css')
+// Every top-level rule for exactly this selector, joined.
 const rule = (css: string, selector: string) => {
-  const m = css.match(new RegExp(`(?:^|\\n)${selector.replace('.', '\\.')} \\{([^}]*)\\}`))
-  if (!m) throw new Error(`no ${selector} rule`)
-  return m[1]
+  const ms = [...css.matchAll(new RegExp(`(?:^|\\n)${selector.replace('.', '\\.')} \\{([^}]*)\\}`, 'g'))]
+  if (!ms.length) throw new Error(`no ${selector} rule`)
+  return ms.map((m) => m[1]).join('\n')
 }
 
 // WCAG 2.2 AA 1.4.11 (non-text contrast): the boundary that shows where a form
@@ -16,17 +18,19 @@ const rule = (css: string, selector: string) => {
 // carries a faint indigo glow (body background): the panel over that glow at
 // full strength is the lightest neighbour.
 describe('form field border (WCAG 1.4.11)', () => {
-  const border = hexToken(indexCss, 'border-control')
-  const bg = hexToken(indexCss, 'bg')
-  const panel = rgbaToken(indexCss, 'panel')
+  const border = hexToken(tokensCss, 'border-control')
+  const bg = hexToken(tokensCss, 'bg')
+  const panel = rgbaToken(tokensCss, 'panel')
   const glow = (() => {
-    const indigo = indexCss.match(/--indigo:\s*(\d+),\s*(\d+),\s*(\d+);/)
+    const indigo = tokensCss.match(/--indigo:\s*(\d+),\s*(\d+),\s*(\d+);/)
     const alpha = rule(indexCss, 'body').match(/radial-gradient\([^,]+,\s*rgba\(var\(--indigo\),\s*([\d.]+)\)/)
     if (!indigo || !alpha) throw new Error('no indigo glow on body')
     return over([...indigo.slice(1).map(Number), Number(alpha[1])] as RGBA, bg)
   })()
   const neighbours: Record<string, RGB> = {
     '--bg (inside the field, and the page)': bg,
+    '--surface-1': hexToken(tokensCss, 'surface-1'),
+    '--surface-2': hexToken(tokensCss, 'surface-2'),
     'a panel over the page': over(panel, bg),
     'a panel over the brightest point of the glow': over(panel, glow),
     'the glow itself': glow,
@@ -37,7 +41,7 @@ describe('form field border (WCAG 1.4.11)', () => {
     })
 
   it('the decorative --line would not pass (why the field has its own token)', () => {
-    expect(contrast(over(rgbaToken(indexCss, 'line'), bg), bg)).toBeLessThan(3)
+    expect(contrast(over(rgbaToken(tokensCss, 'line'), bg), bg)).toBeLessThan(3)
   })
 
   it('.input (the domain field and every other field) draws its border with --border-control', () => {

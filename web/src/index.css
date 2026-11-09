@@ -1,29 +1,23 @@
-/* Design tokens shared with fizsar.com. Text colors keep WCAG AA (≥ 4.5:1) on --bg. */
+/* Tokens live in tokens.css (imported first). Text in the sans; the mono is for
+   labels, data, code and the terminal touches (the selectors under "Mono"). */
+/* The root keeps the browser's size (1rem = 16 px, so the rem-based scale does not
+   compound); the fluid text size goes on body. */
 :root {
-  --bg: #05060b;
-  --panel: rgba(10, 12, 22, 0.78);
-  --text: #e7e8f0;
-  --muted: #9a9fb4; /* 7.3:1 on --bg */
-  --green: #3dffa2;
-  --amber: #ffc857;
-  --red: #ff7a93;
-  --cyan: 90, 200, 250;
-  --indigo: 125, 122, 255;
-  --violet: 191, 90, 242;
-  --line: rgba(143, 140, 255, 0.22); /* decoration only: 1.34:1 */
-  /* Border of form fields: ≥ 3:1 against --bg and the panels (WCAG 1.4.11; contrast.test.ts). */
-  --border-control: #5f5db8;
-  --grad: linear-gradient(90deg, rgb(var(--cyan)), rgb(var(--indigo)) 50%, rgb(var(--violet)));
-  --mono-font: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
-  --gutter: clamp(1rem, 5vw, 3rem);
-
   color-scheme: dark;
-  font-family: var(--mono-font);
-  font-size: 15px;
-  line-height: 1.6;
+  font-family: var(--font-sans);
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+}
+body {
+  font-size: var(--step-0);
+  line-height: var(--leading-text);
+}
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: var(--tracking-display);
 }
 
 *,
@@ -61,7 +55,7 @@ button:focus-visible,
 input:focus-visible,
 summary:focus-visible,
 .main:focus-visible {
-  outline: 2px solid var(--green);
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -78,7 +72,7 @@ h2 {
   color: var(--muted);
 }
 .small {
-  font-size: 0.85rem;
+  font-size: var(--step--1);
 }
 .sr-only {
   position: absolute;
@@ -146,7 +140,7 @@ h2 {
   padding: 2.5rem 0;
 }
 .footer {
-  font-size: 0.85rem;
+  font-size: var(--step--1);
   color: var(--muted);
 }
 
@@ -154,14 +148,14 @@ h2 {
 .terminal,
 .panel {
   width: min(100%, 46rem);
-  padding: 1.25rem 1.5rem;
+  padding: var(--space-s) var(--space-m);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-l);
   background: var(--panel);
   box-shadow: 0 0 60px rgba(var(--indigo), 0.08);
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: var(--space-xs);
   overflow-wrap: anywhere;
 }
 .prompt .user {
@@ -171,13 +165,16 @@ h2 {
   color: rgb(var(--cyan));
 }
 .h-title {
-  font-size: clamp(1.2rem, 4vw, 1.5rem);
+  font-size: var(--step-2);
+  font-weight: 700;
+  line-height: var(--leading-tight);
   color: var(--green);
   text-shadow: 0 0 8px rgba(61, 255, 162, 0.4);
 }
 .h-section {
   margin: 0; /* an h3 when the report is nested (/examples): no browser margin */
-  font-size: 1.05rem;
+  font-size: var(--step-1);
+  line-height: var(--leading-tight);
   color: rgb(var(--indigo));
 }
 /* Phones: less padding, so text inside a panel and a finding keeps a usable width. */
@@ -190,6 +187,8 @@ h2 {
   }
 }
 .lead {
+  font-size: var(--step-1);
+  line-height: 1.45;
   color: var(--text);
 }
 
@@ -237,8 +236,8 @@ h2 {
   color: var(--bg);
   background: var(--green);
   border: 1px solid var(--green);
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
+  border-radius: var(--radius-s);
+  padding: var(--space-2xs) var(--space-s);
   cursor: pointer;
   text-align: center;
   align-self: flex-start;
@@ -260,6 +259,9 @@ a.btn:hover {
   gap: 0.4rem;
 }
 .label {
+  font-size: var(--step--1);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
   color: var(--muted);
 }
 .row {
@@ -273,8 +275,8 @@ a.btn:hover {
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border-control);
-  border-radius: 8px;
-  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-s);
+  padding: var(--space-2xs) var(--space-xs);
 }
 .input::placeholder {
   color: var(--muted);
@@ -398,7 +400,7 @@ a.btn:hover {
   overflow-wrap: anywhere;
 }
 code {
-  font-family: var(--mono-font);
+  font-size: 0.92em; /* the mono's x-height is larger than the sans' */
   color: rgb(var(--cyan));
 }
 
@@ -431,8 +433,8 @@ code {
   gap: 1.5rem;
 }
 .verdict {
-  font-size: clamp(1.15rem, 3.5vw, 1.6rem);
-  line-height: 1.4;
+  font-size: var(--step-2);
+  line-height: 1.25;
 }
 .tone-good {
   color: var(--green);
@@ -545,7 +547,7 @@ code {
   gap: 0.35rem;
 }
 .host {
-  font-size: 1.2rem;
+  font-size: var(--step-1);
   font-weight: 700;
 }
 .badge {
@@ -573,7 +575,7 @@ code {
   width: 100%;
 }
 .level {
-  font-size: 0.85rem;
+  font-size: var(--step--1);
   color: var(--muted);
   font-weight: 400;
 }
@@ -720,8 +722,28 @@ code {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1.5rem;
-  font-size: 0.85rem;
+  font-size: var(--step--1);
   color: var(--muted);
+}
+
+/* Mono: what is typed, measured or labelled. Last in the file, so it wins over
+   the `font: inherit` of buttons and fields (same specificity). */
+.crumbs,
+.prompt,
+code,
+.label,
+.input,
+.btn-target,
+.lang-btn,
+.wordmark,
+.badge,
+.sev,
+.pts,
+.host,
+.grade-score,
+.record-fields dd,
+.items {
+  font-family: var(--font-mono);
 }
 
 @media (prefers-reduced-motion: reduce) {

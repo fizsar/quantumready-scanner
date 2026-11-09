@@ -4,7 +4,7 @@
    so text and 3D never overlap. Panel colours are checked for WCAG AA against
    the brightest possible backdrop (contrast.test.ts). */
 .story {
-  /* Behind every text: the page background, 88 % opaque. */
+  /* Behind every text: the page background (--bg), 88 % opaque. */
   --story-panel: rgba(5, 6, 11, 0.88);
   width: 100%;
   position: relative;
@@ -72,15 +72,24 @@
   color: var(--text);
 }
 .story-kicker {
+  font-family: var(--font-mono);
   color: var(--green);
   font-size: 0.85rem;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-label);
   text-transform: uppercase;
+}
+/* Data and the sliders' labels in the mono, like the rest of the site. */
+.story-qn,
+.story-scale,
+.story-legend,
+.story-mosca-row {
+  font-family: var(--font-mono);
 }
 .story-h {
   margin: 0;
   font-size: clamp(1.3rem, 1.05rem + 0.6vw, 1.65rem);
-  line-height: 1.25;
+  font-weight: 700;
+  line-height: 1.2;
   color: var(--text);
   overflow-wrap: anywhere;
 }

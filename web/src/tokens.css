@@ -1,0 +1,79 @@
+/* Design tokens (docs/design/direccion-arte.md, section 4). Imported before
+   every other stylesheet (main.tsx). Colours keep WCAG AA (≥ 4.5:1) for text
+   and 3:1 for control borders; contrast.test.ts and tokens.test.ts check them. */
+
+/* Bricolage Grotesque (OFL 1.1, licence next to the file), self-hosted: one
+   variable file, weight 400–700 and optical size 12–96 (font-optical-sizing
+   follows the font size), Latin with the punctuation, arrows and operators the
+   texts use. index.html preloads it: the first screen and its LCP are in it.
+   Greek and ℏ are not in it: formulas stay in the mono and MathML. */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./assets/fonts/bricolage-grotesque.woff2') format('woff2');
+}
+/* Metric-matched fallback (Arial scaled to Bricolage's average width at text
+   size and its vertical metrics): the swap moves no line. */
+@font-face {
+  font-family: 'Bricolage Fallback';
+  src: local('Arial'), local('Helvetica Neue'), local('Helvetica');
+  size-adjust: 106.17%;
+  ascent-override: 87.6%;
+  descent-override: 25.43%;
+  line-gap-override: 0%;
+}
+
+:root {
+  /* Colour (shared with fizsar.com). */
+  --bg: #05060b;
+  --surface-1: #0b0d17;
+  --surface-2: #121528;
+  --panel: rgba(10, 12, 22, 0.78);
+  --text: #e7e8f0;
+  --muted: #9a9fb4; /* 7.7:1 on --bg */
+  --green: #3dffa2;
+  --amber: #ffc857;
+  --red: #ff7a93;
+  --cyan: 90, 200, 250;
+  --indigo: 125, 122, 255;
+  --violet: 191, 90, 242;
+  --line: rgba(143, 140, 255, 0.22); /* decoration only: 1.34:1 */
+  /* Border of form fields: ≥ 3:1 against --bg and the panels (WCAG 1.4.11; tokens.test.ts). */
+  --border-control: #5f5db8;
+  --focus: var(--green);
+  --grad: linear-gradient(90deg, rgb(var(--cyan)), rgb(var(--indigo)) 50%, rgb(var(--violet)));
+
+  /* Type: Bricolage Grotesque for headings and text, JetBrains Mono for labels,
+     data, code and the terminal touches. Fluid scale from 360 to 1440 px:
+     ratio 1.2 → 1.333, base 16 → 18 px. */
+  --font-sans: 'Bricolage Grotesque', 'Bricolage Fallback', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --mono-font: var(--font-mono); /* the name the components already use */
+  --step--1: clamp(0.833rem, 0.83rem + 0.016vw, 0.844rem);
+  --step-0: clamp(1rem, 0.958rem + 0.185vw, 1.125rem);
+  --step-1: clamp(1.2rem, 1.1rem + 0.444vw, 1.5rem);
+  --step-2: clamp(1.44rem, 1.254rem + 0.828vw, 1.999rem);
+  --step-3: clamp(1.728rem, 1.416rem + 1.388vw, 2.665rem);
+  --step-4: clamp(2.074rem, 1.581rem + 2.19vw, 3.552rem);
+  --step-5: clamp(2.488rem, 1.739rem + 3.328vw, 4.735rem);
+  --leading-tight: 1.12;
+  --leading-text: 1.55;
+  --tracking-display: -0.01em;
+  --tracking-label: 0.08em;
+  --measure: 66ch;
+
+  /* Space: 4 px base, fluid from 360 to 1440 px (Utopia). */
+  --space-3xs: clamp(0.25rem, 0.229rem + 0.093vw, 0.313rem); /* 4 → 5 px */
+  --space-2xs: clamp(0.5rem, 0.458rem + 0.185vw, 0.625rem); /* 8 → 10 px */
+  --space-xs: clamp(0.75rem, 0.688rem + 0.278vw, 0.938rem); /* 12 → 15 px */
+  --space-s: clamp(1rem, 0.917rem + 0.37vw, 1.25rem); /* 16 → 20 px */
+  --space-m: clamp(1.5rem, 1.375rem + 0.556vw, 1.875rem); /* 24 → 30 px */
+  --space-l: clamp(2rem, 1.833rem + 0.741vw, 2.5rem); /* 32 → 40 px */
+  --space-xl: clamp(3rem, 2.75rem + 1.111vw, 3.75rem); /* 48 → 60 px */
+  --gutter: clamp(1rem, 0.5rem + 2.222vw, 2.5rem); /* 16 → 40 px */
+  --radius-s: 6px;
+  --radius-m: 12px;
+  --radius-l: 16px;
+}
