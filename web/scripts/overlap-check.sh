@@ -19,7 +19,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 PROFILES=${1:-chromium:375x667x2,chromium:375x812x1,chromium:393x852x3,chromium:1280x800x1,chromium:1280x800x2,chromium:1440x900x1,chromium:1440x900x2,chromium:1634x916x1,chromium:1920x1080x1,chromium:1920x1080x2,webkit:375x667x3,webkit:393x852x3,webkit:393x659x3,webkit:1440x900x2}
 shift || true
-[ $# -gt 0 ] || set -- '/lab/historia?lang=es' '/lab/historia?lang=en'
+[ $# -gt 0 ] || set -- '/lab/historia?lang=es' '/lab/historia?lang=en' '/?lang=es' '/?lang=en'
 # The same version as the playwright package in package.json.
 PW=mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
 [ -d node_modules/playwright ] || npm ci --no-fund --no-audit

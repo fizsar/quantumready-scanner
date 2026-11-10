@@ -40,6 +40,7 @@ export type FigureId =
   | 'lwe'
   | 'mlkem'
   | 'hybrid'
+  | 'qhat'
 
 export const FIGURES: readonly FigureId[] = [
   'bloch0',
@@ -65,6 +66,8 @@ export const FIGURES: readonly FigureId[] = [
   'lwe',
   'mlkem',
   'hybrid',
+  // Last: a figure's index seeds its particles, so the ones above keep theirs.
+  'qhat',
 ]
 
 /** Share of all particles per unit of area (world units²): about the light of an average orbital. */
@@ -84,6 +87,8 @@ interface Part {
   emph: number
   /** 0 = indigo (NEGATIVE) … 1 = green (POSITIVE). */
   hue: number
+  /** The hue from where the particle is, instead of one hue for the part. */
+  hueAt?: (p: V3) => number
   /** A random point of the part. */
   at: (r: () => number, g: () => number) => V3
   /** Particles flow along the wire (circuit). */
@@ -569,8 +574,88 @@ function hybridParts(): Part[] {
   return parts
 }
 
+// ---- The brand: Q̂ ----
+
+/**
+ * The logo, Q with a circumflex (the hat of a quantum operator), as strokes in
+ * the xy plane: an oval bowl, its tail and the two strokes of the hat. Drawn,
+ * not computed: the one figure that stands for no number.
+ */
+export const QHAT = {
+  bowl: { c: [0, -0.15] as [number, number], rx: 1, ry: 1.2 },
+  tail: [
+    [0.3, -0.8],
+    [1.1, -1.6],
+  ] as [number, number][],
+  hat: [
+    [-0.5, 1.45],
+    [0, 1.85],
+    [0.5, 1.45],
+  ] as [number, number][],
+  /** Thickness of the strokes (world units): a bold glyph. */
+  stroke: 0.16,
+  /** Particles per area of stroke, relative to the other figures: the brand reads solid, not dotted. */
+  dens: 3,
+  /** Hue across the glyph: indigo at its left edge, green at its right one. */
+  hue: [0.12, 1] as [number, number],
+} as const
+
+/** An ellipse outline of thickness t in the xy plane, particles spread evenly along its length. */
+const oval = (c: [number, number], rx: number, ry: number, t: number, emph: number): Part => {
+  // Ramanujan's approximation of the perimeter.
+  const len = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))
+  const top = Math.max(rx, ry)
+  return {
+    area: len * t,
+    emph,
+    hue: 0.5,
+    at: (r, g) => {
+      // Rejection: an angle in proportion to the arc length it covers.
+      let a = 0
+      for (let k = 0; k < 16; k++) {
+        a = 2 * Math.PI * r()
+        if (r() * top <= Math.hypot(rx * Math.sin(a), ry * Math.cos(a))) break
+      }
+      const k = 1 + (g() * t) / 3 / top
+      return [c[0] + rx * k * Math.cos(a), c[1] + ry * k * Math.sin(a), (g() * t) / 3]
+    },
+  }
+}
+
+/** Half-axes of the dust inside and just around the bowl (inside the glyph's box). */
+const DUST: [number, number] = [0.95, 1.3]
+
+function qhatParts(): Part[] {
+  const { bowl, tail, hat, stroke } = QHAT
+  const p3 = (p: [number, number]): V3 => [p[0], p[1], 0]
+  const ps: Part[] = [
+    oval(bowl.c, bowl.rx, bowl.ry, stroke, 1.4),
+    seg(p3(tail[0]), p3(tail[1]), 1.4, 0.5, stroke),
+    seg(p3(hat[0]), p3(hat[1]), 1.4, 0.5, stroke * 0.8),
+    seg(p3(hat[1]), p3(hat[2]), 1.4, 0.5, stroke * 0.8),
+    // A faint dust around the glyph: what is left of the cloud it condensed from.
+    {
+      area: Math.PI * DUST[0] * DUST[1],
+      dens: 0.35,
+      emph: 0.3,
+      hue: 0.5,
+      at: (r: () => number, g: () => number): V3 => {
+        const a = 2 * Math.PI * r()
+        const k = Math.sqrt(r())
+        return [bowl.c[0] + DUST[0] * k * Math.cos(a), bowl.c[1] + DUST[1] * k * Math.sin(a), g() * 0.05]
+      },
+    },
+  ].map((p, k) => (k < 4 ? { ...p, dens: QHAT.dens } : p))
+  const x0 = bowl.c[0] - bowl.rx
+  const x1 = tail[1][0]
+  const hueAt = (p: V3) => QHAT.hue[0] + (QHAT.hue[1] - QHAT.hue[0]) * Math.min(1, Math.max(0, (p[0] - x0) / (x1 - x0)))
+  return ps.map((p) => ({ ...p, hueAt }))
+}
+
 function parts(id: FigureId): Part[] {
   switch (id) {
+    case 'qhat':
+      return qhatParts()
     case 'bloch0':
       return blochParts([0, 0, 0], BLOCH_R, bloch(zeros(1)))
     case 'blochH':
@@ -696,7 +781,7 @@ export function buildFigure(id: FigureId, count: number, seed: number): Built {
     for (let m = 0; m < n && i < count; m++, i++) {
       const q = p.at(r, g)
       positions.set(q, 3 * i)
-      looks[2 * i] = p.hue
+      looks[2 * i] = p.hueAt ? p.hueAt(q) : p.hue
       looks[2 * i + 1] = p.flow ? -p.emph : p.emph
     }
   })

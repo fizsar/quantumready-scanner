@@ -6,6 +6,7 @@
 //
 //   node lab-perf.mjs <devtools-port> home <base-url>...     the home page: FCP, LCP, scanner ready, long tasks, bytes
 //   node lab-perf.mjs <devtools-port> scene <base-url> <path> FPS while scrolling through a scene, points, GPU memory
+//   node lab-perf.mjs <devtools-port> hero <base-url>         FPS of the home's hero: during the entry and at rest
 //
 // Profiles: desktop (1440×900, DPR 1, no throttling) and mobile (390×844,
 // DPR 3, touch, 4 cores, CPU ×4 and a slow 4G link: 150 ms, 1.6 Mbit/s).
@@ -57,8 +58,9 @@ const evaluate = async (page, expression) => (await page.send('Runtime.evaluate'
 
 // Installed before any page script: paint, LCP, long tasks and when the scanner's input appears.
 const OBSERVERS = `
-window.__perf = { lcp: 0, long: [], ready: 0 };
-new PerformanceObserver((l) => { for (const e of l.getEntries()) __perf.lcp = e.startTime }).observe({ type: 'largest-contentful-paint', buffered: true });
+window.__perf = { lcp: 0, lcpEl: '', cls: 0, long: [], ready: 0 };
+new PerformanceObserver((l) => { for (const e of l.getEntries()) { __perf.lcp = e.startTime; __perf.lcpEl = e.element ? e.element.tagName.toLowerCase() + (e.element.className ? '.' + String(e.element.className).split(' ').join('.') : '') : '?' } }).observe({ type: 'largest-contentful-paint', buffered: true });
+new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) __perf.cls += e.value }).observe({ type: 'layout-shift', buffered: true });
 new PerformanceObserver((l) => { for (const e of l.getEntries()) __perf.long.push([e.startTime, e.duration]) }).observe({ type: 'longtask', buffered: true });
 new MutationObserver((_, o) => { const i = document.querySelector('main form input'); if (i && !i.disabled) { __perf.ready = performance.now(); o.disconnect() } })
   .observe(document, { childList: true, subtree: true });`
@@ -83,13 +85,52 @@ async function home(base, profile) {
       const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? 0
       const ready = __perf.ready
       const tbt = __perf.long.filter(([s]) => s >= fcp && s < ready + 5000).reduce((a, [, d]) => a + Math.max(0, d - 50), 0)
-      return { fcp, lcp: __perf.lcp, ready, load: nav.loadEventEnd, tbt, longTasks: __perf.long.length }
+      return { fcp, lcp: __perf.lcp, cls: __perf.cls, ready, load: nav.loadEventEnd, tbt, longTasks: __perf.long.length, lcpEl: __perf.lcpEl }
     })()`)
     out.push({ ...r, kb: bytes / 1024 })
     await page.close()
   }
-  const keys = Object.keys(out[0])
-  return Object.fromEntries(keys.map((k) => [k, Math.round(median(out.map((o) => o[k])) * 10) / 10]))
+  const keys = Object.keys(out[0]).filter((k) => k !== 'lcpEl')
+  // The LCP element of each run (it must be the same one for the median to mean anything).
+  return { ...Object.fromEntries(keys.map((k) => [k, Math.round(median(out.map((o) => o[k])) * (k === 'cls' ? 10000 : 10)) / (k === 'cls' ? 10000 : 10)])), lcpEl: [...new Set(out.map((o) => o.lcpEl))].join(' | ') }
+}
+
+// The home's hero: frames per second while the entry plays (from the first 3D
+// frame to the Q̂ at rest) and then at rest, with the card on screen.
+async function hero(base, profile) {
+  const page = await open()
+  await setup(page, profile)
+  const errors = []
+  await page.send('Runtime.enable')
+  page.on((m) => {
+    if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.text)
+    if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') errors.push(String(m.params.args[0]?.value).split('\n')[0])
+  })
+  // Counts frames per phase of the entry from the moment the canvas exists.
+  await page.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `window.__hero = { ready: 0, phases: {} }; (() => { let last = 0; const tick = (now) => { const c = document.querySelector('.hero-canvas'); if (c?.dataset.ready === 'true') { if (!__hero.ready) __hero.ready = now; const p = c.dataset.phase; const s = (__hero.phases[p] ??= { n: 0, ms: 0, max: 0 }); if (last) { s.n++; s.ms += now - last; s.max = Math.max(s.max, now - last) } } last = now; requestAnimationFrame(tick) }; requestAnimationFrame(tick) })()`,
+  })
+  await page.send('Page.navigate', { url: `${base}/?lang=es` })
+  let info = null
+  for (let k = 0; k < 300; k++) {
+    await sleep(100)
+    // Phones: the card is below the text; keep it on screen (the entry waits for it, and the
+    // page above it grows as it loads).
+    await evaluate(page, `document.querySelector('.hero-scene')?.scrollIntoView({ block: 'center' })`)
+    info = await evaluate(page, `(() => { const c = document.querySelector('.hero-canvas'); return { mode: document.querySelector('.hero-scene')?.dataset.mode, phase: c?.dataset.phase, ready: __hero.ready } })()`)
+    // The card shows the still image until the page has decided (after the first paint): give it 20 s.
+    if (info?.phase === 'rest' || (info?.mode === 'still' && k > 200)) break
+  }
+  await sleep(SECONDS * 1000) // at rest
+  const r = await evaluate(page, `(() => { const c = document.querySelector('.hero-canvas'); return { phases: __hero.phases, ready: __hero.ready, points: c && +c.dataset.points, drawn: c && +c.dataset.drawn, w: c?.width, h: c?.height } })()`)
+  await page.close()
+  if (info?.mode !== '3d') return { mode: info?.mode, errors }
+  const fps = (names) => {
+    const s = names.map((n) => r.phases[n]).filter(Boolean)
+    const n = s.reduce((a, x) => a + x.n, 0)
+    return n ? { fps: Math.round((n / s.reduce((a, x) => a + x.ms, 0)) * 10000) / 10, worstMs: Math.round(Math.max(...s.map((x) => x.max)) * 10) / 10 } : null
+  }
+  return { mode: '3d', errors, firstFrameMs: Math.round(r.ready), entry: fps(['handover', 'inhale', 'condense', 'hold', 'collapse']), rest: fps(['rest']), points: r.points, drawn: r.drawn, canvas: `${r.w}×${r.h}` }
 }
 
 async function scene(base, path, profile) {
@@ -172,4 +213,5 @@ async function scene(base, path, profile) {
 for (const [name, profile] of Object.entries(PROFILES)) {
   if (what === 'home') for (const base of args) console.log(name, base, JSON.stringify(await home(base, profile)))
   else if (what === 'scene') console.log(name, JSON.stringify(await scene(args[0], args[1], profile)))
+  else if (what === 'hero') console.log(name, JSON.stringify(await hero(args[0], profile)))
 }
