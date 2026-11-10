@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { json, stubFetch } from '../../test/fixtures'
 import { renderAt } from '../../test/render'
 import { curvePoints } from './figures'
@@ -356,6 +356,43 @@ describe('/lab/historia', () => {
       const [panels, active] = await sameFrame(r)
       expect(active, `track ${r.top}..${r.bottom}`).toBe(panels === 'on' ? 'true' : 'false')
     }
+  })
+
+  it('re-measures when the track itself resizes (its 100svh steps change after layout): the stage never stays on past the end', async () => {
+    media(() => true)
+    const vh = window.innerHeight
+    let track = { top: -500, bottom: 8000 }
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const r = this.classList.contains('story-track') ? track : this.classList.contains('story-stage') ? { top: 0, bottom: vh } : { top: 0, bottom: 0 }
+      return { ...r, left: 0, right: 100, width: 100, height: r.bottom - r.top, x: 0, y: r.top, toJSON() {} } as DOMRect
+    })
+    const observed = new Map<Element, () => void>()
+    const real = globalThis.ResizeObserver
+    globalThis.ResizeObserver = class {
+      cb: () => void
+      constructor(cb: () => void) {
+        this.cb = cb
+      }
+      observe(el: Element) {
+        observed.set(el, this.cb)
+      }
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver
+    onTestFinished(() => {
+      globalThis.ResizeObserver = real
+    })
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    const st = () => document.querySelector<HTMLElement>('.story-stage')!.style
+    await waitFor(() => expect(st().visibility).toBe('visible'))
+    // Safari's toolbar shortens every 100svh step: the track now ends far above the
+    // screen. No scroll or resize event comes after the new layout, only the track's resize.
+    track = { top: -9600, bottom: -2368 }
+    const el = document.querySelector('.story-track')!
+    expect(observed.has(el)).toBe(true)
+    observed.get(el)!()
+    await waitFor(() => expect(st().visibility).toBe('hidden'))
   })
 
   it('progress uses the visible height (visualViewport: iOS toolbars), not the layout viewport', async () => {
