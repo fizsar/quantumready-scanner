@@ -106,14 +106,7 @@ export default function Story() {
     window.addEventListener('resize', onScroll)
     window.visualViewport?.addEventListener('resize', onScroll)
     window.visualViewport?.addEventListener('scroll', onScroll)
-    // The track's steps are 100svh tall: when the viewport changes, the track's own
-    // size changes after layout, which can come after the resize event's frame
-    // (WebKit). Then the update above measured the old track and nothing followed:
-    // the stage stayed on over the sources. Re-measure when the track itself resizes.
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => onScroll())
-    if (track.current) ro?.observe(track.current)
     return () => {
-      ro?.disconnect()
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
       window.visualViewport?.removeEventListener('resize', onScroll)
