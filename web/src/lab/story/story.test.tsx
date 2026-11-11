@@ -69,7 +69,8 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('/lab/historia', () => {
-  it('with prefers-reduced-motion: still images per step, and three.js is never loaded', async () => {
+  // The whole story with every still image: over 5 s when the suite runs in parallel.
+  it('with prefers-reduced-motion: still images per step, and three.js is never loaded', { timeout: 20_000 }, async () => {
     media((q) => q === '(prefers-reduced-motion: reduce)')
     webgl2()
     renderAt('/lab/historia')

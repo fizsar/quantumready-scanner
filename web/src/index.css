@@ -727,7 +727,10 @@ code {
 }
 
 /* Mono: what is typed, measured or labelled. Last in the file, so it wins over
-   the `font: inherit` of buttons and fields (same specificity). */
+   the `font: inherit` of buttons and fields (same specificity). `.mono` marks a
+   symbol the sans lacks (Greek, ℏ) when it appears in running text, so the change
+   of face is meant (fontCoverage.test.tsx). */
+.mono,
 .crumbs,
 .prompt,
 code,

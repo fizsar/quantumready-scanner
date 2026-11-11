@@ -12,6 +12,7 @@ import { loadStory, storyStillURL } from './load'
 import { orbitalOf, panelsShown, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
 import { MoscaWidget, type MoscaValue } from './MoscaWidget'
 import { TEXT } from './texts'
+import { typeset } from './typeset'
 import './Story.css'
 
 /** /lab/historia: hidden prototype of the redesign's story (noindex, not linked, not in the sitemap). */
@@ -211,10 +212,10 @@ export default function Story() {
 
       <section className="story-sources" aria-labelledby="story-sources-title">
         <h2 id="story-sources-title">{tx.sources}</h2>
-        <p>{tx.method}</p>
-        <p>{tx.units}</p>
-        <p>{tx.methodQuantum}</p>
-        <p>{tx.methodPq}</p>
+        <p>{typeset(tx.method)}</p>
+        <p>{typeset(tx.units)}</p>
+        <p>{typeset(tx.methodQuantum)}</p>
+        <p>{typeset(tx.methodPq)}</p>
         <Sources lang={lang} />
       </section>
     </article>
@@ -241,7 +242,7 @@ function StepText({ step, first, lang, headingId }: { step: Step; first: boolean
           <Title text={t.title} />
         )}
       </h2>
-      <p className="story-body">{t.body}</p>
+      <p className="story-body">{typeset(t.body)}</p>
       <p className="story-legend">
         {tx.legend[step.scene].map((l, k) => (
           <span key={l} className={k === 0 ? 'story-pos' : 'story-neg'}>
@@ -274,10 +275,10 @@ const FREE_GAP = 24
 /** A step title; an expression before ': ' never breaks inside (e.g. "iℏ ∂ψ/∂t: how it changes"). */
 function Title({ text }: { text: string }) {
   const i = text.indexOf(': ')
-  if (i < 0) return <>{text}</>
+  if (i < 0) return <>{typeset(text)}</>
   return (
     <>
-      <span className="story-nowrap">{text.slice(0, i + 1)}</span> {text.slice(i + 2)}
+      <span className="story-nowrap">{typeset(text.slice(0, i + 1))}</span> {typeset(text.slice(i + 2))}
     </>
   )
 }
@@ -314,7 +315,7 @@ function Caption({ step, lang }: { step: Step; lang: Lang }) {
           </math>{' '}
           {tx.energy} E<sub>{o.n}</sub> = {e} eV
         </p>
-        <p className="story-scale">{tx.scale(r)}</p>
+        <p className="story-scale">{typeset(tx.scale(r))}</p>
       </div>
     )
   }
