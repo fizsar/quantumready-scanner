@@ -2,26 +2,128 @@
    every other stylesheet (main.tsx). Colours keep WCAG AA (≥ 4.5:1) for text
    and 3:1 for control borders; contrast.test.ts and tokens.test.ts check them. */
 
-/* Bricolage Grotesque (OFL 1.1, licence next to the file), self-hosted: one
-   variable file, weight 400–700 and optical size 12–96 (font-optical-sizing
-   follows the font size), Latin with the punctuation, arrows and operators the
-   texts use. index.html preloads it: the first screen and its LCP are in it.
-   Greek and ℏ are not in it: formulas stay in the mono and MathML. */
+/* Self-hosted faces (OFL 1.1, licences next to the files), split by
+   unicode-range: the browser downloads a file only when the page uses a
+   character in its range. "latin" is Latin-1 plus the punctuation, super- and
+   subscripts, arrows, operators and combining marks (Q̂) the texts use; what no
+   face has (ℏ, 𝔽, ∓, ∝, ⊗) is only ever written inside <math>, and Greek only
+   in the mono (fontCoverage.test.tsx checks every rendered character).
+   index.html preloads one file: Bricolage 400 latin, which paints the LCP. */
 @font-face {
   font-family: 'Bricolage Grotesque';
-  font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400;
   font-display: swap;
-  src: url('./assets/fonts/bricolage-grotesque.woff2') format('woff2');
+  src: url('./assets/fonts/bricolage-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0300-0304, U+0308, U+0329, U+2000-206F, U+2070-209F, U+20AC, U+2122, U+2190-21FF, U+2200-22FF, U+25A0-25FF, U+27E8-27E9, U+FEFF, U+FFFD;
 }
-/* Metric-matched fallback (Arial scaled to Bricolage's average width at text
-   size and its vertical metrics): the swap moves no line. */
 @font-face {
-  font-family: 'Bricolage Fallback';
-  src: local('Arial'), local('Helvetica Neue'), local('Helvetica');
-  size-adjust: 106.17%;
-  ascent-override: 87.6%;
-  descent-override: 25.43%;
+  font-family: 'Bricolage Grotesque';
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/bricolage-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-0130, U+0132-0151, U+0154-02AF, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Headings: the optical size follows the font size (18–96). */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/bricolage-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0300-0304, U+0308, U+0329, U+2000-206F, U+2070-209F, U+20AC, U+2122, U+2190-21FF, U+2200-22FF, U+25A0-25FF, U+27E8-27E9, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/bricolage-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-0130, U+0132-0151, U+0154-02AF, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0300-0304, U+0308, U+0329, U+2000-206F, U+2070-209F, U+20AC, U+2122, U+2190-21FF, U+2200-22FF, U+25A0-25FF, U+27E8-27E9, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-0130, U+0132-0151, U+0154-02AF, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-400-greek.woff2') format('woff2');
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0300-0304, U+0308, U+0329, U+2000-206F, U+2070-209F, U+20AC, U+2122, U+2190-21FF, U+2200-22FF, U+25A0-25FF, U+27E8-27E9, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-0130, U+0132-0151, U+0154-02AF, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-700-greek.woff2') format('woff2');
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+}
+
+/* Metric-matched fallbacks, one per local font a visitor may have, so the swap
+   moves nothing (CLS ≈ 0). Computed from the fonts' own tables: for the sans,
+   Bricolage 400's average text width against each local font; for the mono, the
+   single advance width (0.6 em) against each local monospace. Only the one that
+   exists on the device is used; the others are skipped. */
+@font-face {
+  font-family: 'Bricolage Fallback Arial';
+  src: local('Arial'), local('Liberation Sans');
+  size-adjust: 105.98%;
+  ascent-override: 87.75%;
+  descent-override: 25.48%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Bricolage Fallback Roboto';
+  src: local('Roboto');
+  size-adjust: 105.73%;
+  ascent-override: 87.96%;
+  descent-override: 25.54%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'JetBrains Mono Fallback Consolas';
+  src: local('Consolas');
+  size-adjust: 109.13%;
+  ascent-override: 93.47%;
+  descent-override: 27.49%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'JetBrains Mono Fallback Menlo';
+  src: local('Menlo'), local('DejaVu Sans Mono'), local('Droid Sans Mono');
+  size-adjust: 99.66%;
+  ascent-override: 102.35%;
+  descent-override: 30.1%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'JetBrains Mono Fallback Courier';
+  src: local('Roboto Mono'), local('Courier New');
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30%;
   line-gap-override: 0%;
 }
 
@@ -48,8 +150,8 @@
   /* Type: Bricolage Grotesque for headings and text, JetBrains Mono for labels,
      data, code and the terminal touches. Fluid scale from 360 to 1440 px:
      ratio 1.2 → 1.333, base 16 → 18 px. */
-  --font-sans: 'Bricolage Grotesque', 'Bricolage Fallback', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --font-sans: 'Bricolage Grotesque', 'Bricolage Fallback Arial', 'Bricolage Fallback Roboto', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'JetBrains Mono Fallback Consolas', 'JetBrains Mono Fallback Menlo', 'JetBrains Mono Fallback Courier', ui-monospace, monospace;
   --mono-font: var(--font-mono); /* the name the components already use */
   --step--1: clamp(0.833rem, 0.83rem + 0.016vw, 0.844rem);
   --step-0: clamp(1rem, 0.958rem + 0.185vw, 1.125rem);
