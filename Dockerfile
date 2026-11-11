@@ -6,7 +6,7 @@
 # usage stats; run by hand).
 # Only /worker carries the scanner's GODEBUG settings (see cmd/worker).
 
-FROM golang:1.27.3-alpine@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS build
+FROM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 # Modules in a layer, not in a cache mount: the CI's layer cache (buildx,
