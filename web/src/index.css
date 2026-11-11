@@ -10,7 +10,9 @@
   --cyan: 90, 200, 250;
   --indigo: 125, 122, 255;
   --violet: 191, 90, 242;
-  --line: rgba(143, 140, 255, 0.22);
+  --line: rgba(143, 140, 255, 0.22); /* decoration only: 1.34:1 */
+  /* Border of form fields: ≥ 3:1 against --bg and the panels (WCAG 1.4.11; contrast.test.ts). */
+  --border-control: #5f5db8;
   --grad: linear-gradient(90deg, rgb(var(--cyan)), rgb(var(--indigo)) 50%, rgb(var(--violet)));
   --mono-font: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
   --gutter: clamp(1rem, 5vw, 3rem);
@@ -270,7 +272,7 @@ a.btn:hover {
   font: inherit;
   color: var(--text);
   background: var(--bg);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-control);
   border-radius: 8px;
   padding: 0.5rem 0.75rem;
 }

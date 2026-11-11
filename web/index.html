@@ -7,6 +7,11 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05060b" />
+    <!-- JetBrains Mono is self-hosted from @fontsource (main.tsx; woff2, font-display: swap).
+         Preload only the Latin 400: the first screen and its LCP are 400; the 700 and the other
+         subsets load when used. Same file as its @font-face, so Vite emits one hashed asset.
+         crossorigin: fonts are fetched in CORS mode, and a preload without it is wasted. -->
+    <link rel="preload" href="/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
     <title>QuantumReady · Post-quantum audit of your website</title>
     <meta
       name="description"
