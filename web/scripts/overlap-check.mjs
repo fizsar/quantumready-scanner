@@ -22,6 +22,7 @@
 //
 //   node overlap-check.mjs <base-url> <engine:WxHxDPR,...> <path>...
 import { chromium, devices, webkit } from 'playwright'
+import { DUMP, INVALID, INVALID_EXIT, PAINT_MS, PAINTED, PROBE, report } from './painted.mjs'
 
 const [base, profilesArg, ...paths] = process.argv.slice(2)
 const profiles = profilesArg.split(',').map((p) => {
@@ -156,40 +157,20 @@ const FIT = `(() => {${HELPERS}
 // frames for 200–500 ms after setViewportSize, and a fixed wait then read a DOM no
 // frame had shown (the stage still on past the end of the story, never on screen).
 //
-// And a reading only counts if that happened: if the renderer has stopped (a
-// starved machine, a browser that makes no frames), the DOM read is stale and
-// says nothing. The page carries a probe (src/lab/probe.ts) in which the 3D
-// engine counts the frames it draws: besides the two animation frames, an
-// engine whose loop is running must have drawn two more. If neither happens
-// within PAINT_MS the result is "invalid measurement (render stopped)", never
-// "ok" nor a failure, and the run ends there with exit code 3 (a failed check is 1).
+// And a reading only counts if that happened (painted.mjs): if the renderer has
+// stopped, the DOM read is stale and says nothing. Then the result is "invalid
+// measurement (render stopped)", never "ok" nor a failure, with the engine's
+// state at that moment, and the run ends there with exit code 3 (a failed check is 1).
 //   PAUSE_RENDER=1  self-test: stops the page's animation frames before the third reading; the run must end as invalid.
-const PROBE = 'window.__qrProbe = { frames: 0, running: false }'
-const PAINT_MS = Number(process.env.PAINT_MS ?? 5000)
 let readings = 0
+const within = (promise, ms, otherwise) => Promise.race([promise, new Promise((ok) => setTimeout(() => ok(otherwise), ms))])
 async function settle(page, where) {
   if (process.env.PAUSE_RENDER && ++readings === 3) await page.evaluate(() => (window.requestAnimationFrame = () => 0))
-  const fresh = await Promise.race([
-    page.evaluate(
-      () =>
-        new Promise((ok) => {
-          const p = window.__qrProbe ?? { frames: 0, running: false }
-          const f0 = p.frames
-          let n = 0
-          const tick = () => {
-            n++
-            if (n >= 2 && (!p.running || p.frames >= f0 + 2)) ok(true)
-            else requestAnimationFrame(tick)
-          }
-          requestAnimationFrame(tick)
-        }),
-    ),
-    new Promise((ok) => setTimeout(() => ok(false), PAINT_MS)),
-  ])
-  if (fresh) return
-  console.log(`     ${where}: invalid measurement (render stopped): no new frame in ${PAINT_MS} ms`)
-  console.error('✗ invalid measurement (render stopped): the result is neither ok nor a failure. Free the machine and run it again.')
-  process.exit(3)
+  if (await within(page.evaluate(PAINTED), PAINT_MS, false)) return
+  const state = await within(page.evaluate(DUMP), 2000, null)
+  console.log(report(where, state).map((l) => '     ' + l).join('\n'))
+  console.error(`✗ ${INVALID}: the result is neither ok nor a failure.`)
+  process.exit(INVALID_EXIT)
 }
 
 // The home page's entry (a page with .hero): the form is on the first screen

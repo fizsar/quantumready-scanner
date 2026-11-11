@@ -20,6 +20,7 @@
 //   node frame-check.mjs <devtools-port> <url> [WxHxDPR,...]
 import { writeFileSync } from 'node:fs'
 import { inflateSync } from 'node:zlib'
+import { DUMP, INVALID, INVALID_EXIT, PAINT_MS, PAINTED, PROBE, report } from './painted.mjs'
 
 const [port, url, sizesArg = '1280x800x1,1280x800x2,1440x900x1,1440x900x2,1920x1080x1,1920x1080x2,393x852x3'] = process.argv.slice(2)
 const sizes = sizesArg.split(',').map((s) => s.split('x').map(Number))
@@ -96,35 +97,29 @@ const ev = async (e) =>
 await send('Page.enable')
 
 // A measure only counts if the frame it looks at was drawn after the page got
-// to its position. A renderer can stop (a covered or minimized window, a
-// starved machine) and a screenshot then shows a stale frame, which reads as
-// a cut shape, or as fine. The page gets a probe (src/lab/probe.ts) in which
-// the 3D engine counts the frames it draws; before each screenshot, two
-// animation frames must go by and, if the engine's loop is running, it must
-// have drawn two more frames. If that does not happen within PAINT_MS the
-// result is "invalid measurement (render stopped)", never "cut" nor "ok", and
-// the run ends there with exit code 3 (a failed check is 1).
-//   PAUSE_RENDER=1  self-test: freezes the page before the third measure; the run must end as invalid.
-await send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__qrProbe = { frames: 0, running: false }' })
-const PAINT_MS = Number(process.env.PAINT_MS ?? 5000)
-const PAINTED = `new Promise((ok) => {
-  const p = window.__qrProbe
-  const f0 = p.frames
-  let n = 0
-  const tick = () => { n++; if (n >= 2 && (!p.running || p.frames >= f0 + 2)) ok(true); else requestAnimationFrame(tick) }
-  requestAnimationFrame(tick)
-})`
+// to its position (painted.mjs): if not, the result is "invalid measurement
+// (render stopped)", never "cut" nor "ok", with the engine's state at that
+// moment, and the run ends there with exit code 3 (a failed check is 1).
+//   PAUSE_RENDER=1         self-test: freezes the page before the third measure; the run must end as invalid.
+//   PAUSE_RENDER=engine    self-test: only the engine's loop stops drawing while it says it runs (a bug of the
+//                          loop, as the report must name it).
+await send('Page.addScriptToEvaluateOnNewDocument', { source: PROBE })
 let measures = 0
 /** Whether a fresh frame is on screen; if not, reports it and ends the run (a frozen page answers nothing more). */
 async function painted(where, rows) {
-  if (process.env.PAUSE_RENDER && ++measures === 3) await send('Page.setWebLifecycleState', { state: 'frozen' })
+  if (process.env.PAUSE_RENDER && ++measures === 3) {
+    // The engine alone: its frames stop counting (as if its loop had died) while the page goes on.
+    if (process.env.PAUSE_RENDER === 'engine') await ev(`(() => { const p = window.__qrProbe; Object.defineProperty(p, 'frames', { get: () => 0, set: () => {} }); p.running = true })()`)
+    else await send('Page.setWebLifecycleState', { state: 'frozen' })
+  }
   const fresh = await Promise.race([ev(PAINTED), sleep(PAINT_MS).then(() => false)])
   if (fresh) return
-  console.log(`== ${where}\n` + [...rows, `    invalid measurement (render stopped): no new frame in ${PAINT_MS} ms`].join('\n'))
-  console.error('✗ invalid measurement (render stopped): the result is neither ok nor cut. Uncover the browser window or free the machine, and run it again.')
+  const state = await Promise.race([ev(DUMP), sleep(2000).then(() => null)])
+  console.log(`== ${where}\n` + [...rows, ...report('', state).map((l) => '    ' + l)].join('\n'))
+  console.error(`✗ ${INVALID}: the result is neither ok nor cut.`)
   ws.close()
   await fetch(`http://127.0.0.1:${port}/json/close/${t.id}`).catch(() => {})
-  process.exit(3)
+  process.exit(INVALID_EXIT)
 }
 
 // The home's hero card (/): the still image before the 3D, one frame in each

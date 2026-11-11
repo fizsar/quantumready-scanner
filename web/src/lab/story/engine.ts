@@ -29,7 +29,7 @@ import {
   WebGLRenderer,
 } from 'three'
 import { pixelRatio } from '../capability'
-import { findProbe } from '../probe'
+import { drew, findProbe, note, ran } from '../probe'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS } from '../view'
 import { fit, type Box, type Frame } from './camera'
 import { WIRE, type FigureId } from './figures'
@@ -335,7 +335,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     // or paused), draw the same moment again so it never goes blank.
     if (drawnOnce && !running && !failed && apply(clock)) {
       renderer.render(scene, camera)
-      if (probe) probe.frames++
+      drew(probe)
     }
   }
   const setDrawn = (n: number) => {
@@ -364,7 +364,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     const ok = apply(clock)
     renderer.render(scene, camera)
     if (failed || !ok) return
-    if (probe) probe.frames++
+    drew(probe)
     if (!drawnOnce) {
       drawnOnce = true
       opts.onReady()
@@ -385,17 +385,21 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   const start = () => {
     if (running || failed || document.hidden) return
     running = true
-    if (probe) probe.running = true
+    ran(probe, true)
     last = 0
     raf = requestAnimationFrame(frame)
   }
   const stop = () => {
+    if (running) ran(probe, false)
     running = false
-    if (probe) probe.running = false
     cancelAnimationFrame(raf)
   }
   let wanted = false
-  const onVisibility = () => (document.hidden ? stop() : wanted && start())
+  const onVisibility = () => {
+    note(probe, `visibilitychange: ${document.visibilityState}`)
+    if (document.hidden) stop()
+    else if (wanted) start()
+  }
   document.addEventListener('visibilitychange', onVisibility)
 
   return {
@@ -406,10 +410,12 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       free = f
     },
     start() {
+      if (!wanted) note(probe, document.hidden ? 'asked to run (tab hidden: waiting)' : 'asked to run')
       wanted = true
       start()
     },
     stop() {
+      if (wanted) note(probe, 'asked to stop')
       wanted = false
       stop()
     },
