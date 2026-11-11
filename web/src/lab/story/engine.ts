@@ -29,6 +29,7 @@ import {
   WebGLRenderer,
 } from 'three'
 import { pixelRatio } from '../capability'
+import { findProbe } from '../probe'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS } from '../view'
 import { fit, type Box, type Frame } from './camera'
 import { WIRE, type FigureId } from './figures'
@@ -177,6 +178,8 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   renderer.setClearColor(new Color().setRGB(...unit(BACKGROUND), SRGBColorSpace), 1)
   let failed = false
   let drawnOnce = false
+  // Only when a check has installed it (lab/probe.ts): the frames drawn and whether the loop runs.
+  const probe = findProbe()
   renderer.debug.onShaderError = () => {
     if (failed) return
     failed = true
@@ -330,7 +333,10 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     material.uniforms.uMaxPx.value = MAX_POINT * h * dpr
     // Resizing clears the canvas: while the loop is stopped (a scene at rest,
     // or paused), draw the same moment again so it never goes blank.
-    if (drawnOnce && !running && !failed && apply(clock)) renderer.render(scene, camera)
+    if (drawnOnce && !running && !failed && apply(clock)) {
+      renderer.render(scene, camera)
+      if (probe) probe.frames++
+    }
   }
   const setDrawn = (n: number) => {
     drawn = n
@@ -358,6 +364,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     const ok = apply(clock)
     renderer.render(scene, camera)
     if (failed || !ok) return
+    if (probe) probe.frames++
     if (!drawnOnce) {
       drawnOnce = true
       opts.onReady()
@@ -378,11 +385,13 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   const start = () => {
     if (running || failed || document.hidden) return
     running = true
+    if (probe) probe.running = true
     last = 0
     raf = requestAnimationFrame(frame)
   }
   const stop = () => {
     running = false
+    if (probe) probe.running = false
     cancelAnimationFrame(raf)
   }
   let wanted = false

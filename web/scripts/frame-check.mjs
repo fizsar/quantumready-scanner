@@ -95,6 +95,38 @@ const ev = async (e) =>
   ).result?.value
 await send('Page.enable')
 
+// A measure only counts if the frame it looks at was drawn after the page got
+// to its position. A renderer can stop (a covered or minimized window, a
+// starved machine) and a screenshot then shows a stale frame, which reads as
+// a cut shape, or as fine. The page gets a probe (src/lab/probe.ts) in which
+// the 3D engine counts the frames it draws; before each screenshot, two
+// animation frames must go by and, if the engine's loop is running, it must
+// have drawn two more frames. If that does not happen within PAINT_MS the
+// result is "invalid measurement (render stopped)", never "cut" nor "ok", and
+// the run ends there with exit code 3 (a failed check is 1).
+//   PAUSE_RENDER=1  self-test: freezes the page before the third measure; the run must end as invalid.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__qrProbe = { frames: 0, running: false }' })
+const PAINT_MS = Number(process.env.PAINT_MS ?? 5000)
+const PAINTED = `new Promise((ok) => {
+  const p = window.__qrProbe
+  const f0 = p.frames
+  let n = 0
+  const tick = () => { n++; if (n >= 2 && (!p.running || p.frames >= f0 + 2)) ok(true); else requestAnimationFrame(tick) }
+  requestAnimationFrame(tick)
+})`
+let measures = 0
+/** Whether a fresh frame is on screen; if not, reports it and ends the run (a frozen page answers nothing more). */
+async function painted(where, rows) {
+  if (process.env.PAUSE_RENDER && ++measures === 3) await send('Page.setWebLifecycleState', { state: 'frozen' })
+  const fresh = await Promise.race([ev(PAINTED), sleep(PAINT_MS).then(() => false)])
+  if (fresh) return
+  console.log(`== ${where}\n` + [...rows, `    invalid measurement (render stopped): no new frame in ${PAINT_MS} ms`].join('\n'))
+  console.error('✗ invalid measurement (render stopped): the result is neither ok nor cut. Uncover the browser window or free the machine, and run it again.')
+  ws.close()
+  await fetch(`http://127.0.0.1:${port}/json/close/${t.id}`).catch(() => {})
+  process.exit(3)
+}
+
 // The home's hero card (/): the still image before the 3D, one frame in each
 // phase of the entry (the canvas's data-phase: handover, inhale, condense,
 // hold, collapse at its start and half-way, rest) and the Q̂ two seconds into
@@ -106,6 +138,7 @@ async function hero(width, height, dpr, phone) {
   const rows = []
   let bad = false
   const shoot = async (label) => {
+    await painted(`hero ${width}×${height} DPR ${dpr}, ${label}`, rows)
     const g = await ev(`(() => {
       const r = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom } }
       const card = document.querySelector('.hero-scene')
@@ -220,6 +253,7 @@ for (const [width, height, dpr] of sizes) {
     else if (pos.at !== undefined)
       await ev(`(() => { const t = document.querySelector('.story-track'); scrollTo(0, t.getBoundingClientRect().top + scrollY + innerHeight * Math.max(0, ${pos.at})) })()`)
     await sleep(1800)
+    await painted(`${width}×${height} DPR ${dpr}, position ${name}`, rows)
     const g = await ev(`(() => {
       const r = (e) => { if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom } }
       const stage = r(document.querySelector('.story-stage'))

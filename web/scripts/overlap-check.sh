@@ -15,6 +15,9 @@
 #             and 1440×900 DPR 2)
 #   BASE=https://… web/scripts/overlap-check.sh   checks a site already up
 #             (for instance production, as any visitor would) instead of a build.
+# Exit code: 0 ok, 1 a check failed, 3 invalid measurement (the renderer made
+# no new frame: the result says nothing; overlap-check.mjs). PAUSE_RENDER=1
+# forces that case, to test it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PROFILES=${1:-chromium:375x667x2,chromium:375x812x1,chromium:393x852x3,chromium:1280x800x1,chromium:1280x800x2,chromium:1440x900x1,chromium:1440x900x2,chromium:1634x916x1,chromium:1920x1080x1,chromium:1920x1080x2,webkit:375x667x3,webkit:393x852x3,webkit:393x659x3,webkit:1440x900x2}
@@ -25,7 +28,7 @@ PW=mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102
 [ -d node_modules/playwright ] || npm ci --no-fund --no-audit
 
 if [ -n "${BASE:-}" ]; then
-	docker run --rm --ipc=host -v "$PWD:/web:ro" -w /web "$PW" node scripts/overlap-check.mjs "$BASE" "$PROFILES" "$@"
+	docker run --rm --ipc=host -e PAUSE_RENDER -e PAINT_MS -v "$PWD:/web:ro" -w /web "$PW" node scripts/overlap-check.mjs "$BASE" "$PROFILES" "$@"
 	exit
 fi
 
@@ -47,4 +50,4 @@ docker network create --internal "$NET" >/dev/null
 docker run -d --name "$NET-web" --network "$NET" --network-alias web -v "$serve:/usr/share/nginx/html:ro" \
 	-v "$PWD/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
 	-v "$PWD/nginx/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro" "$NGINX" >/dev/null
-docker run --rm --ipc=host --network "$NET" -v "$PWD:/web:ro" -w /web "$PW" node scripts/overlap-check.mjs http://web:8080 "$PROFILES" "$@"
+docker run --rm --ipc=host --network "$NET" -e PAUSE_RENDER -e PAINT_MS -v "$PWD:/web:ro" -w /web "$PW" node scripts/overlap-check.mjs http://web:8080 "$PROFILES" "$@"

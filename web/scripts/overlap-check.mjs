@@ -155,7 +155,42 @@ const FIT = `(() => {${HELPERS}
 // painted frame always went through its update; but headless WebKit can stop making
 // frames for 200–500 ms after setViewportSize, and a fixed wait then read a DOM no
 // frame had shown (the stage still on past the end of the story, never on screen).
-const settle = (page) => page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok()))))
+//
+// And a reading only counts if that happened: if the renderer has stopped (a
+// starved machine, a browser that makes no frames), the DOM read is stale and
+// says nothing. The page carries a probe (src/lab/probe.ts) in which the 3D
+// engine counts the frames it draws: besides the two animation frames, an
+// engine whose loop is running must have drawn two more. If neither happens
+// within PAINT_MS the result is "invalid measurement (render stopped)", never
+// "ok" nor a failure, and the run ends there with exit code 3 (a failed check is 1).
+//   PAUSE_RENDER=1  self-test: stops the page's animation frames before the third reading; the run must end as invalid.
+const PROBE = 'window.__qrProbe = { frames: 0, running: false }'
+const PAINT_MS = Number(process.env.PAINT_MS ?? 5000)
+let readings = 0
+async function settle(page, where) {
+  if (process.env.PAUSE_RENDER && ++readings === 3) await page.evaluate(() => (window.requestAnimationFrame = () => 0))
+  const fresh = await Promise.race([
+    page.evaluate(
+      () =>
+        new Promise((ok) => {
+          const p = window.__qrProbe ?? { frames: 0, running: false }
+          const f0 = p.frames
+          let n = 0
+          const tick = () => {
+            n++
+            if (n >= 2 && (!p.running || p.frames >= f0 + 2)) ok(true)
+            else requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        }),
+    ),
+    new Promise((ok) => setTimeout(() => ok(false), PAINT_MS)),
+  ])
+  if (fresh) return
+  console.log(`     ${where}: invalid measurement (render stopped): no new frame in ${PAINT_MS} ms`)
+  console.error('✗ invalid measurement (render stopped): the result is neither ok nor a failure. Free the machine and run it again.')
+  process.exit(3)
+}
 
 // The home page's entry (a page with .hero): the form is on the first screen
 // and nothing is ever over it. At the top of the page, as soon as the form
@@ -204,8 +239,10 @@ for (const { engine, width, height, dpr } of profiles) {
     isMobile: phone,
     hasTouch: phone,
   })
+  await ctx.addInitScript(PROBE)
   for (const path of paths) {
     const page = await ctx.newPage()
+    const where = (y) => `${engine} ${width}×${height} DPR ${dpr} ${path} @${y}px`
     await page.goto(base + path)
     const home = new Set()
     // The home's form must be usable from the first paint: check before anything else has loaded.
@@ -221,7 +258,7 @@ for (const { engine, width, height, dpr } of profiles) {
     for (let y = 0; y <= max + 1; y += Math.round(height / 8)) {
       await page.evaluate((y) => scrollTo(0, y), Math.min(y, max))
       await page.waitForTimeout(350)
-      await settle(page)
+      await settle(page, where(Math.min(y, max)))
       positions++
       const r = await page.evaluate(AT_POSITION)
       for (const p of (await page.evaluate(`${HOME}(false)`)) ?? []) home.add(`${p} @${Math.min(y, max)}px`)
@@ -233,14 +270,14 @@ for (const { engine, width, height, dpr } of profiles) {
       if (engine === 'webkit' && phone) {
         await page.setViewportSize({ width, height: height - 90 })
         await page.waitForTimeout(250)
-        await settle(page)
+        await settle(page, where(Math.min(y, max)) + ' (toolbar)')
         const t = await page.evaluate(AT_POSITION)
         for (const p of t.over) if (!over.has(p)) over.set(p + ' (toolbar)', Math.min(y, max))
         if (t.empty) empty.push(`${Math.min(y, max)} (toolbar)`)
         if (t.early !== null) early.push(`${Math.min(y, max)} (toolbar, scene ${t.early}px)`)
         await page.setViewportSize({ width, height })
         await page.waitForTimeout(150)
-        await settle(page)
+        await settle(page, where(Math.min(y, max)) + ' (toolbar off)')
       }
     }
     const fit = await page.evaluate(FIT)
