@@ -4,9 +4,9 @@
 #   deploy/deploy.sh sha-14226c7   # a specific build (preferred)
 #   deploy/deploy.sh latest        # origin/main's newest commit, by its sha- tag
 #
-# Only commits of origin/main or origin/showcase can be deployed: those are
-# the branches whose CI-tested builds release.yml publishes (showcase never
-# moves :latest). QR_DEPLOY_DRY_RUN=1 stops after that check, without SSH
+# Only commits of origin/main can be deployed: the branch whose CI-tested
+# builds release.yml publishes. (Until 16/11/2026, origin/showcase too: the
+# branch production came from before main.) QR_DEPLOY_DRY_RUN=1 stops after that check, without SSH
 # (deploy/test-deploy-ref.sh).
 #
 # Images by digest (security review of 01/11/2026): release.yml records the
@@ -53,9 +53,9 @@ else
 fi
 commit=$(git rev-parse "$ref^{commit}")
 on_branch() { git merge-base --is-ancestor "$commit" "origin/$1" 2>/dev/null; }
-if ! on_branch main && ! on_branch showcase; then
-	echo "refusing to deploy $TAG: commit ${commit:0:7} is not on origin/main nor origin/showcase;" >&2
-	echo "only those branches' builds are published (release.yml). Push it to one of them first." >&2
+if ! on_branch main; then
+	echo "refusing to deploy $TAG: commit ${commit:0:7} is not on origin/main;" >&2
+	echo "only main's builds are published (release.yml). Merge it into main first." >&2
 	exit 1
 fi
 # latest is origin/main's newest commit, deployed by its own sha- tag (the

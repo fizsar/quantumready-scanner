@@ -131,6 +131,27 @@ func TestWorkflowPolicy(t *testing.T) {
 	}
 }
 
+// CI on pushes and the Release only for main (the showcase branch closed on
+// 16/11/2026): nothing else is ever published or deployed.
+func TestOnlyMainIsReleased(t *testing.T) {
+	for _, w := range load(t) {
+		var key string
+		switch w.file {
+		case "release.yml":
+			key = "workflow_run"
+		case "ci.yml":
+			key = "push"
+		default:
+			continue
+		}
+		trig, _ := w.On[key].(map[string]any)
+		branches, _ := trig["branches"].([]any)
+		if len(branches) != 1 || branches[0] != "main" {
+			t.Errorf("%s: %s branches %v, want [main]", w.file, key, branches)
+		}
+	}
+}
+
 // Manual workflows that write: dispatched by hand, and run for the owner only.
 func TestWritingWorkflowsAreManualOrGuarded(t *testing.T) {
 	for _, w := range load(t) {
@@ -219,7 +240,6 @@ func TestReleaseOnlyFromOwnPushes(t *testing.T) {
 		want bool
 	}{
 		{"push to main by the owner", run("push", "success", "fizsar/quantumready-saas", "main", "fizsar"), true},
-		{"push to showcase by the owner", run("push", "success", "fizsar/quantumready-saas", "showcase", "fizsar"), true},
 		{"CI failed", run("push", "failure", "fizsar/quantumready-saas", "main", "fizsar"), false},
 		{"pull request from a fork, branch named main", run("pull_request", "success", "mallory/quantumready-saas", "main", "mallory"), false},
 		{"pull request from this repository", run("pull_request", "success", "fizsar/quantumready-saas", "fix/x", "fizsar"), false},
