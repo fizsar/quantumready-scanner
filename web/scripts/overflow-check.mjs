@@ -66,9 +66,14 @@ for (const url of urls) {
         }
         return null
       }
+      // Visually hidden on purpose (for screen readers), by class or by a media query: clip-path inset(50%).
+      const srOnly = (e) => {
+        for (let a = e; a && a !== document.body; a = a.parentElement) if (getComputedStyle(a).clipPath === 'inset(50%)') return true
+        return false
+      }
       const out = []
       for (const e of document.querySelectorAll('body *')) {
-        if (!e.getClientRects().length || e.closest('.sr-only, marker, defs')) continue
+        if (!e.getClientRects().length || e.closest('.sr-only, marker, defs') || srOnly(e)) continue
         const b = e.getBoundingClientRect()
         if (b.width === 0) continue
         const clip = clipOf(e)

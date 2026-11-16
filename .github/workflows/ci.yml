@@ -133,6 +133,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # three.js (the redesign's 3D scenes) only in a lazy chunk, never in the initial load.
+      - run: npm run check-bundle
 
   # The backup scripts that run on the VPS: shellcheck of every deploy script,
   # then backup and restore drill against a throwaway PostgreSQL and a local
@@ -174,3 +176,9 @@ jobs:
             COMMIT=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      # Package pins over the base image (web/Dockerfile, '# base-pins'): fails once
+      # the base's digest carries them, so they get dropped in the same PR.
+      - name: Base image pins still needed
+        env:
+          DOCKERFILE: ${{ matrix.file }}
+        run: python3 deploy/check_base_pins.py "$DOCKERFILE"

@@ -1,0 +1,348 @@
+/* /lab/historia. The 3D stage is fixed behind the page while the story track
+   is on screen. Wide screens: text panels on the left, the scene on the right.
+   Phones: the scene in the top 56 % and the current step in a sheet below it,
+   so text and 3D never overlap. Panel colours are checked for WCAG AA against
+   the brightest possible backdrop (contrast.test.ts). */
+.story {
+  /* Behind every text: the page background, 88 % opaque. */
+  --story-panel: rgba(5, 6, 11, 0.88);
+  width: 100%;
+  position: relative;
+}
+
+.page:has(.story) .topbar,
+.page:has(.story) .footer {
+  position: relative;
+  z-index: 3;
+}
+
+.story-intro {
+  position: relative;
+  z-index: 1;
+  max-width: 46rem;
+  display: grid;
+  gap: 0.9rem;
+  padding-bottom: 3rem;
+}
+.story-lead {
+  font-size: clamp(1.1rem, 1rem + 0.45vw, 1.35rem);
+  line-height: 1.55;
+}
+.story-note {
+  color: var(--muted);
+}
+
+.story-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--bg);
+  /* Mask (soft edges), opacity and visibility follow the scroll (Story.tsx, model.ts stageView, stageMask). */
+  opacity: 0;
+  visibility: hidden;
+}
+.story-canvas,
+.story-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* The still image sits in the free part of the stage (right of the panels on wide screens). */
+.story-still {
+  inset: 0 var(--free-right, 0px) 0 var(--free-left, 0px);
+  width: auto;
+  object-fit: contain;
+}
+.story-canvas {
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+.story-canvas[data-ready='true'] {
+  opacity: 1;
+}
+
+/* Text panels: dark, large type. */
+.story-panel,
+.story-sheet {
+  background: var(--story-panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+}
+.story-kicker {
+  color: var(--green);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.story-h {
+  margin: 0;
+  font-size: clamp(1.3rem, 1.05rem + 0.6vw, 1.65rem);
+  line-height: 1.25;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.story-body {
+  font-size: clamp(1.08rem, 1rem + 0.35vw, 1.3rem);
+  line-height: 1.6;
+}
+.story-legend {
+  font-size: 0.95rem;
+}
+.story-pos {
+  color: var(--green);
+}
+.story-neg {
+  color: var(--muted);
+}
+
+.story-track {
+  position: relative;
+  z-index: 1;
+}
+.story-step {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+}
+/* An expression inside a title stays on one line. */
+.story-nowrap {
+  white-space: nowrap;
+}
+.story-panel {
+  max-width: 36rem;
+  padding: 1.5rem 1.75rem;
+  display: grid;
+  gap: 0.75rem;
+}
+.story-tail {
+  height: 70svh;
+}
+/* Panels only with the scene in place (model.ts panelsShown): they fade in once
+   the scene fills 40 % of the screen, and go at once as it leaves. Opacity only:
+   screen readers still read them. */
+.story-track .story-panel {
+  transition: opacity 0.4s ease;
+}
+.story[data-panels='off'] .story-track .story-panel {
+  opacity: 0;
+  transition: none;
+}
+
+/* The label inside each panel: quantum numbers, energy and scale, or the equation term by term. */
+.story-cap {
+  display: grid;
+  gap: 0.35rem;
+}
+.story-qn {
+  font-size: 1.1rem;
+}
+.story-qn math {
+  font-size: 1.4rem;
+  color: var(--green);
+}
+.story-scale {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.story-eq {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.story-eq math {
+  font-size: 1.5rem;
+  margin: 0.35rem 0;
+}
+/* Terms: hidden until their step, then shown; lit while their text explains them. */
+.story-eq [data-term] {
+  transition: opacity 0.5s ease, color 0.5s ease;
+}
+.story-eq [data-state='hidden'] {
+  opacity: 0;
+}
+.story-eq [data-state='shown'] {
+  opacity: 0.8;
+  color: var(--text);
+}
+.story-eq [data-state='active'] {
+  opacity: 1;
+  color: var(--green);
+  text-shadow: 0 0 14px rgba(61, 255, 162, 0.65);
+}
+
+.story-sheet {
+  display: none;
+}
+
+/* The sheet holds every step stacked in one grid cell; only the current one
+   is visible. Toggling visibility needs no layout. */
+.story-layer {
+  grid-area: layer;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  visibility: hidden;
+}
+.story-layer[data-current='true'] {
+  visibility: visible;
+}
+/* The copied text of a sheet step keeps the layer's layout (only aria-hidden). */
+.story-layer-copy {
+  display: contents;
+}
+
+/* Scene 6: the inequality's sliders. */
+.story-mosca {
+  display: grid;
+  gap: 0.35rem;
+}
+.story-mosca-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr 4.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+.story-mosca-var {
+  color: var(--green);
+  font-weight: 700;
+}
+.story-mosca-row input[type='range'] {
+  width: 100%;
+  accent-color: var(--green);
+}
+.story-mosca-row output {
+  text-align: right;
+  color: var(--text);
+}
+.story-mosca-out {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.story-sources {
+  position: relative;
+  z-index: 1;
+  max-width: 46rem;
+  padding: 3rem 0 1rem;
+  display: grid;
+  gap: 0.8rem;
+  font-size: 0.95rem;
+}
+.story-sources h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.story-sources ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.45rem;
+  overflow-wrap: anywhere;
+}
+
+/* Phones: scene above, text below, never on top of each other. */
+@media (max-width: 40rem) {
+  /* The scene above the sheet: the sheet's height is measured (Story.tsx). */
+  .story-stage {
+    bottom: var(--sheet-h, 45svh);
+  }
+  .story-sheet {
+    display: grid;
+    grid-template-areas: 'layer';
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    padding: 0.85rem var(--gutter) 1rem;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 0;
+    background: rgb(5, 6, 11);
+    /* As tall as its tallest step: never scrolls inside (overlap-check.sh checks it). */
+    overflow: hidden;
+    align-content: start;
+    /* Hidden at once (a panel never lingers over a scene that is leaving); shown with a fade. */
+    opacity: 0;
+    visibility: hidden;
+  }
+  .story-sheet[data-active='true'] {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.4s ease;
+  }
+  .story-sheet .story-h {
+    font-size: 1.25rem;
+  }
+  .story-sheet .story-body {
+    font-size: 1.05rem;
+    line-height: 1.5;
+  }
+  .story-sheet .story-eq math {
+    font-size: 1.15rem;
+  }
+  /* Short screens (iPhone SE, Safari's toolbars shown): a more compact sheet, so the
+     scene keeps at least 40 % of the height and the panel can show (model.ts panelsShown). */
+  @media (max-height: 720px) {
+    .story-sheet {
+      padding: 0.55rem var(--gutter) 0.6rem;
+    }
+    .story-sheet .story-layer {
+      gap: 0.4rem;
+    }
+    .story-sheet .story-kicker {
+      font-size: 0.75rem;
+    }
+    .story-sheet .story-h {
+      font-size: 1.1rem;
+    }
+    .story-sheet .story-body {
+      font-size: 0.98rem;
+      line-height: 1.42;
+    }
+    .story-sheet .story-legend,
+    .story-sheet .story-scale {
+      font-size: 0.85rem;
+    }
+    .story-sheet .story-eq math {
+      font-size: 1.02rem;
+      margin: 0.15rem 0;
+    }
+  }
+  /* Scene 6 on phones: the sliders take the place of the legend and the note
+     (both stay in the step panel, which screen readers read): the sheet, as tall
+     as its tallest step, keeps the scene at 40 % of the height. */
+  .story-sheet [data-step='mosca'] .story-legend,
+  .story-sheet [data-step='mosca'] .story-scale {
+    display: none;
+  }
+  .story-sheet .story-mosca-row,
+  .story-sheet .story-mosca-out {
+    font-size: 0.88rem;
+  }
+  .story-sheet .story-mosca-row {
+    grid-template-columns: 6.5rem 1fr 4rem;
+  }
+  /* The step panels stay in the page for screen readers; the sheet shows them. */
+  .story-panel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-stage,
+  .story-track .story-panel,
+  .story-canvas,
+  .story-sheet,
+  .story-eq [data-term] {
+    transition: none;
+  }
+}
