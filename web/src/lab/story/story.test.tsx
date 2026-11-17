@@ -69,7 +69,8 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('/lab/historia', () => {
-  it('with prefers-reduced-motion: still images per step, and three.js is never loaded', async () => {
+  // The whole story with every still image: over 5 s when the suite runs in parallel.
+  it('with prefers-reduced-motion: still images per step, and three.js is never loaded', { timeout: 20_000 }, async () => {
     media((q) => q === '(prefers-reduced-motion: reduce)')
     webgl2()
     renderAt('/lab/historia')
@@ -172,7 +173,7 @@ describe('/lab/historia', () => {
     expect(line('qft')).toBe('picos en y = 0, 64, 128, 192, P = 0,25 · r = 4')
     expect(line('factors')).toBe('mcd(48, 15) = 3 · mcd(50, 15) = 5 · 3 × 5 = 15')
     expect(line('curve')).toBe(`sobre 𝔽₁₀₁: ${curvePoints().length + 1} puntos (con el del infinito)`)
-    expect(line('broken')).toBe('RSA-2048: < 1.000.000 cúbits ruidosos, < 7 días, con 0,1 % de error por puerta, ciclo de 1 µs y 10 µs de reacción')
+    expect(line('broken')).toBe('RSA-2048: < 1.000.000 cúbits ruidosos, < 7 días, con 0,1\u00a0% de error por puerta, ciclo de 1 µs y 10 µs de reacción')
     // The formula of each step in MathML.
     for (const id of ['q0', 'bell', 'circ', 'reg6', 'shorF', 'qft', 'key', 'factors', 'curve'])
       expect(cap(id).querySelector('math')?.namespaceURI, id).toBe('http://www.w3.org/1998/Math/MathML')
@@ -238,13 +239,13 @@ describe('/lab/historia', () => {
     expect(x.getAttribute('aria-valuetext')).toBe('10 años')
     const out = w.querySelector('.story-mosca-out')!
     expect(out.getAttribute('aria-live')).toBe('polite')
-    expect(out.textContent).toBe('x + y = 15 años: en 15 años, los expertos ven un 51–70 % de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.')
+    expect(out.textContent).toBe('x + y = 15 años: en 15 años, los expertos ven un 51–\u206070\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.')
     fireEvent.change(x, { target: { value: '2' } })
     fireEvent.change(y, { target: { value: '2' } })
     expect(x.getAttribute('aria-valuetext')).toBe('2 años')
-    expect(out.textContent).toBe('x + y = 4 años: en 5 años la media no pasa del 15 %; en 10, 28–49 % (GRI 2025).')
+    expect(out.textContent).toBe('x + y = 4 años: en 5 años la media no pasa del 15\u00a0%; en 10, 28–\u206049\u00a0% (GRI 2025).')
     fireEvent.change(x, { target: { value: '20' } })
-    expect(out.textContent).toBe('x + y = 22 años: en 15 años, los expertos ven un 51–70 % de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo. A 20, al menos el 69 %.')
+    expect(out.textContent).toBe('x + y = 22 años: en 15 años, los expertos ven un 51–\u206070\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo. A 20, al menos el 69\u00a0%.')
   })
 
   it('scene 6 on phones: the active widget is the sheet’s (not hidden from assistive technology); the panel’s copy is inert and hidden', async () => {
@@ -264,7 +265,7 @@ describe('/lab/historia', () => {
     // One state: moving the sheet's slider moves the panel's too.
     fireEvent.change(sheetW.querySelector('input')!, { target: { value: '25' } })
     expect((panelW.querySelector('input') as HTMLInputElement).value).toBe('25')
-    expect(sheetW.querySelector('.story-mosca-out')!.textContent).toBe('x + y = 30 years: within 15 years, experts put a capable quantum computer at 51–70% (GRI 2025). At risk. At 20, at least 69%.')
+    expect(sheetW.querySelector('.story-mosca-out')!.textContent).toBe('x + y = 30 years: within 15 years, experts put a capable quantum computer at 51–\u206070% (GRI 2025). At risk. At 20, at least 69%.')
   })
 
   it('the stage shows only the track on screen, with soft edges, and fades in with it; the sheet shows once the track is behind it', async () => {
@@ -324,6 +325,38 @@ describe('/lab/historia', () => {
     // Past it: hidden.
     await scroll({ top: -9600, bottom: -10 })
     await waitFor(() => expect(st().visibility).toBe('hidden'))
+  })
+
+  it('the sheet changes in the same frame as data-panels: never shown over no scene, not even for a render', async () => {
+    media(() => true)
+    const vh = window.innerHeight
+    let track = { top: vh - 200, bottom: 9000 }
+    const boxes: Record<string, { top: number; bottom: number }> = {
+      'story-stage': { top: 0, bottom: vh },
+      'story-sheet': { top: vh - 160, bottom: vh },
+    }
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const key = [...this.classList].find((c) => c in boxes || c === 'story-track')
+      const r = key === 'story-track' ? track : key ? boxes[key] : { top: 0, bottom: 0 }
+      return { ...r, left: 0, right: 100, width: 100, height: r.bottom - r.top, x: 0, y: r.top, toJSON() {} } as DOMRect
+    })
+    renderAt('/lab/historia')
+    await screen.findByRole('heading', { level: 1 })
+    // Read both attributes in the animation frame right after the page's update,
+    // before React could render anything.
+    const sameFrame = (r: { top: number; bottom: number }) =>
+      new Promise<[string | null, string | null]>((ok) => {
+        track = r
+        window.dispatchEvent(new Event('scroll'))
+        requestAnimationFrame(() =>
+          ok([document.querySelector('.story')!.getAttribute('data-panels'), document.querySelector('.story-sheet')!.getAttribute('data-active')]),
+        )
+      })
+    // In, out at the end (as when Safari's toolbar shortens the track), in again, entering.
+    for (const r of [{ top: -500, bottom: 8000 }, { top: -9000, bottom: vh - 300 }, { top: -500, bottom: 8000 }, { top: vh - 100, bottom: 9000 }]) {
+      const [panels, active] = await sameFrame(r)
+      expect(active, `track ${r.top}..${r.bottom}`).toBe(panels === 'on' ? 'true' : 'false')
+    }
   })
 
   it('progress uses the visible height (visualViewport: iOS toolbars), not the layout viewport', async () => {

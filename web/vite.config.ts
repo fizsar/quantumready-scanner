@@ -9,7 +9,10 @@ export default defineConfig({
   plugins: [react(), storyImages()],
   // three.js is one lazy chunk of ~530 kB (~130 kB gzip), loaded only by the
   // 3D scenes; scripts/check-bundle.mjs keeps it out of the initial load.
-  build: { chunkSizeWarningLimit: 600 },
+  // Fonts are never inlined as data: (the Greek faces are under the 4 KB default):
+  // inlined, they would sit in the render-blocking CSS of every page; as files the
+  // browser fetches them only when a page uses their unicode-range.
+  build: { chunkSizeWarningLimit: 600, assetsInlineLimit: (file) => (file.endsWith('.woff2') ? false : undefined) },
   server: {
     // In development the Go API runs separately; in production Caddy routes /api.
     proxy: {

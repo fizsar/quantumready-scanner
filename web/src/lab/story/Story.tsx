@@ -12,6 +12,7 @@ import { loadStory, storyStillURL } from './load'
 import { orbitalOf, panelsShown, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
 import { MoscaWidget, type MoscaValue } from './MoscaWidget'
 import { TEXT } from './texts'
+import { typeset } from './typeset'
 import './Story.css'
 
 /** /lab/historia: hidden prototype of the redesign's story (noindex, not linked, not in the sitemap). */
@@ -24,8 +25,6 @@ export default function Story() {
   const mode: Mode = failed ? { kind: 'still', reason: 'no-webgl2' } : chosen
   const [index, setIndex] = useState(0)
   const [ready, setReady] = useState(false)
-  // The sheet (phones): shown while the track is behind it.
-  const [sheetOn, setSheetOn] = useState(false)
   // Scene 6: the inequality's sliders (one state for the panel's and the sheet's widget).
   const [mosca, setMosca] = useState<MoscaValue>({ ...MOSCA_DEFAULT })
   const phone = usePhone()
@@ -90,9 +89,12 @@ export default function Story() {
         engine.current?.setFrame(free)
         // Text panels only with the scene in place: entering, the intro leaves, the
         // scene fills its zone, then the panel comes in; leaving, the other way round.
+        // The sheet (phones) follows in the same frame, written to the DOM like
+        // data-panels: through React state it lagged a render behind, and for a
+        // moment it showed over no scene (WebKit, a toolbar appearing at the exit).
         const on = panelsShown(r, box, vh, phone ? sh!.getBoundingClientRect() : undefined)
         article.current?.setAttribute('data-panels', on ? 'on' : 'off')
-        setSheetOn(phone && on)
+        sh?.setAttribute('data-active', String(phone && on))
         st.style.setProperty('--free-left', `${free.left}px`)
         st.style.setProperty('--free-right', `${box.width - free.right}px`)
       }
@@ -181,7 +183,8 @@ export default function Story() {
       {/* Phones: text and 3D in separate zones, the current step in a panel below the scene. */}
       {/* Its text is a copy of the step panels (which screen readers read), so it is
           hidden from them; only an interactive control (scene 6) is not, on phones. */}
-      <div ref={sheet} className="story-sheet" data-active={sheetOn}>
+      {/* data-active is set by the scroll handler, in the frame data-panels changes. */}
+      <div ref={sheet} className="story-sheet">
         {STEPS.map((s, i) => (
           <div key={s.id} className="story-layer" data-current={i === index} data-step={s.id}>
             <div className="story-layer-copy" aria-hidden="true">
@@ -209,10 +212,10 @@ export default function Story() {
 
       <section className="story-sources" aria-labelledby="story-sources-title">
         <h2 id="story-sources-title">{tx.sources}</h2>
-        <p>{tx.method}</p>
-        <p>{tx.units}</p>
-        <p>{tx.methodQuantum}</p>
-        <p>{tx.methodPq}</p>
+        <p>{typeset(tx.method)}</p>
+        <p>{typeset(tx.units)}</p>
+        <p>{typeset(tx.methodQuantum)}</p>
+        <p>{typeset(tx.methodPq)}</p>
         <Sources lang={lang} />
       </section>
     </article>
@@ -239,7 +242,7 @@ function StepText({ step, first, lang, headingId }: { step: Step; first: boolean
           <Title text={t.title} />
         )}
       </h2>
-      <p className="story-body">{t.body}</p>
+      <p className="story-body">{typeset(t.body)}</p>
       <p className="story-legend">
         {tx.legend[step.scene].map((l, k) => (
           <span key={l} className={k === 0 ? 'story-pos' : 'story-neg'}>
@@ -272,10 +275,10 @@ const FREE_GAP = 24
 /** A step title; an expression before ': ' never breaks inside (e.g. "iℏ ∂ψ/∂t: how it changes"). */
 function Title({ text }: { text: string }) {
   const i = text.indexOf(': ')
-  if (i < 0) return <>{text}</>
+  if (i < 0) return <>{typeset(text)}</>
   return (
     <>
-      <span className="story-nowrap">{text.slice(0, i + 1)}</span> {text.slice(i + 2)}
+      <span className="story-nowrap">{typeset(text.slice(0, i + 1))}</span> {typeset(text.slice(i + 2))}
     </>
   )
 }
@@ -312,7 +315,7 @@ function Caption({ step, lang }: { step: Step; lang: Lang }) {
           </math>{' '}
           {tx.energy} E<sub>{o.n}</sub> = {e} eV
         </p>
-        <p className="story-scale">{tx.scale(r)}</p>
+        <p className="story-scale">{typeset(tx.scale(r))}</p>
       </div>
     )
   }
@@ -482,7 +485,7 @@ function Sources({ lang }: { lang: Lang }) {
         </a>{' '}
         (2025):{' '}
         {es
-          ? 'menos de un millón de cúbits ruidosos y menos de una semana, suponiendo un 0,1 % de error por puerta, un ciclo de 1 µs y 10 µs de tiempo de reacción. Antes, C. Gidney y M. Ekerå, '
+          ? 'menos de un millón de cúbits ruidosos y menos de una semana, suponiendo un 0,1\u00a0% de error por puerta, un ciclo de 1 µs y 10 µs de tiempo de reacción. Antes, C. Gidney y M. Ekerå, '
           : 'under a million noisy qubits and under a week, assuming 0.1% gate error, a 1 µs cycle and 10 µs reaction time. Earlier, C. Gidney and M. Ekerå, '}
         <cite>Quantum</cite> 5, 433 (2021): {es ? '20 millones de cúbits y 8 horas.' : '20 million qubits and 8 hours.'}
       </li>
@@ -501,8 +504,8 @@ function Sources({ lang }: { lang: Lang }) {
         </a>
         , Global Risk Institute, {es ? 'marzo de 2026' : 'March 2026'}:{' '}
         {es
-          ? '26 expertos estiman la probabilidad de un ordenador cuántico capaz de factorizar un número de 2048 bits en menos de 24 horas; medias entre la interpretación «pesimista» y la «optimista» de sus respuestas: 28–49 % en 10 años, 51–70 % en 15 (y ~15 % en 5 años en la optimista, ~69 % en 20 en la pesimista).'
-          : '26 experts estimate the likelihood of a quantum computer able to factor a 2048-bit number in less than 24 hours; averages between the “pessimistic” and “optimistic” readings of their answers: 28–49% within 10 years, 51–70% within 15 (and ~15% within 5 years in the optimistic one, ~69% within 20 in the pessimistic one).'}
+          ? '26 expertos estiman la probabilidad de un ordenador cuántico capaz de factorizar un número de 2048 bits en menos de 24 horas; medias entre la interpretación «pesimista» y la «optimista» de sus respuestas: 28–\u206049\u00a0% en 10 años, 51–\u206070\u00a0% en 15 (y ~15\u00a0% en 5 años en la optimista, ~69\u00a0% en 20 en la pesimista).'
+          : '26 experts estimate the likelihood of a quantum computer able to factor a 2048-bit number in less than 24 hours; averages between the “pessimistic” and “optimistic” readings of their answers: 28–\u206049% within 10 years, 51–\u206070% within 15 (and ~15% within 5 years in the optimistic one, ~69% within 20 in the pessimistic one).'}
       </li>
       <li>
         L. Babai, «On Lovász’ lattice reduction and the nearest lattice point problem», <cite>Combinatorica</cite> 6(1), 1–13 (1986).

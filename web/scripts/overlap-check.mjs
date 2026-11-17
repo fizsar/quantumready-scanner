@@ -146,6 +146,13 @@ const FIT = `(() => {${HELPERS}
   return out
 })()`
 
+// Read the page as it would be painted: after a scroll or a resize, two animation
+// frames. The page updates in requestAnimationFrame, right before each paint, so a
+// painted frame always went through its update; but headless WebKit can stop making
+// frames for 200–500 ms after setViewportSize, and a fixed wait then read a DOM no
+// frame had shown (the stage still on past the end of the story, never on screen).
+const settle = (page) => page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok()))))
+
 let failed = false
 const browsers = {}
 for (const { engine, width, height, dpr } of profiles) {
@@ -170,6 +177,7 @@ for (const { engine, width, height, dpr } of profiles) {
     for (let y = 0; y <= max + 1; y += Math.round(height / 8)) {
       await page.evaluate((y) => scrollTo(0, y), Math.min(y, max))
       await page.waitForTimeout(350)
+      await settle(page)
       positions++
       const r = await page.evaluate(AT_POSITION)
       for (const p of r.over) if (!over.has(p)) over.set(p, Math.min(y, max))
@@ -180,12 +188,14 @@ for (const { engine, width, height, dpr } of profiles) {
       if (engine === 'webkit' && phone) {
         await page.setViewportSize({ width, height: height - 90 })
         await page.waitForTimeout(250)
+        await settle(page)
         const t = await page.evaluate(AT_POSITION)
         for (const p of t.over) if (!over.has(p)) over.set(p + ' (toolbar)', Math.min(y, max))
         if (t.empty) empty.push(`${Math.min(y, max)} (toolbar)`)
         if (t.early !== null) early.push(`${Math.min(y, max)} (toolbar, scene ${t.early}px)`)
         await page.setViewportSize({ width, height })
         await page.waitForTimeout(150)
+        await settle(page)
       }
     }
     const fit = await page.evaluate(FIT)

@@ -9,6 +9,7 @@ import { A, B_ERR, B_EXACT, BAD, babai, closest, det, dist, gauss, GOOD, LWE, TA
 import { HYBRID, hex, ML_KEM, N as KEM_N, Q as KEM_Q, sizes, spaceDigits, total, X25519 } from './mlkem'
 import type { Step } from './model'
 import { apply, bell, bloch, blochOf, collapse, f, factorsFrom, GIDNEY_2025, H, order, periodFrom, probabilities, purity, Q, qftDistribution, reduced, SHOR, uniform, zeros, zz } from './quantum'
+import { typeset } from './typeset'
 
 const fmt = (lang: Lang, v: number, digits = 3) => new Intl.NumberFormat(lang, { maximumFractionDigits: digits }).format(Math.abs(v) < 1e-12 ? 0 : v).replace('-', '−')
 const vec = (lang: Lang, v: readonly number[]) => `(${v.map((x) => fmt(lang, x)).join('; ')})`
@@ -276,7 +277,7 @@ export const FigureCaption = memo(function FigureCaption({ step, lang }: { step:
       else {
         const g = GIDNEY_2025
         line = es
-          ? `RSA-2048: < ${n(g.qubits, 0)} cúbits ruidosos, < ${g.days} días, con ${n(g.gateError * 100, 1)} % de error por puerta, ciclo de ${g.cycleMicros} µs y ${g.reactionMicros} µs de reacción`
+          ? `RSA-2048: < ${n(g.qubits, 0)} cúbits ruidosos, < ${g.days} días, con ${n(g.gateError * 100, 1)}\u00a0% de error por puerta, ciclo de ${g.cycleMicros} µs y ${g.reactionMicros} µs de reacción`
           : `RSA-2048: < ${n(g.qubits, 0)} noisy qubits, < ${g.days} days, at ${n(g.gateError * 100, 1)}% gate error, ${g.cycleMicros} µs cycle and ${g.reactionMicros} µs reaction`
       }
       break
@@ -453,7 +454,7 @@ export const FigureCaption = memo(function FigureCaption({ step, lang }: { step:
   return (
     <div className="story-cap story-eq">
       {formula}
-      <p className="story-scale">{line}</p>
+      <p className="story-scale">{typeset(line)}</p>
     </div>
   )
 })

@@ -85,13 +85,13 @@ export function sentence(v: Verdict, lang: 'es' | 'en'): string {
   const head = `x + y = ${yrs(v.total)}: `
   if (v.kind === 'range') {
     const { years, low, high } = v.anchor
-    const also = v.also ? (es ? ` A ${v.also.years}, al menos el ${pct(v.also.low)} %.` : ` At ${v.also.years}, at least ${pct(v.also.low)}%.`) : ''
+    const also = v.also ? (es ? ` A ${v.also.years}, al menos el ${pct(v.also.low)}\u00a0%.` : ` At ${v.also.years}, at least ${pct(v.also.low)}%.`) : ''
     return es
-      ? `${head}en ${years} años, los expertos ven un ${pct(low)}–${pct(high)} % de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.${also}`
-      : `${head}within ${years} years, experts put a capable quantum computer at ${pct(low)}–${pct(high)}% (GRI 2025). At risk.${also}`
+      ? `${head}en ${years} años, los expertos ven un ${pct(low)}–\u2060${pct(high)}\u00a0% de probabilidad de un ordenador cuántico capaz (GRI 2025). Riesgo.${also}`
+      : `${head}within ${years} years, experts put a capable quantum computer at ${pct(low)}–\u2060${pct(high)}% (GRI 2025). At risk.${also}`
   }
   const tail = es
-    ? `en 5 años la media no pasa del ${pct(five.high!)} %; en 10, ${pct(ten.low!)}–${pct(ten.high!)} % (GRI 2025).`
-    : `within 5 years the average is at most ${pct(five.high!)}%; within 10, ${pct(ten.low!)}–${pct(ten.high!)}% (GRI 2025).`
+    ? `en 5 años la media no pasa del ${pct(five.high!)}\u00a0%; en 10, ${pct(ten.low!)}–\u2060${pct(ten.high!)}\u00a0% (GRI 2025).`
+    : `within 5 years the average is at most ${pct(five.high!)}%; within 10, ${pct(ten.low!)}–\u2060${pct(ten.high!)}% (GRI 2025).`
   return head + tail
 }
