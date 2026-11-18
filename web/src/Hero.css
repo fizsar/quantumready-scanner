@@ -1,0 +1,230 @@
+/* The home's entry (pages/Home.tsx, components/HeroScene.tsx): the title and
+   the form on one side, the scene in a framed card on the other. Everything is
+   in the first paint; the scene is a still image until the 3D covers it. */
+
+.hero {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* Phones: the scene after all the text, below the first screen. There the
+     largest thing painted first is text (the LCP), not the scene's image. */
+  grid-template-areas: 'copy' 'more' 'scene';
+  gap: var(--space-m);
+}
+@media (min-width: 64rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    /* The scene beside the title and the form only: what loads later below
+       them (the example domains) cannot move it. */
+    grid-template-areas: 'copy scene' 'more .';
+    column-gap: var(--space-xl);
+  }
+}
+.hero-copy {
+  grid-area: copy;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  min-width: 0;
+}
+.hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-size: var(--step--1);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  white-space: nowrap; /* "--pqc" never breaks after its dashes */
+  color: var(--muted);
+}
+.hero-dot {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+}
+.hero-title {
+  font-size: clamp(2.488rem, 1.6rem + 3.9vw, 4rem);
+  font-weight: 700;
+  line-height: 1.08;
+  text-wrap: balance;
+  color: var(--text);
+}
+/* Large text only (≥ 3:1): every stop of the gradient is checked in hero.test.ts. */
+.hero-accent {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@media (forced-colors: active) {
+  .hero-accent {
+    background: none;
+    color: CanvasText;
+  }
+}
+.hero-lead {
+  max-width: 44ch;
+  color: var(--muted);
+}
+.hero-more {
+  grid-area: more;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  max-width: 44ch;
+}
+
+/* The form: the first thing to use, comfortable to hit (48 px high). */
+.hero .scan-form {
+  max-width: 34rem;
+}
+.hero .row > * {
+  min-height: 3rem;
+}
+.hero .row .btn {
+  align-self: stretch;
+  padding-inline: var(--space-m);
+}
+@media (max-width: 40rem) {
+  /* Phones: the form must be on the first screen, even on a short one. */
+  .hero-copy {
+    gap: var(--space-xs);
+  }
+  .hero-lead {
+    font-size: var(--step-0);
+  }
+  /* Room for the example domains before they load (about their height with
+     two of them): the scene below neither peeks into the first screen for a
+     moment nor jumps down when they arrive. */
+  .hero-more {
+    min-height: 15.5rem;
+  }
+  .hero .row {
+    flex-direction: column;
+  }
+  .hero .row > * {
+    flex: none;
+    width: 100%;
+  }
+}
+
+/* The scene: a square card (the still image is square, and the 3D frames the
+   cloud in the same square, so one sits exactly over the other). Decorative:
+   it takes no pointer events and is clipped to its own box, so nothing it
+   draws can ever cover the form. */
+.hero-scene {
+  grid-area: scene;
+  align-self: center;
+  position: relative;
+  width: 100%;
+  max-width: 34rem;
+  aspect-ratio: 1;
+  justify-self: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--bg); /* the canvas's and the image's own background */
+  overflow: hidden;
+  contain: layout paint;
+  pointer-events: none;
+}
+@media (min-width: 64rem) {
+  .hero-scene {
+    justify-self: end;
+  }
+}
+.hero-still,
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Particles fade out before the card's edge: never a straight cut. */
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 80%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 80%, transparent 100%);
+}
+.hero-still {
+  object-fit: contain;
+}
+/* Opaque once drawn, over the image: the first 3D frame is the image's own frame. */
+.hero-canvas {
+  opacity: 0;
+  transition: opacity var(--dur-base) linear;
+}
+.hero-canvas[data-ready='true'] {
+  opacity: 1;
+}
+/* Grid marks in the corners. */
+.hero-mark {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  opacity: 0.6;
+  background:
+    linear-gradient(var(--muted), var(--muted)) center / 100% 1px no-repeat,
+    linear-gradient(var(--muted), var(--muted)) center / 1px 100% no-repeat;
+}
+.hero-mark-tl {
+  top: var(--space-s);
+  left: var(--space-s);
+}
+.hero-mark-tr {
+  top: var(--space-s);
+  right: var(--space-s);
+}
+.hero-mark-bl {
+  bottom: var(--space-s);
+  left: var(--space-s);
+}
+.hero-mark-br {
+  bottom: var(--space-s);
+  right: var(--space-s);
+}
+/* What the cloud is, on its own opaque pill (no text straight over the scene).
+   It names the orbital, so it leaves when the cloud collapses into the logo. */
+.hero-label {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-s);
+  transform: translateX(-50%);
+  max-width: calc(100% - 4 * var(--space-s));
+  padding: var(--space-3xs) var(--space-xs);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-1);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  white-space: nowrap;
+  color: var(--text);
+  transition:
+    opacity var(--dur-fast) var(--ease-in),
+    visibility 0s linear var(--dur-fast);
+}
+.hero-label[data-on='false'] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Entrance: context first (title), then the lead, the action, the rest. Text
+   and form are visible and usable from the first frame: they only settle. */
+@media (prefers-reduced-motion: no-preference) {
+  .hero [data-enter] {
+    animation: hero-enter var(--dur-slow) var(--ease-out) backwards;
+  }
+  .hero [data-enter='1'] {
+    animation-delay: var(--stagger);
+  }
+  .hero [data-enter='2'] {
+    animation-delay: calc(2 * var(--stagger));
+  }
+  .hero [data-enter='3'] {
+    animation-delay: calc(3 * var(--stagger));
+  }
+}
+@keyframes hero-enter {
+  from {
+    opacity: 0.4;
+    transform: translateY(0.6rem);
+  }
+}

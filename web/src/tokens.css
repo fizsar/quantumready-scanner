@@ -179,3 +179,28 @@
   --radius-m: 12px;
   --radius-l: 16px;
 }
+
+/* Motion (direccion-arte.md 4.4). The 3D engine uses the same curves
+   (lab/story/model.ts EASE; model.test.ts checks they match). */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* entrances */
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1); /* scene changes, camera */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* interface feedback */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1); /* exits */
+  --dur-instant: 100ms;
+  --dur-fast: 200ms;
+  --dur-base: 400ms;
+  --dur-slow: 800ms;
+  --dur-scene: 1200ms;
+  --stagger: 80ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0ms;
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+    --dur-scene: 0ms;
+    --stagger: 0ms;
+  }
+}

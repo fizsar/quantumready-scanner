@@ -29,10 +29,11 @@ import {
   WebGLRenderer,
 } from 'three'
 import { pixelRatio } from '../capability'
+import { drew, findProbe, note, ran } from '../probe'
 import { BACKGROUND, NEGATIVE, POSITIVE, RADIUS } from '../view'
 import { fit, type Box, type Frame } from './camera'
 import { WIRE, type FigureId } from './figures'
-import { DOF, fillBase, frameAt, MAX_BLUR, MAX_POINT, POINT, shapeBox, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type Shape } from './model'
+import { DOF, fillBase, frameAt, MAX_BLUR, MAX_POINT, POINT, shapeBox, shapeKey, STEPS, storyAlpha, storySize, WAVE, WAVE_GAIN, WAVE_SIZE, type FrameState, type Shape } from './model'
 import type { StoryReply, StoryRequest } from './story.worker'
 import { field, SAMPLES, X_RANGE } from './wave'
 
@@ -51,6 +52,12 @@ export interface StoryOptions {
   seed: number
   onReady: () => void
   onError: () => void
+  /** What to draw at a progress (default: the story, model.ts frameAt). */
+  script?: (p: number) => FrameState
+  /** Build only these shapes (default: the whole story). */
+  only?: StoryRequest['only']
+  /** Called before each frame is drawn, with the time since the last one (ms; never more than 100). */
+  onFrame?: (dt: number) => void
 }
 
 const f = (v: number) => v.toFixed(6)
@@ -171,6 +178,8 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   renderer.setClearColor(new Color().setRGB(...unit(BACKGROUND), SRGBColorSpace), 1)
   let failed = false
   let drawnOnce = false
+  // Only when a check has installed it (lab/probe.ts): the frames drawn and whether the loop runs.
+  const probe = findProbe()
   renderer.debug.onShaderError = () => {
     if (failed) return
     failed = true
@@ -231,9 +240,14 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     else seeds = new BufferAttribute(m.seeds, 4)
     bound = ''
   }
-  worker.postMessage({ count: opts.points, seed: opts.seed } satisfies StoryRequest)
+  worker.postMessage({ count: opts.points, seed: opts.seed, only: opts.only } satisfies StoryRequest)
+  const script = opts.script ?? frameAt
 
   let progress = 0
+  // The scene's own clock (ms): it only runs while frames are drawn, so the
+  // spin, the sway and the flow pick up where they were after a pause (the
+  // tab hidden, the scene off screen) instead of jumping ahead.
+  let clock = 0
   let bound = ''
   let lastT = Number.NaN
   /** Whether a shape's data has arrived from the worker. */
@@ -248,7 +262,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
 
   function apply(time: number) {
     if (!orbitals[0]) return false
-    const fr = frameAt(progress)
+    const fr = script(progress)
     let { a, b, mix, burst } = fr
     // Data still on its way: stay on the last shape that has arrived.
     if (!ready(b)) [b, mix, burst] = [a, 0, 0]
@@ -272,8 +286,9 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     // The step's camera path, plus a slow sway; the atom spins slowly. The
     // camera frames the shape (between A and B during a morph) whole, centred
     // in the free part of the screen (camera.ts fit).
-    const atom = STEPS[fr.step].scene === 1 ? 1 - mix : 0
+    const atom = fr.spin ?? (STEPS[fr.step].scene === 1 ? 1 - mix : 0)
     material.uniforms.uSpin.value = time * 0.00012 * atom
+    material.uniforms.uAlpha.value = storyAlpha(drawn) * (fr.gain ?? 1)
     material.uniforms.uTime.value = time % FLOW_MS // small: float32 keeps its precision
     const box = lerpBox(shapeBox(a, fieldData), shapeBox(b, fieldData), mix)
     const shot = fit(box, fr.cam.az + 0.08 * Math.sin(time * 0.00009), fr.cam.el, fr.cam.frame, fr.cam.fov, frameNow())
@@ -316,6 +331,12 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     const focal = (h * dpr) / 2 / Math.tan(((camera.fov / 2) * Math.PI) / 180)
     material.uniforms.uSize.value = POINT * focal * storySize(drawn)
     material.uniforms.uMaxPx.value = MAX_POINT * h * dpr
+    // Resizing clears the canvas: while the loop is stopped (a scene at rest,
+    // or paused), draw the same moment again so it never goes blank.
+    if (drawnOnce && !running && !failed && apply(clock)) {
+      renderer.render(scene, camera)
+      drew(probe)
+    }
   }
   const setDrawn = (n: number) => {
     drawn = n
@@ -338,9 +359,12 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     raf = requestAnimationFrame(frame)
     const dt = last ? Math.min(t - last, 100) : 16
     last = t
-    const ok = apply(t)
+    clock += dt
+    opts.onFrame?.(dt)
+    const ok = apply(clock)
     renderer.render(scene, camera)
     if (failed || !ok) return
+    drew(probe)
     if (!drawnOnce) {
       drawnOnce = true
       opts.onReady()
@@ -361,15 +385,21 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   const start = () => {
     if (running || failed || document.hidden) return
     running = true
+    ran(probe, true)
     last = 0
     raf = requestAnimationFrame(frame)
   }
   const stop = () => {
+    if (running) ran(probe, false)
     running = false
     cancelAnimationFrame(raf)
   }
   let wanted = false
-  const onVisibility = () => (document.hidden ? stop() : wanted && start())
+  const onVisibility = () => {
+    note(probe, `visibilitychange: ${document.visibilityState}`)
+    if (document.hidden) stop()
+    else if (wanted) start()
+  }
   document.addEventListener('visibilitychange', onVisibility)
 
   return {
@@ -380,10 +410,12 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       free = f
     },
     start() {
+      if (!wanted) note(probe, document.hidden ? 'asked to run (tab hidden: waiting)' : 'asked to run')
       wanted = true
       start()
     },
     stop() {
+      if (wanted) note(probe, 'asked to stop')
       wanted = false
       stop()
     },

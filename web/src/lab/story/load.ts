@@ -3,3 +3,6 @@ export const storyStillURL = (step: string) => `/lab/story-${step}.png`
 
 /** Loads the story engine (three.js): a separate chunk, fetched only in 3D mode. */
 export const loadStory = () => import('./engine')
+
+/** Loads the home's hero scene (the same engine, playing the entry): fetched only in 3D mode. */
+export const loadHero = () => import('../hero/hero')

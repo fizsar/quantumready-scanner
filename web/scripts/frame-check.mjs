@@ -14,11 +14,13 @@
 // camera between its cam and via), and the way out (the end of the story at
 // 55 % of the height). The edges are those of the visible band too: entering
 // and leaving, a lit pixel at the band's top or bottom edge is a straight cut
-// (the stage must fade out there).
+// (the stage must fade out there). With the home page's URL it checks the
+// hero card instead: the still image and every phase of the entry (hero()).
 //
 //   node frame-check.mjs <devtools-port> <url> [WxHxDPR,...]
 import { writeFileSync } from 'node:fs'
 import { inflateSync } from 'node:zlib'
+import { DUMP, INVALID, INVALID_EXIT, PAINT_MS, PAINTED, PROBE, report } from './painted.mjs'
 
 const [port, url, sizesArg = '1280x800x1,1280x800x2,1440x900x1,1440x900x2,1920x1080x1,1920x1080x2,393x852x3'] = process.argv.slice(2)
 const sizes = sizesArg.split(',').map((s) => s.split('x').map(Number))
@@ -94,6 +96,118 @@ const ev = async (e) =>
   ).result?.value
 await send('Page.enable')
 
+// A measure only counts if the frame it looks at was drawn after the page got
+// to its position (painted.mjs): if not, the result is "invalid measurement
+// (render stopped)", never "cut" nor "ok", with the engine's state at that
+// moment, and the run ends there with exit code 3 (a failed check is 1).
+//   PAUSE_RENDER=1         self-test: freezes the page before the third measure; the run must end as invalid.
+//   PAUSE_RENDER=engine    self-test: only the engine's loop stops drawing while it says it runs (a bug of the
+//                          loop, as the report must name it).
+await send('Page.addScriptToEvaluateOnNewDocument', { source: PROBE })
+let measures = 0
+/** Whether a fresh frame is on screen; if not, reports it and ends the run (a frozen page answers nothing more). */
+async function painted(where, rows) {
+  if (process.env.PAUSE_RENDER && ++measures === 3) {
+    // The engine alone: its frames stop counting (as if its loop had died) while the page goes on.
+    if (process.env.PAUSE_RENDER === 'engine') await ev(`(() => { const p = window.__qrProbe; Object.defineProperty(p, 'frames', { get: () => 0, set: () => {} }); p.running = true })()`)
+    else await send('Page.setWebLifecycleState', { state: 'frozen' })
+  }
+  const fresh = await Promise.race([ev(PAINTED), sleep(PAINT_MS).then(() => false)])
+  if (fresh) return
+  const state = await Promise.race([ev(DUMP), sleep(2000).then(() => null)])
+  console.log(`== ${where}\n` + [...rows, ...report('', state).map((l) => '    ' + l)].join('\n'))
+  console.error(`✗ ${INVALID}: the result is neither ok nor cut.`)
+  ws.close()
+  await fetch(`http://127.0.0.1:${port}/json/close/${t.id}`).catch(() => {})
+  process.exit(INVALID_EXIT)
+}
+
+// The home's hero card (/): the still image before the 3D, one frame in each
+// phase of the entry (the canvas's data-phase: handover, inhale, condense,
+// hold, collapse at its start and half-way, rest) and the Q̂ two seconds into
+// its rest. In each: nothing lit in a 4 px band along the card's edges (the
+// cloud fades out before them: never a straight cut) and at most 2 % of the
+// lit pixels burnt to white. The label and the corner marks are left out.
+const HALF = 1850 // ms into the entry: half-way through the collapse (lab/hero/entry.ts ENTRY)
+async function hero(width, height, dpr, phone) {
+  const rows = []
+  let bad = false
+  const shoot = async (label) => {
+    await painted(`hero ${width}×${height} DPR ${dpr}, ${label}`, rows)
+    const g = await ev(`(() => {
+      const r = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom } }
+      const card = document.querySelector('.hero-scene')
+      const cs = getComputedStyle(card)
+      const c = r(card)
+      // Inside the border, and one more pixel (a border on a fractional position is antialiased).
+      const bw = parseFloat(cs.borderTopWidth) + 1
+      const skip = [...card.querySelectorAll('.hero-label, .hero-mark')].filter((e) => getComputedStyle(e).visibility !== 'hidden').map(r)
+      // The card's rounded corners: its own border curves through them.
+      const rad = parseFloat(cs.borderTopLeftRadius) || 0
+      for (const [x, y] of [[c.l, c.t], [c.r - rad, c.t], [c.l, c.b - rad], [c.r - rad, c.b - rad]]) skip.push({ l: x, t: y, r: x + rad, b: y + rad })
+      return { card: { l: c.l + bw, t: c.t + bw, r: c.r - bw, b: c.b - bw }, skip }
+    })()`)
+    const { data } = await send('Page.captureScreenshot', { format: 'png' })
+    const buf = Buffer.from(data, 'base64')
+    if (process.env.SHOTS) writeFileSync(`hero-${width}x${height}x${dpr}-${label}.png`, buf)
+    const img = decodePNG(buf)
+    const s = img.w / width
+    const box = (q) => ({ l: Math.ceil(q.l * s), t: Math.ceil(q.t * s), r: Math.floor(q.r * s), b: Math.floor(q.b * s) })
+    const card = box(g.card)
+    const skip = g.skip.map(box)
+    const band = Math.round(4 * s)
+    let lit = 0
+    let burnt = 0
+    let cut = 0
+    for (let y = Math.max(0, card.t); y < Math.min(img.h, card.b); y++)
+      for (let x = Math.max(0, card.l); x < Math.min(img.w, card.r); x++) {
+        if (skip.some((q) => x >= q.l - 1 && x <= q.r && y >= q.t - 1 && y <= q.b)) continue
+        const o = (y * img.w + x) * img.bpp
+        if (Math.max(img.px[o], img.px[o + 1], img.px[o + 2]) < 40) continue
+        lit++
+        if (Math.min(img.px[o], img.px[o + 1], img.px[o + 2]) >= 235) burnt++
+        if (x < card.l + band || x >= card.r - band || y < card.t + band || y >= card.b - band) cut++
+      }
+    const cutPct = (100 * cut) / ((card.r - card.l) * (card.b - card.t))
+    const burntPct = (100 * burnt) / Math.max(1, lit)
+    // An empty card is a failure too: the still image or the cloud must be there.
+    const fail = cutPct > 0.02 || burntPct > 2 || lit === 0
+    bad ||= fail
+    rows.push(`${label.padStart(10)} ${fail ? 'FAIL' : 'ok  '} cut ${cutPct.toFixed(3)} %  burnt ${burntPct.toFixed(1)} %  lit ${((100 * lit) / ((card.r - card.l) * (card.b - card.t))).toFixed(1)} %`)
+  }
+  // Phones: the card is below the form; the entry waits until enough of it is on screen.
+  await ev(`document.querySelector('.hero-scene').scrollIntoView({ block: 'center' })`)
+  // The image loaded and the fonts in (the card moves when the text beside it reflows).
+  await ev(`document.fonts.ready.then(() => 1)`)
+  await ev(`(async () => { const i = document.querySelector('.hero-still'); if (i) { await i.decode().catch(() => {}); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))) } })()`)
+  await shoot('still')
+  const state = () => ev(`(() => { const c = document.querySelector('.hero-canvas'); return c?.dataset.ready === 'true' ? c.dataset.phase : document.querySelector('.hero-scene').dataset.mode === 'still' ? 'still' : '' })()`)
+  const seen = new Set()
+  let halfway = false
+  for (let k = 0; k < 1200; k++) {
+    const p = await state()
+    if (p === 'still' && k > 400) break // no 3D on this device: the image is all there is
+    if (p && p !== 'still' && !seen.has(p)) {
+      seen.add(p)
+      await shoot(p)
+      if (p === 'rest') break
+    } else if (p === 'collapse' && !halfway && (await ev(`+document.querySelector('.hero-canvas').dataset.entry`)) > HALF) {
+      halfway = true
+      await shoot('collapse½')
+    }
+    await sleep(15)
+  }
+  if (seen.has('rest')) {
+    await sleep(2000)
+    await shoot('rest+2s')
+  } else {
+    rows.push('     (no 3D: still image only)')
+    bad ||= !process.env.ALLOW_STILL
+  }
+  console.log(`== hero ${width}×${height} DPR ${dpr}${phone ? ' (phone)' : ''}\n` + rows.join('\n'))
+  return bad
+}
+
 let failed = false
 for (const [width, height, dpr] of sizes) {
   const phone = width < 600
@@ -108,6 +222,18 @@ for (const [width, height, dpr] of sizes) {
     maxTouchPoints: 5,
   })
   await send('Page.navigate', { url })
+  // The home page: its hero card plays the entry once, by itself (see hero() below).
+  let isHero = false
+  for (let k = 0; k < 100 && !isHero; k++) {
+    await sleep(50)
+    const page = await ev(`document.querySelector('.hero-scene') ? 'hero' : document.querySelector('.story') ? 'story' : ''`)
+    if (page === 'story') break
+    isHero = page === 'hero'
+  }
+  if (isHero) {
+    failed = (await hero(width, height, dpr, phone)) || failed
+    continue
+  }
   await sleep(6000)
   const steps = await ev(`document.querySelectorAll('.story-step').length`)
   const rows = []
@@ -122,6 +248,7 @@ for (const [width, height, dpr] of sizes) {
     else if (pos.at !== undefined)
       await ev(`(() => { const t = document.querySelector('.story-track'); scrollTo(0, t.getBoundingClientRect().top + scrollY + innerHeight * Math.max(0, ${pos.at})) })()`)
     await sleep(1800)
+    await painted(`${width}×${height} DPR ${dpr}, position ${name}`, rows)
     const g = await ev(`(() => {
       const r = (e) => { if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom } }
       const stage = r(document.querySelector('.story-stage'))

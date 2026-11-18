@@ -244,6 +244,47 @@ export function stepAt(p: number) {
 const smooth = (f: number) => f * f * (3 - 2 * f)
 const lerp = (a: number, b: number, f: number) => a + (b - a) * f
 
+// ---- motion: the named curves of tokens.css, for what the engine animates ----
+
+/** The control points of the motion tokens (tokens.css; model.test.ts checks they are the same). */
+export const EASE = {
+  out: [0.16, 1, 0.3, 1],
+  inOut: [0.76, 0, 0.24, 1],
+  standard: [0.2, 0, 0, 1],
+  in: [0.4, 0, 1, 1],
+} as const satisfies Record<string, readonly [number, number, number, number]>
+
+/** CSS cubic-bezier(x1, y1, x2, y2) at x ∈ [0, 1]: the same curve the browser draws. */
+export function bezier([x1, y1, x2, y2]: readonly [number, number, number, number], x: number): number {
+  if (x <= 0) return 0
+  if (x >= 1) return 1
+  const at = (a: number, b: number, t: number) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3
+  // x(t) is monotonic for control points in [0, 1]: bisection.
+  let lo = 0
+  let hi = 1
+  for (let k = 0; k < 40; k++) {
+    const mid = (lo + hi) / 2
+    if (at(x1, x2, mid) < x) lo = mid
+    else hi = mid
+  }
+  return at(y1, y2, (lo + hi) / 2)
+}
+
+/** What the engine draws at one moment (frameAt for the story; hero/entry.ts for the home's entry). */
+export interface FrameState {
+  a: Shape
+  b: Shape
+  mix: number
+  burst: number
+  t: number
+  cam: Cam
+  step: number
+  /** How much an orbital spins about its axis, 0 … 1 (default: scene 1 spins, less as it morphs away). */
+  spin?: number
+  /** Light, relative to the usual (default 1). */
+  gain?: number
+}
+
 /** How far particles fly apart in the middle of a morph (world units): a gentle stir within a scene, a burst from one scene to the next. */
 export const BURST = { orbital: 0.3, scene: 2.4 }
 
@@ -254,7 +295,7 @@ export const BURST = { orbital: 0.3, scene: 2.4 }
  * to the next step's cam; a change of shape holds for the first half of the
  * step and morphs in the second; a wave runs its time range.
  */
-export function frameAt(p: number): { a: Shape; b: Shape; mix: number; burst: number; t: number; cam: Cam; step: number } {
+export function frameAt(p: number): FrameState {
   const last = STEPS.length - 1
   const q = Math.min(Math.max(p, 0), STEPS.length - 1e-6)
   const i = Math.floor(q)

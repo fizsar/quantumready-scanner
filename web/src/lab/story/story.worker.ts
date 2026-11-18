@@ -9,6 +9,8 @@ import { densityWeights, orbitalHues, waveSeeds } from './model'
 export interface StoryRequest {
   count: number
   seed: number
+  /** Build only these shapes (the home's entry needs two); default: the whole story. */
+  only?: { orbitals: number[]; figures: FigureId[] }
 }
 
 export type StoryReply =
@@ -34,12 +36,19 @@ scope.onmessage = (e) => {
     }
     scope.postMessage({ kind: 'orbital', index, positions: s.positions, looks, r95: s.r95 }, [s.positions.buffer, looks.buffer])
   }
+  const figure = (id: FigureId) => {
+    const f = buildFigure(id, count, seed)
+    scope.postMessage({ kind: 'figure', id, positions: f.positions, looks: f.looks }, [f.positions.buffer, f.looks.buffer])
+  }
+  const { only } = e.data
+  if (only) {
+    only.orbitals.forEach(orbital)
+    only.figures.forEach(figure)
+    return
+  }
   orbital(0)
   const seeds = waveSeeds(count, seed)
   scope.postMessage({ kind: 'seeds', seeds }, [seeds.buffer])
   for (let i = 1; i < ORBITALS.length; i++) orbital(i)
-  for (const id of FIGURES) {
-    const f = buildFigure(id, count, seed)
-    scope.postMessage({ kind: 'figure', id, positions: f.positions, looks: f.looks }, [f.positions.buffer, f.looks.buffer])
-  }
+  FIGURES.forEach(figure)
 }

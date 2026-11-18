@@ -15,6 +15,10 @@ export const dict = {
     'nav.home': 'Inicio',
     'nav.skip': 'Saltar al contenido',
     'home.title': '¿Está tu web preparada para la era cuántica?',
+    // The words of the title drawn in the brand's gradient (must be part of it).
+    'home.titleAccent': 'era cuántica',
+    // Under the orbital in the hero card: the cloud is |ψ|² sampled, not an illustration.
+    'home.sceneLabel': 'calculado, no dibujado',
     'home.lead':
       'Comprobamos cómo cifra tu web las conexiones: si ya usa intercambio de claves post-cuántico (ML-KEM), qué versiones de TLS y cifrados acepta y qué certificado presenta. El resultado, en lenguaje claro.',
     'home.demo': 'Por ahora, el escáner solo está abierto a estos dominios de demostración:',
@@ -267,6 +271,8 @@ export const dict = {
     'nav.home': 'Home',
     'nav.skip': 'Skip to content',
     'home.title': 'Is your website ready for the quantum era?',
+    'home.titleAccent': 'quantum era',
+    'home.sceneLabel': 'computed, not drawn',
     'home.lead':
       'We check how your website encrypts connections: whether it already uses post-quantum key exchange (ML-KEM), which TLS versions and ciphers it accepts and which certificate it presents. The result, in plain language.',
     'home.demo': 'For now, the scanner is only open to these demo domains:',

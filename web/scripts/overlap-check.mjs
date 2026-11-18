@@ -14,10 +14,15 @@
 // and, once per page, if a panel scrolls inside, cuts an equation or breaks a
 // title inside an expression (.story-nowrap on more than one line), or the
 // scene keeps less than 40 % of a phone's height.
+// On the home page (its hero card is a stage too) it also fails if the form
+// is not on the first screen from the first paint, if the scene's card
+// overlaps a control, if something covers a control where it would be
+// tapped, or if the page scrolls sideways (HOME below).
 // Run by overlap-check.sh.
 //
 //   node overlap-check.mjs <base-url> <engine:WxHxDPR,...> <path>...
 import { chromium, devices, webkit } from 'playwright'
+import { DUMP, INVALID, INVALID_EXIT, PAINT_MS, PAINTED, PROBE, report } from './painted.mjs'
 
 const [base, profilesArg, ...paths] = process.argv.slice(2)
 const profiles = profilesArg.split(',').map((p) => {
@@ -151,7 +156,57 @@ const FIT = `(() => {${HELPERS}
 // painted frame always went through its update; but headless WebKit can stop making
 // frames for 200–500 ms after setViewportSize, and a fixed wait then read a DOM no
 // frame had shown (the stage still on past the end of the story, never on screen).
-const settle = (page) => page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok()))))
+//
+// And a reading only counts if that happened (painted.mjs): if the renderer has
+// stopped, the DOM read is stale and says nothing. Then the result is "invalid
+// measurement (render stopped)", never "ok" nor a failure, with the engine's
+// state at that moment, and the run ends there with exit code 3 (a failed check is 1).
+//   PAUSE_RENDER=1  self-test: stops the page's animation frames before the third reading; the run must end as invalid.
+let readings = 0
+const within = (promise, ms, otherwise) => Promise.race([promise, new Promise((ok) => setTimeout(() => ok(otherwise), ms))])
+async function settle(page, where) {
+  if (process.env.PAUSE_RENDER && ++readings === 3) await page.evaluate(() => (window.requestAnimationFrame = () => 0))
+  if (await within(page.evaluate(PAINTED), PAINT_MS, false)) return
+  const state = await within(page.evaluate(DUMP), 2000, null)
+  console.log(report(where, state).map((l) => '     ' + l).join('\n'))
+  console.error(`✗ ${INVALID}: the result is neither ok nor a failure.`)
+  process.exit(INVALID_EXIT)
+}
+
+// The home page's entry (a page with .hero): the form is on the first screen
+// and nothing is ever over it. At the top of the page, as soon as the form
+// exists (the first paint) and again once everything has loaded; then at every
+// scroll position, for whatever controls are on screen.
+const HOME = `((first) => {${HELPERS}
+  const hero = document.querySelector('.hero')
+  if (!hero) return null
+  const out = []
+  const card = document.querySelector('.hero-scene').getBoundingClientRect()
+  const controls = [...hero.querySelectorAll('input, button, a[href]')].filter(shown)
+  if (first) {
+    for (const c of hero.querySelectorAll('.scan-form input, .scan-form button[type=submit]')) {
+      const b = c.getBoundingClientRect()
+      if (b.top < 0 || b.bottom > innerHeight) out.push(tag(c) + ' not on the first screen (' + Math.round(b.bottom) + ' of ' + innerHeight + 'px)')
+    }
+    if (!hero.querySelector('.hero-title')?.textContent.trim()) out.push('no title')
+    if (!shown(document.querySelector('.hero-scene')) || card.width < 100) out.push('no scene card')
+  }
+  for (const c of controls) {
+    const b = c.getBoundingClientRect()
+    if (Math.min(b.right, card.right) - Math.max(b.left, card.left) > 0 && Math.min(b.bottom, card.bottom) - Math.max(b.top, card.top) > 0) out.push('the scene overlaps ' + tag(c))
+    // What a tap in its middle would hit, if it is on screen (a link that wraps: the middle of its first line).
+    const q = c.getClientRects()[0] ?? b
+    const x = (q.left + q.right) / 2
+    const y = (q.top + q.bottom) / 2
+    if (x < 0 || x >= innerWidth || y < 0 || y >= innerHeight) continue
+    const hit = document.elementFromPoint(x, y)
+    if (hit && hit !== c && !c.contains(hit)) out.push(tag(c) + ' covered by ' + tag(hit))
+  }
+  if (document.documentElement.scrollWidth > innerWidth + 1) out.push('horizontal scroll: ' + document.documentElement.scrollWidth + ' > ' + innerWidth)
+  const label = document.querySelector('.hero-label')
+  if (label && shown(label) && !opaque(label)) out.push('the label has no opaque background')
+  return out
+})`
 
 let failed = false
 const browsers = {}
@@ -165,10 +220,17 @@ for (const { engine, width, height, dpr } of profiles) {
     isMobile: phone,
     hasTouch: phone,
   })
+  await ctx.addInitScript(PROBE)
   for (const path of paths) {
     const page = await ctx.newPage()
+    const where = (y) => `${engine} ${width}×${height} DPR ${dpr} ${path} @${y}px`
     await page.goto(base + path)
+    const home = new Set()
+    // The home's form must be usable from the first paint: check before anything else has loaded.
+    await page.waitForSelector('.scan-form input, .story', { timeout: 15000 })
+    for (const p of (await page.evaluate(`${HOME}(true)`)) ?? []) home.add(p + ' (first paint)')
     await page.waitForTimeout(2500)
+    for (const p of (await page.evaluate(`${HOME}(true)`)) ?? []) home.add(p)
     const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)
     const over = new Map()
     const empty = []
@@ -177,9 +239,10 @@ for (const { engine, width, height, dpr } of profiles) {
     for (let y = 0; y <= max + 1; y += Math.round(height / 8)) {
       await page.evaluate((y) => scrollTo(0, y), Math.min(y, max))
       await page.waitForTimeout(350)
-      await settle(page)
+      await settle(page, where(Math.min(y, max)))
       positions++
       const r = await page.evaluate(AT_POSITION)
+      for (const p of (await page.evaluate(`${HOME}(false)`)) ?? []) home.add(`${p} @${Math.min(y, max)}px`)
       for (const p of r.over) if (!over.has(p)) over.set(p, Math.min(y, max))
       if (r.empty) empty.push(Math.min(y, max))
       if (r.early !== null) early.push(`${Math.min(y, max)} (scene ${r.early}px)`)
@@ -188,24 +251,25 @@ for (const { engine, width, height, dpr } of profiles) {
       if (engine === 'webkit' && phone) {
         await page.setViewportSize({ width, height: height - 90 })
         await page.waitForTimeout(250)
-        await settle(page)
+        await settle(page, where(Math.min(y, max)) + ' (toolbar)')
         const t = await page.evaluate(AT_POSITION)
         for (const p of t.over) if (!over.has(p)) over.set(p + ' (toolbar)', Math.min(y, max))
         if (t.empty) empty.push(`${Math.min(y, max)} (toolbar)`)
         if (t.early !== null) early.push(`${Math.min(y, max)} (toolbar, scene ${t.early}px)`)
         await page.setViewportSize({ width, height })
         await page.waitForTimeout(150)
-        await settle(page)
+        await settle(page, where(Math.min(y, max)) + ' (toolbar off)')
       }
     }
     const fit = await page.evaluate(FIT)
-    const ok = over.size === 0 && empty.length === 0 && early.length === 0 && fit.length === 0
+    const ok = over.size === 0 && empty.length === 0 && early.length === 0 && fit.length === 0 && home.size === 0
     failed ||= !ok
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${engine} ${width}×${height} DPR ${dpr} ${path}: ${positions} positions` +
       (over.size ? `; text over the stage: ${[...over].slice(0, 5).map(([p, y]) => `${p} @${y}px`).join(' | ')}${over.size > 5 ? ` (+${over.size - 5})` : ''}` : '') +
       (empty.length ? `; EMPTY screen at ${empty.length} positions (${empty.slice(0, 6).join(', ')}px…)` : '') +
       (early.length ? `; PANEL with the scene < 40 % at ${early.length} positions (${early.slice(0, 4).join(', ')}…)` : '') +
-      (fit.length ? `; panels: ${fit.join(' | ')}` : ''))
+      (fit.length ? `; panels: ${fit.join(' | ')}` : '') +
+      (home.size ? `; home: ${[...home].slice(0, 6).join(' | ')}` : ''))
     await page.close()
   }
   await ctx.close()
