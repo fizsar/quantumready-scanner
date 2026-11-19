@@ -15,14 +15,17 @@ ARG COMMIT=unknown
 LABEL org.opencontainers.image.source="https://github.com/fizsar/quantumready-saas" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${COMMIT}"
-# The pinned base still ships musl 1.2.6-r2 and zlib 1.3.2-r0, with fixable HIGH
-# vulnerabilities (CVE-2026-107891, CVE-2026-85091; Trivy in release.yml): install
+# The pinned base still ships musl 1.2.6-r2, zlib 1.3.2-r0 and nginx 1.30.6-r1, with
+# fixable HIGH/CRITICAL vulnerabilities (musl CVE-2026-107891, zlib CVE-2026-85091;
+# nginx CVE-2026-113425, -121810, -123007, -123633, -118899, -123634, fixed in
+# 1.30.7-r0; Trivy in release.yml), and no newer digest is published yet: install
 # at least the fixed versions (a minimum, not an exact version: Alpine keeps only
-# the latest revision, so an exact pin would break the build at the next one).
+# the latest revision, so an exact pin would break the build at the next one). The
+# image's own nginx.conf stays (apk leaves the package's as nginx.conf.apk-new).
 # deploy/check_base_pins.py (CI, Docker web job) fails once the base image's digest
 # carries them all: then drop these three lines.
 USER root
-RUN apk add --no-cache 'musl>=1.2.6-r3' 'musl-utils>=1.2.6-r3' 'zlib>=1.3.2-r1'   # base-pins
+RUN apk add --no-cache 'musl>=1.2.6-r3' 'musl-utils>=1.2.6-r3' 'zlib>=1.3.2-r1' 'nginx>=1.30.7-r0'   # base-pins
 USER 101
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
