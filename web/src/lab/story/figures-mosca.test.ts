@@ -19,10 +19,11 @@ const q = (v: number[], f: number) => [...v].sort((a, b) => a - b)[Math.floor(f 
 const yearX = (t: number) => -3 + (6 * t) / YEARS
 
 describe('scene 6 figures: what is drawn comes from mosca.ts', () => {
-  it('the captured traffic flows on the wire; the store holds 12 packets', () => {
-    const flow = withWeight('harvest', -1.3)
+  it('the captured traffic flows on the wire as packets; the store holds 12 packets', () => {
+    const flow = withWeight('harvest', -1.9)
     expect(flow.length).toBeGreaterThan(100)
-    for (const p of flow) expect(Math.abs(p[1] - WIRE.y)).toBeLessThan(0.1)
+    // Packets have a size (a gaussian dot): on the wire within a few of its sigmas.
+    for (const p of flow) expect(Math.abs(p[1] - WIRE.y)).toBeLessThan(0.3)
     expect(withWeight('harvest', 1.4).length).toBeGreaterThan(0) // the packets inside
   })
 

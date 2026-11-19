@@ -93,6 +93,8 @@ interface Part {
   at: (r: () => number, g: () => number) => V3
   /** Particles flow along the wire (circuit). */
   flow?: boolean
+  /** All the points the part can take, when they are few (the box uses them instead of samples). */
+  extent?: V3[]
 }
 
 // ---- Parts ----
@@ -164,6 +166,36 @@ const cube = (c: V3, s: number, emph: number, hue: number): Part[] => {
       }
   return out
 }
+/** A column of light: a cylinder of radius rad and height h standing on c, with a bright cap (the value it shows). */
+const column = (c: V3, h: number, rad: number, emph: number, hue: number): Part[] => [
+  {
+    area: 2 * Math.PI * rad * Math.max(h, 0.01),
+    emph,
+    hue,
+    at: (r) => {
+      const a = 2 * Math.PI * r()
+      return [c[0] + rad * Math.cos(a), c[1] + h * r(), c[2] + rad * Math.sin(a)]
+    },
+  },
+  {
+    area: 2 * Math.PI * rad * rad,
+    emph: emph * 1.6,
+    hue,
+    at: (r) => {
+      const a = 2 * Math.PI * r()
+      const k = rad * Math.sqrt(r())
+      return [c[0] + k * Math.cos(a), c[1] + h, c[2] + k * Math.sin(a)]
+    },
+  },
+]
+/** A faint horizontal plate (w × d) at c: the floor the columns stand on. */
+const plate = (c: V3, w: number, d: number, emph: number, hue: number): Part => ({
+  area: w * d,
+  dens: 0.12,
+  emph,
+  hue,
+  at: (r) => [c[0] + (r() - 0.5) * w, c[1], c[2] + (r() - 0.5) * d],
+})
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 const scale = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k]
 const X: V3 = [1, 0, 0]
@@ -238,41 +270,27 @@ function circuitParts(): Part[] {
     parts.push(seg([x0, wy, 0], [x1, wy, 0], 0.35, 0.25))
     parts.push({ ...seg([x0, wy, 0], [x1, wy, 0], 1.3, 1, 0.07), flow: true })
   }
-  // H on qubit 0.
+  // The two qubits, |0⟩ each: small glowing spheres where the wires start.
+  for (const wy of [y, -y]) parts.push({ ...shell([x0 - 0.3, wy, 0], 0.22, 1, 0.6), dens: 0.8 }, dot([x0 - 0.3, wy, 0], 0.05, 1.6, 0.6))
+  // H on qubit 0: a gate with volume (a cube).
   const hx = -1.5
-  const hs = 0.36
-  for (const [a, b] of [
-    [
-      [hx - hs, y - hs],
-      [hx + hs, y - hs],
-    ],
-    [
-      [hx + hs, y - hs],
-      [hx + hs, y + hs],
-    ],
-    [
-      [hx + hs, y + hs],
-      [hx - hs, y + hs],
-    ],
-    [
-      [hx - hs, y + hs],
-      [hx - hs, y - hs],
-    ],
-  ])
-    parts.push(seg([a[0], a[1], 0], [b[0], b[1], 0], 1.1, 0.6))
-  // CNOT: control on qubit 0, target (⊕) on qubit 1.
+  parts.push(...cube([hx, y, 0], 0.72, 1.1, 0.6))
+  // CNOT: control on qubit 0, target (⊕) on qubit 1, the target a ring in the wire's plane plus its cross.
   const cx = 0.6
   const tr = 0.28
-  parts.push(dot([cx, y, 0], 0.07, 1.6, 0.6))
+  parts.push(dot([cx, y, 0], 0.08, 1.8, 0.6))
   parts.push(seg([cx, y, 0], [cx, -y - tr, 0], 1.1, 0.6))
-  parts.push(ring([cx, -y, 0], tr, X, Y, 1.1, 0.6))
+  parts.push(ring([cx, -y, 0], tr, X, Y, 1.1, 0.6), ring([cx, -y, 0], tr, Y, Z, 0.7, 0.6))
   parts.push(seg([cx - tr, -y, 0], [cx + tr, -y, 0], 1.1, 0.6))
-  // The outcome: P(00), P(01), P(10), P(11) of CNOT (H ⊗ I) |00⟩, as bars.
+  // Out: the Bell pair, the two wires joined by a bright arc (entangled: no longer two separate states).
+  parts.push(arc([x1, y, 0], [x1, -y, 0], [0.55, 0, 0], 1.45, 1))
+  // The outcome: P(00), P(01), P(10), P(11) of CNOT (H ⊗ I) |00⟩, as columns of light on a floor.
   const p = probabilities(bell())
+  parts.push(plate([4.23, -1.2, 0], 1.8, 0.9, 0.4, 0.25))
   for (let i = 0; i < 4; i++) {
     const bx = 3.6 + i * 0.42
-    parts.push(seg([bx - 0.12, -1.2, 0], [bx + 0.12, -1.2, 0], 0.5, 0.25))
-    if (p[i] > 1e-9) parts.push(seg([bx, -1.2, 0], [bx, -1.2 + 2.4 * p[i], 0], 1.5, 1, 0.1))
+    parts.push(dot([bx, -1.2, 0], 0.03, 0.8, 0.3))
+    if (p[i] > 1e-9) parts.push(...column([bx, -1.2, 0], 2.4 * p[i], 0.11, 1.5, 1))
   }
   return parts
 }
@@ -297,22 +315,31 @@ function registerParts(n: number): Part[] {
     const cx = -W / 2 + (i % side) * step
     const cz = rows > 1 ? -W / 2 + Math.floor(i / side) * (W / (rows - 1)) : 0
     const h = Math.hypot(...s[i]) * AMP_H
-    parts.push(seg([cx, 0, cz], [cx, h, cz], 1.4, 1, t))
+    parts.push(...column([cx, 0, cz], h, t * 0.9, 1.4, 1))
     parts.push(dot([cx, 0, cz], t * 0.3, 0.8, 0.35))
   }
+  // The floor of the register: every basis state stands on it.
+  const depth = rows > 1 ? W : 0.8
+  parts.push(plate([0, 0, rows > 1 ? 0 : 0], W + 0.6, depth + 0.6, 0.4, 0.25))
   return parts
 }
 
 /** f(x) = 7^x mod 15 for x = 0 … 31: the height of each dot is f(x). */
 export const F_XS = 32
 function shorFParts(): Part[] {
-  const parts: Part[] = [seg([-3.2, 0, 0], [3.2, 0, 0], 0.35, 0.25)]
+  const parts: Part[] = [seg([-3.2, 0, 0], [3.2, 0, 0], 0.35, 0.25), plate([0, 0, 0], 6.6, 0.7, 0.35, 0.25)]
+  const px = (x: number) => -3.1 + (x * 6.2) / (F_XS - 1)
+  const ph = (x: number) => (f(x) / SHOR.N) * 2.8
   for (let x = 0; x < F_XS; x++) {
-    const px = -3.1 + (x * 6.2) / (F_XS - 1)
-    const h = (f(x) / SHOR.N) * 2.8
-    parts.push(seg([px, 0, 0], [px, h, 0], 0.45, 0.35, 0.03))
-    parts.push(dot([px, h, 0], 0.045, 1.8, 1))
+    // A thin column of light up to f(x), its value a bright point on top.
+    parts.push(...column([px(x), 0, 0], ph(x), 0.035, 0.6, 0.35))
+    parts.push(dot([px(x), ph(x), 0], 0.05, 1.8, 1))
   }
+  // The period r (the smallest r > 0 with f(r) = 1): each value is joined to the same value
+  // r steps later by an arc over the top. The repetition, which is what Shor finds, is visible.
+  let r = 1
+  while (r < F_XS && f(r) !== 1) r++
+  for (let x = 0; x + r < F_XS; x++) parts.push(arc([px(x), ph(x), 0], [px(x + r), ph(x + r), 0], [0, 0.32, 0], 0.8, 0.7, 0.5))
   return parts
 }
 
@@ -320,12 +347,14 @@ function shorFParts(): Part[] {
 export const QFT_H = 10
 function shorQFTParts(): Part[] {
   const p = qftDistribution()
-  const parts: Part[] = [seg([-3.25, 0, 0], [3.25, 0, 0], 0.4, 0.25)]
+  const parts: Part[] = [seg([-3.25, 0, 0], [3.25, 0, 0], 0.4, 0.25), plate([0, 0, 0], 6.8, 0.9, 0.35, 0.25)]
   for (let y = 0; y < Q; y++) {
     if (p[y] < 1e-9) continue
     const px = -3.2 + (y * 6.4) / Q
-    parts.push(seg([px, 0, 0], [px, p[y] * QFT_H, 0], 1.6, 1, 0.09))
-    parts.push(dot([px, p[y] * QFT_H, 0], 0.08, 1.8, 1))
+    // Each peak a column of light as tall as P(y), with a halo at its foot where it lands.
+    parts.push(...column([px, 0, 0], p[y] * QFT_H, 0.09, 1.6, 1))
+    parts.push(ring([px, 0, 0], 0.22, X, Z, 0.9, 1))
+    parts.push(dot([px, p[y] * QFT_H, 0], 0.09, 2, 1))
   }
   return parts
 }
@@ -334,7 +363,11 @@ function shorQFTParts(): Part[] {
 const CUBE = 0.38
 function keyParts(): Part[] {
   const parts: Part[] = []
-  for (let i = 0; i < SHOR.N; i++) parts.push(...cube([-((SHOR.N - 1) / 2) * CUBE * 1.02 + i * CUBE * 1.02, 0, 0], CUBE, 0.9, 1))
+  for (let i = 0; i < SHOR.N; i++) {
+    const c: V3 = [-((SHOR.N - 1) / 2) * CUBE * 1.02 + i * CUBE * 1.02, 0, 0]
+    // Each unit a lit cube: its edges and a glowing core.
+    parts.push(...cube(c, CUBE, 0.9, 1), dot(c, 0.05, 1.6, 1))
+  }
   return parts
 }
 /** The same 15 cubes rearranged as p rows of q (3 × 5), the rows pulled apart: the factors. */
@@ -343,7 +376,11 @@ function factorsParts(): Part[] {
   const [p, q] = FACTORS
   const parts: Part[] = []
   for (let r = 0; r < p; r++)
-    for (let c = 0; c < q; c++) parts.push(...cube([(c - (q - 1) / 2) * CUBE * 1.3, ((p - 1) / 2 - r) * CUBE * 2.2, (r - 1) * 0.25], CUBE, 0.9, r === 1 ? 0.6 : 1))
+    for (let c = 0; c < q; c++) {
+      const at: V3 = [(c - (q - 1) / 2) * CUBE * 1.3, ((p - 1) / 2 - r) * CUBE * 2.2, (r - 1) * 0.25]
+      // The same pieces as the key, in the same order: the morph moves each cube as a whole.
+      parts.push(...cube(at, CUBE, 0.9, r === 1 ? 0.6 : 1), dot(at, 0.05, 1.6, r === 1 ? 0.6 : 1))
+    }
   return parts
 }
 
@@ -379,6 +416,10 @@ function curveParts(broken: boolean): Part[] {
   const half = (v: number) => (v < (CURVE_P - 1) / 2 ? -1 : 1)
   const parts: Part[] = []
   for (const [x, y] of curvePoints()) parts.push(dot(move(curveAt(x, y), half(x), half(y)), 0.045, 1.6, 1))
+  // y² = …: every point (x, y) has its mirror (x, p − y). A faint thread joins each pair: the
+  // curve's symmetry, visible even as a scatter (in the same order for the broken curve).
+  for (const [x, y] of curvePoints())
+    if (y > 0 && y < CURVE_P - y) parts.push(seg(move(curveAt(x, y), half(x), half(y)), move(curveAt(x, CURVE_P - y), half(x), half(CURVE_P - y)), 0.25, 0.4, 0.02))
   // The frame of the field's grid, in four corners.
   const h = CURVE_W / 2 + 0.15
   for (const qx of [-1, 1])
@@ -404,6 +445,29 @@ const rect = (x: number, y: number, w: number, h: number, emph: number, hue: num
 function storeParts(c: V3, rad: number, open: boolean): Part[] {
   const parts: Part[] = []
   const h = 0.6 * rad
+  // A vault: a faint cylinder wall with brighter rings, a lid and a floor.
+  parts.push({
+    area: 2 * Math.PI * rad * 2 * h,
+    dens: 0.25,
+    emph: 0.35,
+    hue: 0.25,
+    at: (r) => {
+      const a = 2 * Math.PI * r()
+      return [c[0] + rad * Math.cos(a), c[1] - h + 2 * h * r(), c[2] + rad * Math.sin(a)]
+    },
+  })
+  for (const yy of [-h, h])
+    parts.push({
+      area: Math.PI * rad * rad,
+      dens: 0.2,
+      emph: 0.3,
+      hue: 0.25,
+      at: (r) => {
+        const a = 2 * Math.PI * r()
+        const k = rad * Math.sqrt(r())
+        return [c[0] + k * Math.cos(a), c[1] + yy, c[2] + k * Math.sin(a)]
+      },
+    })
   for (let k = 0; k <= 4; k++) parts.push(ring(add(c, [0, -h + (k * 2 * h) / 4, 0]), rad, X, Z, 0.55, 0.25))
   for (let k = 0; k < 4; k++) {
     const a = (k * Math.PI) / 2 + Math.PI / 4
@@ -430,8 +494,11 @@ function harvestParts(): Part[] {
     dot([WIRE.x0, y, 0], 0.07, 1.8, 0.6),
     dot([WIRE.x1, y, 0], 0.07, 1.8, 0.6),
     seg([WIRE.x0, y, 0], [WIRE.x1, y, 0], 0.35, 0.25),
-    { ...seg([WIRE.x0, y, 0], [WIRE.x1, y, 0], 1.3, 1, 0.08), flow: true },
-    seg([0, y, 0], [0, store[1] + 0.6 * 0.8, 0], 0.9, 1, 0.04),
+    // Today's traffic as discrete packets travelling along the wire (the shader moves them).
+    ...Array.from({ length: 9 }, (_, k): Part => ({ ...dot([WIRE.x0 + ((k + 0.5) * (WIRE.x1 - WIRE.x0)) / 9, y, 0], 0.055, 1.9, 1), flow: true })),
+    // The tap: a thin line down to the store, and copies of packets dropping along it.
+    seg([0, y, 0], [0, store[1] + 0.6 * 0.8, 0], 0.5, 0.25, 0.03),
+    ...[0.2, 0.45, 0.7].map((f) => dot([0, y + (store[1] + 0.6 * 0.8 - y) * f, 0], 0.045, 1.6, 1)),
     ...storeParts(store, 0.8, false),
   ]
 }
@@ -475,8 +542,14 @@ function moscaParts(): Part[] {
     }
   }
   const { x, y } = MOSCA_DEFAULT
+  // Three rows, each on its own axis (the engine stretches them with the sliders; rows and hues identify them):
+  // x alone, y alone, and x then y end to end: the total that is compared with z.
   parts.push(seg([yearX(0), -0.5, 0], [yearX(x), -0.5, 0], 1.4, 1, 0.12))
-  parts.push(seg([yearX(x), -0.5, 0], [yearX(x + y), -0.5, 0], 1.4, 0.15, 0.12))
+  parts.push(seg([yearX(0), -0.9, 0], [yearX(y), -0.9, 0], 1.4, 0.15, 0.12))
+  parts.push(seg([yearX(0), -1.3, 0], [yearX(x), -1.3, 0], 1.4, 0.95, 0.12))
+  parts.push(seg([yearX(x), -1.3, 0], [yearX(x + y), -1.3, 0], 1.4, 0.15, 0.12))
+  // The marker of x + y (the engine slides it with the sliders, hue 0.62 identifies it).
+  parts.push(seg([yearX(x + y), -1.5, 0], [yearX(x + y), MOSCA_H * 1.05, 0], 0.9, 0.62, 0.05))
   return parts
 }
 
@@ -488,11 +561,47 @@ const latAt = (p: P2): V3 => [(p[0] - (WINDOW.x0 + WINDOW.x1) / 2) * LAT_SCALE, 
 
 /** The lattice, one basis drawn from the origin, the target and the closest point; with the bad basis, Babai's answer too. */
 function latticeParts(basis: Basis): Part[] {
-  const parts: Part[] = pointsIn(GOOD, WINDOW.x0, WINDOW.x1, WINDOW.y0, WINDOW.y1).map((p) => dot(latAt(p), 0.04, 1.1, 0.35))
+  const inWin = (p: P2) => p[0] >= WINDOW.x0 && p[0] <= WINDOW.x1 && p[1] >= WINDOW.y0 && p[1] <= WINDOW.y1
+  const pts = pointsIn(GOOD, WINDOW.x0, WINDOW.x1, WINDOW.y0, WINDOW.y1)
+  // Each lattice point a crisp core with a faint ring: an atom of the lattice, not a fuzzy star.
+  const parts: Part[] = pts.map((p) => dot(latAt(p), 0.022, 1.6, 0.35))
   const o = latAt([0, 0])
+  // The fundamental parallelogram spanned by the basis: square-ish for the good one, long and
+  // thin for the bad one, with the same area (|det|): the same lattice either way. Only the part
+  // inside the window is drawn (the bad one reaches far beyond it).
+  const [v1, v2] = basis
+  const det = Math.abs(v1[0] * v2[1] - v1[1] * v2[0])
+  const winArea = (WINDOW.x1 - WINDOW.x0) * (WINDOW.y1 - WINDOW.y0)
+  parts.push({
+    area: Math.min(det, winArea * 0.5) * LAT_SCALE * LAT_SCALE,
+    dens: 0.9,
+    emph: 0.55,
+    hue: 0.7,
+    at: (r) => {
+      let q: P2 = [0, 0]
+      for (let k = 0; k < 40; k++) {
+        const u = r()
+        const v = r()
+        q = [u * v1[0] + v * v2[0], u * v1[1] + v * v2[1]]
+        if (inWin(q)) break
+      }
+      return latAt(q)
+    },
+  })
+  // The basis vectors from the origin, cut at the window's edge when they leave it; a bright
+  // head only where the vector really ends inside the picture.
+  const clip = (b: P2): [P2, boolean] => {
+    let s = 1
+    if (b[0] > WINDOW.x1) s = Math.min(s, WINDOW.x1 / b[0])
+    if (b[0] < WINDOW.x0) s = Math.min(s, WINDOW.x0 / b[0])
+    if (b[1] > WINDOW.y1) s = Math.min(s, WINDOW.y1 / b[1])
+    if (b[1] < WINDOW.y0) s = Math.min(s, WINDOW.y0 / b[1])
+    return [[b[0] * s, b[1] * s], s === 1]
+  }
   for (const b of basis) {
-    parts.push(seg(o, latAt(b), 1.5, 1, 0.06))
-    parts.push(dot(latAt(b), 0.07, 1.8, 1))
+    const [end, whole] = clip(b)
+    parts.push(seg(o, latAt(end), 1.5, 1, 0.05))
+    if (whole) parts.push(dot(latAt(end), 0.06, 1.8, 1))
   }
   const t = latAt(TARGET)
   const c = latAt(closest(GOOD, TARGET))
@@ -500,9 +609,18 @@ function latticeParts(basis: Basis): Part[] {
   parts.push(ring(c, 0.12, X, Y, 1.4, 1))
   parts.push(seg(t, c, 1.2, 1, 0.03))
   if (basis === BAD) {
+    // Rounding with the bad basis lands far away: that answer and the long way to it stand out.
     const w = latAt(babai(BAD, TARGET))
-    parts.push(ring(w, 0.12, X, Y, 1.4, 0))
+    parts.push(ring(w, 0.16, X, Y, 1.8, 0), dot(w, 0.03, 1.6, 0))
     parts.push(seg(t, w, 0.9, 0.1, 0.03))
+  } else {
+    // With the good basis, its cells: the lattice reads as a regular mesh.
+    const [g1, g2] = basis
+    for (const p of pts)
+      for (const g of [g1, g2]) {
+        const q: P2 = [p[0] + g[0], p[1] + g[1]]
+        if (inWin(q)) parts.push(seg(latAt(p), latAt(q), 0.35, 0.35, 0.012))
+      }
   }
   return parts
 }
@@ -544,11 +662,18 @@ function mlkemParts(): Part[] {
   for (let k = 0; k < p.k; k++)
     for (let i = 0; i < KEM_N; i++) {
       const a = (i * 2 * Math.PI) / KEM_N
-      const r = 0.55 + 0.32 * k
-      parts.push(dot(add(c, [r * Math.cos(a), r * Math.sin(a), 0]), 0.018, 1.3, 1 - 0.25 * k))
+      // The k polynomials of the module, one ring each, stacked in depth.
+      const r = 0.7
+      parts.push(dot(add(c, [r * Math.cos(a), r * Math.sin(a), (k - (p.k - 1) / 2) * 0.45]), 0.016, 1.5, 1 - 0.25 * k))
     }
+  // The module's axis: the k rings belong to one vector of polynomials.
+  parts.push(seg(add(c, [0, 0, -((p.k - 1) / 2) * 0.45 - 0.2]), add(c, [0, 0, ((p.k - 1) / 2) * 0.45 + 0.2]), 0.6, 0.6, 0.02))
   const s = sizes(p)
-  const bar = (y: number, bytes: number, hue: number) => parts.push(rect(-0.5, y, (BYTES_W * bytes) / s.ek, 0.24, 1.2, hue))
+  // The sizes as blocks with volume (their length is the number of bytes).
+  const bar = (y: number, bytes: number, hue: number) => {
+    const w = (BYTES_W * bytes) / s.ek
+    parts.push({ area: w * 0.24 * 1.6, emph: 1.2, hue, at: (r) => [-0.5 + w * r(), y + 0.24 * r(), (r() - 0.5) * 0.28] })
+  }
   bar(0.55, s.ek, 1)
   bar(0.05, s.ct, 0.8)
   bar(-0.45, X25519.pub, 0.3)
@@ -564,7 +689,10 @@ function hybridParts(): Part[] {
     let x = -HYBRID_W / 2
     for (const q of ps) {
       const w = Math.max(q.bytes * scale, 0.05)
-      parts.push(rect(x, y, w, 0.28, 1.2, q.part.startsWith('ML-KEM') ? 1 : 0.3))
+      // A block with volume (the depth is only for the eye: the bytes are the length).
+      const hue = q.part.startsWith('ML-KEM') ? 1 : 0.3
+      const bx = x
+      parts.push({ area: w * 0.28 * 1.6, emph: 1.2, hue, at: (r) => [bx + w * r(), y + 0.28 * r(), (r() - 0.5) * 0.3] })
       x += w + 0.05
     }
   }
@@ -600,57 +728,139 @@ export const QHAT = {
   hue: [0.12, 1] as [number, number],
 } as const
 
-/** An ellipse outline of thickness t in the xy plane, particles spread evenly along its length. */
-const oval = (c: [number, number], rx: number, ry: number, t: number, emph: number): Part => {
-  // Ramanujan's approximation of the perimeter.
-  const len = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))
-  const top = Math.max(rx, ry)
+/** A path in the xy plane: its length, the point at u ∈ [0, 1] (by arc length) and the unit normal there. */
+interface Path {
+  len: number
+  closed: boolean
+  at: (u: number) => [number, number]
+  normal: (u: number) => [number, number]
+}
+const ovalPath = (c: [number, number], rx: number, ry: number): Path => {
+  const N = 720
+  const cum = new Float64Array(N + 1)
+  for (let i = 1; i <= N; i++) {
+    const a = (2 * Math.PI * (i - 0.5)) / N
+    cum[i] = cum[i - 1] + Math.hypot(rx * Math.sin(a), ry * Math.cos(a)) * ((2 * Math.PI) / N)
+  }
+  const len = cum[N]
+  const angle = (u: number) => {
+    const s = u * len
+    let lo = 0
+    let hi = N
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1
+      if (cum[mid] <= s) lo = mid
+      else hi = mid
+    }
+    return (2 * Math.PI * (lo + (s - cum[lo]) / Math.max(cum[hi] - cum[lo], 1e-9))) / N
+  }
   return {
-    area: len * t,
-    emph,
-    hue: 0.5,
-    at: (r, g) => {
-      // Rejection: an angle in proportion to the arc length it covers.
-      let a = 0
-      for (let k = 0; k < 16; k++) {
-        a = 2 * Math.PI * r()
-        if (r() * top <= Math.hypot(rx * Math.sin(a), ry * Math.cos(a))) break
-      }
-      const k = 1 + (g() * t) / 3 / top
-      return [c[0] + rx * k * Math.cos(a), c[1] + ry * k * Math.sin(a), (g() * t) / 3]
+    len,
+    closed: true,
+    at: (u) => {
+      const a = angle(u)
+      return [c[0] + rx * Math.cos(a), c[1] + ry * Math.sin(a)]
+    },
+    normal: (u) => {
+      const a = angle(u)
+      const nx = Math.cos(a) / rx
+      const ny = Math.sin(a) / ry
+      const l = Math.hypot(nx, ny)
+      return [nx / l, ny / l]
     },
   }
 }
+const linePath = (a: [number, number], b: [number, number]): Path => {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+  const n: [number, number] = [-(b[1] - a[1]) / len, (b[0] - a[0]) / len]
+  return { len, closed: false, at: (u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u], normal: () => n }
+}
 
-/** Half-axes of the dust inside and just around the bowl (inside the glyph's box). */
-const DUST: [number, number] = [0.95, 1.3]
+/** The hero's particle count, and how many particles sit on each site of the glyph (a still dot; halving the cloud on a slow device keeps every site). */
+const HERO_N = 60_000
+const SITE_K = 3
+/**
+ * A stroke as a 3D tube of radius rho made of distinct dots: rings every `spacing` along the
+ * path, M dots around each ring (alternate rows offset by half a step), each dot exactly on its
+ * site (SITE_K particles stacked: a crisp, round point, not a fill). One part per position around
+ * the tube, so the dots in front (towards the camera, +z) are brighter than those behind.
+ * `skip`: sites where another stroke already is (no doubled, burnt light at a crossing).
+ */
+const tube = (path: Path, rho: number, M: number, spacing: number, emph: number, skip?: (p: V3) => boolean): Part[] => {
+  const rings = Math.max(2, Math.round(path.len / spacing))
+  return Array.from({ length: M }, (_, j) => {
+    const sites: V3[] = []
+    for (let i = 0; i < rings; i++) {
+      const u = path.closed ? i / rings : i / (rings - 1)
+      const th = (2 * Math.PI * (j + (i % 2) * 0.5)) / M
+      const [x, y] = path.at(u)
+      const [nx, ny] = path.normal(u)
+      const p: V3 = [x + rho * Math.cos(th) * nx, y + rho * Math.cos(th) * ny, rho * Math.sin(th)]
+      if (!skip?.(p)) sites.push(p)
+    }
+    const front = (Math.sin((2 * Math.PI * j) / M) + 1) / 2
+    let n = 0
+    return {
+      area: (sites.length * SITE_K) / (DENSITY * HERO_N),
+      emph: emph * (0.4 + 0.6 * front),
+      hue: 0.5,
+      extent: sites,
+      // Visit the sites with a large prime stride: any first few calls (figureBox samples 24) spread along the whole stroke.
+      at: (): V3 => (sites.length ? ([...sites[(n++ * 7919) % sites.length]] as V3) : [0, 0, 0]),
+    }
+  })
+}
+
 
 function qhatParts(): Part[] {
   const { bowl, tail, hat, stroke } = QHAT
-  const p3 = (p: [number, number]): V3 => [p[0], p[1], 0]
-  const ps: Part[] = [
-    oval(bowl.c, bowl.rx, bowl.ry, stroke, 1.4),
-    seg(p3(tail[0]), p3(tail[1]), 1.4, 0.5, stroke),
-    seg(p3(hat[0]), p3(hat[1]), 1.4, 0.5, stroke * 0.8),
-    seg(p3(hat[1]), p3(hat[2]), 1.4, 0.5, stroke * 0.8),
-    // A faint dust around the glyph: what is left of the cloud it condensed from.
-    {
-      area: Math.PI * DUST[0] * DUST[1],
-      dens: 0.35,
-      emph: 0.3,
-      hue: 0.5,
-      at: (r: () => number, g: () => number): V3 => {
-        const a = 2 * Math.PI * r()
-        const k = Math.sqrt(r())
-        return [bowl.c[0] + DUST[0] * k * Math.cos(a), bowl.c[1] + DUST[1] * k * Math.sin(a), g() * 0.05]
-      },
+  // The Q̂ as particles: every stroke a 3D tube of distinct dots in rows (the engine makes
+  // each dot quiver softly on its own phase, hero.ts), and a few faint loose particles nearby.
+  const rho = stroke * 0.62
+  const M = 8
+  const spacing = 0.0725 // 20 % fewer dots: a little air between them
+  const emph = 5.5
+  // Where the tail crosses the ring the ring's dots are already there: the tail's dots inside
+  // the ring's tube are left out, so the crossing is as bright as the rest.
+  const onRing = ([x, y]: V3) => Math.abs(Math.hypot((x - bowl.c[0]) / bowl.rx, (y - bowl.c[1]) / bowl.ry) - 1) * Math.min(bowl.rx, bowl.ry) < rho
+  // The circumflex: a mitred point. Both strokes run past the apex and each is cut at the
+  // vertical through it, so they meet in one clean point, without overlap or offset.
+  const [h0, apex, h2] = hat
+  const past = (a: [number, number], b: [number, number]): [number, number] => {
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1])
+    return [b[0] + ((b[0] - a[0]) / l) * rho * 2.5, b[1] + ((b[1] - a[1]) / l) * rho * 2.5]
+  }
+  const strokes: Part[] = [
+    ...tube(ovalPath(bowl.c, bowl.rx, bowl.ry), rho, M, spacing, emph),
+    ...tube(linePath(tail[0], tail[1]), rho, M, spacing, emph, onRing),
+    ...tube(linePath(h0, past(h0, apex)), rho, M, spacing, emph, ([x]) => x > apex[0]),
+    ...tube(linePath(past(h2, apex), h2), rho, M, spacing, emph, ([x]) => x <= apex[0]),
+  ]
+  // A few loose particles floating near the glyph, very faint.
+  const loose: Part = {
+    area: 160 / (DENSITY * HERO_N),
+    emph: 0.35,
+    hue: 0.5,
+    at: (r, g) => {
+      const a = 2 * Math.PI * r()
+      const cut = (v: number) => Math.max(-1.4, Math.min(1.4, v))
+      const k = 1 + cut(g()) * 0.35
+      return [bowl.c[0] + bowl.rx * k * Math.cos(a), bowl.c[1] + bowl.ry * k * Math.sin(a), cut(g()) * 0.3]
     },
-  ].map((p, k) => (k < 4 ? { ...p, dens: QHAT.dens } : p))
+    // Their farthest reach (the gaussian is cut at 1.4 σ), for the box.
+    extent: Array.from({ length: 16 }, (_, j): V3 => {
+      const a = (j * Math.PI) / 4
+      const k = j < 8 ? 1.49 : 0.51
+      return [bowl.c[0] + bowl.rx * k * Math.cos(a), bowl.c[1] + bowl.ry * k * Math.sin(a), j % 2 ? 0.42 : -0.42]
+    }),
+  }
   const x0 = bowl.c[0] - bowl.rx
   const x1 = tail[1][0]
+  // The brand's gradient, indigo to green across the glyph.
   const hueAt = (p: V3) => QHAT.hue[0] + (QHAT.hue[1] - QHAT.hue[0]) * Math.min(1, Math.max(0, (p[0] - x0) / (x1 - x0)))
-  return ps.map((p) => ({ ...p, hueAt }))
+  return [...strokes, loose].map((p) => ({ ...p, hueAt }))
 }
+
 
 function parts(id: FigureId): Part[] {
   switch (id) {
@@ -715,7 +925,10 @@ function hullOf(id: FigureId): V3[] {
   const r = rng(7)
   const pts: V3[] = []
   // The parts' own points, without the lines' thickness (the box adds a pad).
-  for (const p of parts(id)) for (let k = 0; k < 24; k++) pts.push(p.at(r, () => 0))
+  for (const p of parts(id)) {
+    if (p.extent) pts.push(...p.extent)
+    else for (let k = 0; k < 24; k++) pts.push(p.at(r, () => 0))
+  }
   h = convexEnough(pts)
   hulls.set(id, h)
   return h
@@ -765,8 +978,14 @@ export interface Built {
  * its area (DENSITY of all particles per unit²), the rest stay invisible
  * inside the figure's box.
  */
+/** Figures built from the same pieces in the same order (they morph piece by piece). */
+export const figureFamily = (id: FigureId): FigureId =>
+  id.startsWith('bloch') ? 'bloch0' : id === 'factors' ? 'key' : id === 'curveBroken' ? 'curve' : id === 'latticeBad' ? 'lattice' : id
+
 export function buildFigure(id: FigureId, count: number, seed: number): Built {
-  const r = rng(seed * 7919 + FIGURES.indexOf(id) * 104729 + 1)
+  // A family shares one seed: same parts, same draws, same order, so particle i is on the
+  // same piece in each and a morph only moves what changes (the Bloch vector, the cubes, the quadrants).
+  const r = rng(seed * 7919 + FIGURES.indexOf(figureFamily(id)) * 104729 + 1)
   const g = gauss(r)
   const ps = parts(id)
   const positions = new Float32Array(count * 3)
@@ -794,7 +1013,9 @@ export function buildFigure(id: FigureId, count: number, seed: number): Built {
   }
   // Interleave: a particle's index should not decide its part (the cloud is
   // drawn in index order and may be halved on slow devices: drawRange).
-  shuffle(positions, looks, r)
+  // The interleaving depends only on the seed and the count, never on the parts: in a family
+  // the pieces both figures share (drawn first) stay on the same particles.
+  shuffle(positions, looks, rng(seed * 7919 + 424243))
   return { positions, looks }
 }
 

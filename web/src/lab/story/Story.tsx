@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Lang } from '../../api'
 import { useLang } from '../../i18n'
 import { usePageMeta } from '../../usePageMeta'
@@ -9,17 +9,37 @@ import type { Story as Engine } from './engine'
 import { FigureCaption } from './captions'
 import { MOSCA_DEFAULT } from './figures'
 import { loadStory, storyStillURL } from './load'
-import { orbitalOf, panelsShown, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
+import { EDGE, orbitalOf, panelsShown, progressAt, stageMask, stageView, STEPS, stepAt, termState, type Step, type Term } from './model'
 import { MoscaWidget, type MoscaValue } from './MoscaWidget'
 import { TEXT } from './texts'
 import { typeset } from './typeset'
 import './Story.css'
 
-/** /lab/historia: hidden prototype of the redesign's story (noindex, not linked, not in the sitemap). */
+// The step texts, their captions and the sources depend only on the step and the language:
+// memoised, so changing step (every few hundred pixels of scroll) re-renders none of the 34
+// panels (twice: the track and the phone sheet) nor their formulas. It used to cost a 50–90 ms
+// stall at every step change.
+const MemoStepText = memo(StepText)
+const MemoCaption = memo(Caption)
+const MemoSourcesBody = memo(function SourcesBody({ lang }: { lang: Lang }) {
+  const tx = TEXT[lang]
+  return (
+    <>
+      <h2 id="story-sources-title">{tx.sources}</h2>
+      <p>{typeset(tx.method)}</p>
+      <p>{typeset(tx.units)}</p>
+      <p>{typeset(tx.methodQuantum)}</p>
+      <p>{typeset(tx.methodPq)}</p>
+      <Sources lang={lang} />
+    </>
+  )
+})
+
+/** /historia: the story, from quantum mechanics to your website (linked from the home). */
 export default function Story() {
   const { lang } = useLang()
   const tx = TEXT[lang]
-  usePageMeta(`${tx.title} · QuantumReady`, true)
+  usePageMeta(`${tx.title} · QuantumReady`)
   const [chosen] = useState<Mode>(() => chooseMode())
   const [failed, setFailed] = useState(false)
   const mode: Mode = failed ? { kind: 'still', reason: 'no-webgl2' } : chosen
@@ -27,6 +47,11 @@ export default function Story() {
   const [ready, setReady] = useState(false)
   // Scene 6: the inequality's sliders (one state for the panel's and the sheet's widget).
   const [mosca, setMosca] = useState<MoscaValue>({ ...MOSCA_DEFAULT })
+  const moscaNow = useRef<MoscaValue>(mosca)
+  moscaNow.current = mosca
+  useEffect(() => {
+    engine.current?.setMosca(mosca.x, mosca.y)
+  }, [mosca])
   const phone = usePhone()
   const track = useRef<HTMLDivElement>(null)
   const article = useRef<HTMLElement>(null)
@@ -79,11 +104,16 @@ export default function Story() {
         const phone = !!sh && getComputedStyle(sh).display !== 'none'
         const panel = el.querySelector('.story-panel')?.getBoundingClientRect()
         const left = phone || !panel ? 0 : Math.min(box.width * 0.6, panel.right - box.left + FREE_GAP)
+        // Vertically: the band of the stage that is visible (the rest is masked, behind the header
+        // or the sources), inside its soft edges, so the shape is never half hidden.
+        const bandTop = m.top + (v.clipTop > 0 ? EDGE : 0)
+        const bandBottom = m.bottom - (v.clipBottom > 0 ? EDGE : 0)
+        const band = bandBottom - bandTop > box.height * 0.25
         const free = {
           left,
-          top: 0,
+          top: band ? bandTop : m.top,
           right: box.width - (phone ? 0 : FREE_GAP),
-          bottom: box.height,
+          bottom: band ? bandBottom : m.bottom,
         }
         latest.current.free = free
         engine.current?.setFrame(free)
@@ -137,6 +167,7 @@ export default function Story() {
         engine.current = createStory(canvas.current, {
           points: chosen.points,
           seed: SEED,
+          smooth: true,
           onReady: () => setReady(true),
           onError: () => {
             const e = engine.current
@@ -146,6 +177,7 @@ export default function Story() {
           },
         })
         engine.current.setProgress(latest.current.p)
+        engine.current.setMosca(moscaNow.current.x, moscaNow.current.y)
         if (latest.current.free) engine.current.setFrame(latest.current.free)
         if (visible.current) engine.current.start()
       })
@@ -188,8 +220,8 @@ export default function Story() {
         {STEPS.map((s, i) => (
           <div key={s.id} className="story-layer" data-current={i === index} data-step={s.id}>
             <div className="story-layer-copy" aria-hidden="true">
-              <StepText step={s} first={sceneStart(i)} lang={lang} />
-              <Caption step={s} lang={lang} />
+              <MemoStepText step={s} first={sceneStart(i)} lang={lang} />
+              <MemoCaption step={s} lang={lang} />
             </div>
             {phone && s.id === 'mosca' && <MoscaWidget value={mosca} onChange={setMosca} lang={lang} active />}
           </div>
@@ -200,9 +232,9 @@ export default function Story() {
         {STEPS.map((s, i) => (
           <section key={s.id} className="story-step" aria-labelledby={`story-step-${s.id}`}>
             <div className="story-panel">
-              <StepText step={s} first={sceneStart(i)} lang={lang} headingId={`story-step-${s.id}`} />
+              <MemoStepText step={s} first={sceneStart(i)} lang={lang} headingId={`story-step-${s.id}`} />
               {/* The label (quantum numbers, the equation) inside the panel: nothing loose over the scene. */}
-              <Caption step={s} lang={lang} />
+              <MemoCaption step={s} lang={lang} />
               {s.id === 'mosca' && <MoscaWidget value={mosca} onChange={setMosca} lang={lang} active={!phone} />}
             </div>
           </section>
@@ -211,12 +243,7 @@ export default function Story() {
       </div>
 
       <section className="story-sources" aria-labelledby="story-sources-title">
-        <h2 id="story-sources-title">{tx.sources}</h2>
-        <p>{typeset(tx.method)}</p>
-        <p>{typeset(tx.units)}</p>
-        <p>{typeset(tx.methodQuantum)}</p>
-        <p>{typeset(tx.methodPq)}</p>
-        <Sources lang={lang} />
+        <MemoSourcesBody lang={lang} />
       </section>
     </article>
   )

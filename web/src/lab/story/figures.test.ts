@@ -50,9 +50,10 @@ describe('figures: what the particles draw comes from quantum.ts', () => {
       for (let i = 0; i < N; i++)
         if (looks[2 * i + 1] < 0) {
           expect(['circuit', 'harvest']).toContain(id)
-          expect(Math.abs(Math.abs(positions[3 * i + 1]) - WIRE.y)).toBeLessThan(0.1)
-          expect(positions[3 * i]).toBeGreaterThanOrEqual(WIRE.x0 - 0.1)
-          expect(positions[3 * i]).toBeLessThanOrEqual(WIRE.x1 + 0.1)
+          // (the captured traffic's packets have a size: a few sigmas of their dot)
+          expect(Math.abs(Math.abs(positions[3 * i + 1]) - WIRE.y)).toBeLessThan(0.3)
+          expect(positions[3 * i]).toBeGreaterThanOrEqual(WIRE.x0 - 0.3)
+          expect(positions[3 * i]).toBeLessThanOrEqual(WIRE.x1 + 0.3)
         }
     }
     expect(withWeight('circuit', -1.3).length).toBeGreaterThan(100)

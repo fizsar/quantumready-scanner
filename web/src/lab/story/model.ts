@@ -29,7 +29,7 @@ export interface Cam {
 }
 
 /** Depth of field: point size grows and opacity falls with the distance from the focus (orbitals only). */
-export const DOF = 0.2
+export const DOF = 0.08
 /** The blur grows a point to at most this many times its size (its light still falls as 1/blur²). */
 export const MAX_BLUR = 1.6
 /** No point is ever wider than this share of the drawing area's height (a particle near the camera). */
@@ -121,9 +121,9 @@ export const STEPS: readonly Step[] = [
   // The nodal plane edge-on (elevation ~0), turning around it.
   { id: '2pz', scene: 1, shape: { kind: 'orbital', index: 1 }, cam: cam(0.8, 0.03, 1.15), via: cam(2.0, 0.03, 1.05) },
   // Side view: the two lobes, the ring and, between them, the nodal cones.
-  { id: '3dz2', scene: 1, shape: { kind: 'orbital', index: 2 }, cam: cam(2.6, 0.04, 1.15), via: cam(3.3, 0.12, 1.05) },
+  { id: '3dz2', scene: 1, shape: { kind: 'orbital', index: 2 }, cam: cam(2.6, 0.4, 1.15), via: cam(3.3, 0.32, 1.05) },
   // From above at an angle, the eight octants; then a wide shot for the change of scene.
-  { id: '4fxyz', scene: 1, shape: { kind: 'orbital', index: 3 }, cam: cam(3.9, 0.62, 1.15), via: cam(4.7, 0.95, 2.6) },
+  { id: '4fxyz', scene: 1, shape: { kind: 'orbital', index: 3 }, cam: cam(3.9, 0.62, 1.05), via: cam(4.5, 0.8, 2.1) },
   // The wave from three quarters: from above (elevation) and nearly side-on, so the
   // helix's turns never overlap on screen and |ψ|² hangs right below it (camera.test.ts).
   { id: 'psi', scene: 2, shape: { kind: 'wave', t0: 0, t1: 0 }, cam: waveCam(-0.18, 0.26), term: 'psi' },
@@ -137,16 +137,16 @@ export const STEPS: readonly Step[] = [
   { id: 'qM', scene: 3, shape: fig('blochM'), cam: cam(0.55, 0.22, 1.1) },
   { id: 'bell', scene: 3, shape: fig('bell'), cam: cam(0.18, 0.2, 1.05), via: cam(0.3, 0.24, 1.05) },
   // Scene 4, the computer: the circuit head-on, then the register from above at an angle.
-  { id: 'circ', scene: 4, shape: fig('circuit'), cam: cam(0.08, 0.06, 1.05), via: cam(0.18, 0.1, 1.05) },
+  { id: 'circ', scene: 4, shape: fig('circuit'), cam: cam(0.3, 0.26, 1.05), via: cam(0.42, 0.3, 1.05) },
   { id: 'reg3', scene: 4, shape: fig('reg3'), cam: cam(0.25, 0.3, 1.05) },
   { id: 'reg6', scene: 4, shape: fig('reg6'), cam: cam(0.45, 0.55, 1.05) },
   { id: 'reg10', scene: 4, shape: fig('reg10'), cam: cam(0.6, 0.7, 1.05) },
   // Scene 5, Shor: the plots head-on, the cubes and the curve slightly from the side.
-  { id: 'shorF', scene: 5, shape: fig('shorF'), cam: cam(0.06, 0.05, 1.05) },
-  { id: 'qft', scene: 5, shape: fig('shorQFT'), cam: cam(-0.06, 0.06, 1.05) },
+  { id: 'shorF', scene: 5, shape: fig('shorF'), cam: cam(0.28, 0.24, 1.05) },
+  { id: 'qft', scene: 5, shape: fig('shorQFT'), cam: cam(-0.28, 0.26, 1.05) },
   { id: 'key', scene: 5, shape: fig('key'), cam: cam(0.3, 0.3, 1.05) },
   { id: 'factors', scene: 5, shape: fig('factors'), cam: cam(0.4, 0.25, 1.05) },
-  { id: 'curve', scene: 5, shape: fig('curve'), cam: cam(0.12, 0.08, 1.05) },
+  { id: 'curve', scene: 5, shape: fig('curve'), cam: cam(0.25, 0.28, 1.05) },
   { id: 'broken', scene: 5, shape: fig('curveBroken'), cam: cam(0.3, 0.15, 1.1) },
   // Scene 6, harvest now, decrypt later: the traffic and the store from slightly above, then the inequality head-on.
   { id: 'harvest', scene: 6, shape: fig('harvest'), cam: cam(0.15, 0.22, 1.05) },
@@ -154,11 +154,11 @@ export const STEPS: readonly Step[] = [
   { id: 'decrypted', scene: 6, shape: fig('decrypted'), cam: cam(0.35, 0.35, 1.05) },
   { id: 'mosca', scene: 6, shape: fig('mosca'), cam: cam(0.04, 0.05, 1.05) },
   // Scene 7, lattices and ML-KEM: flat figures, nearly head-on.
-  { id: 'lattice', scene: 7, shape: fig('lattice'), cam: cam(0.06, 0.08, 1.05) },
-  { id: 'cvp', scene: 7, shape: fig('latticeBad'), cam: cam(-0.06, 0.08, 1.05) },
-  { id: 'lwe', scene: 7, shape: fig('lwe'), cam: cam(0.1, 0.1, 1.05) },
-  { id: 'mlkem', scene: 7, shape: fig('mlkem'), cam: cam(0.12, 0.12, 1.05) },
-  { id: 'hybrid', scene: 7, shape: fig('hybrid'), cam: cam(0.05, 0.06, 1.05) },
+  { id: 'lattice', scene: 7, shape: fig('lattice'), cam: cam(0.2, 0.28, 1.05) },
+  { id: 'cvp', scene: 7, shape: fig('latticeBad'), cam: cam(-0.2, 0.28, 1.05) },
+  { id: 'lwe', scene: 7, shape: fig('lwe'), cam: cam(0.22, 0.24, 1.05) },
+  { id: 'mlkem', scene: 7, shape: fig('mlkem'), cam: cam(0.45, 0.32, 1.05) },
+  { id: 'hybrid', scene: 7, shape: fig('hybrid'), cam: cam(0.3, 0.28, 1.05) },
 ]
 
 export const TERMS: readonly Term[] = ['psi', 'dt', 'kin', 'pot', 'sup']
@@ -340,7 +340,9 @@ export function camLerp(a: Cam, b: Cam, f: number): Cam {
 const sphere = (r: number): Box => ({ min: [-r, -r, -r], max: [r, r, r], hull: sphereHull(r) })
 /** Share of an orbital's probability inside its box: the faint last half-percent may fall outside. */
 export const ORBITAL_SHARE = 0.995
-const orbitalBoxes = ORBITALS.map((o) => sphere((RADIUS * rQuantile(o, ORBITAL_SHARE)) / rQuantile(o, 0.95)))
+// The 4f's last percents are a faint, wide halo: framing it whole left its eight lobes tiny.
+const FRAME_SHARE = [ORBITAL_SHARE, ORBITAL_SHARE, 0.98, 0.93]
+const orbitalBoxes = ORBITALS.map((o, i) => sphere((RADIUS * rQuantile(o, FRAME_SHARE[i] ?? ORBITAL_SHARE)) / rQuantile(o, 0.95)))
 
 /** The box around the wave for a field: the helix's cylinder and the |ψ|² fill below it. */
 export function waveBox(field: Float32Array): Box {

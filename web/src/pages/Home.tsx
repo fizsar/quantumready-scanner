@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { solveAltcha } from '../altcha'
 import { ApiError, createScan, getAltcha, getTargets } from '../api'
@@ -7,6 +7,7 @@ import { DemoCta } from '../components/DemoButton'
 import { HeroScene } from '../components/HeroScene'
 import '../Hero.css'
 import { HowItWorks } from '../components/HowItWorks'
+import { storyStillURL } from '../lab/story/load'
 import { ShowcaseHomeLinks } from '../components/ShowcaseLinks'
 import { useLang } from '../i18n'
 import { track } from '../metrics'
@@ -142,8 +143,75 @@ export function Home() {
         <HeroScene />
       </section>
       <DemoCta from="home" />
+      <StoryTeaser lang={lang} />
       <HowItWorks />
       <ShowcaseHomeLinks />
+    </div>
+  )
+}
+
+/** Under the scanner: the way into the story (from quantum mechanics to your website). */
+function StoryTeaser({ lang }: { lang: 'es' | 'en' }) {
+  const es = lang === 'es'
+  return (
+    <section aria-labelledby="story-teaser-title" className="story-teaser-wrap">
+      {/* The whole card is the link to the story. */}
+      <Link to="/historia" className="story-teaser">
+        <div className="story-teaser-copy">
+          <p className="prompt small">./historia</p>
+          <h2 id="story-teaser-title" className="story-teaser-title">
+            {es ? '¿Por qué tu web necesita criptografía post-cuántica?' : 'Why does your website need post-quantum cryptography?'}
+          </h2>
+          <p className="muted">
+            {es
+              ? 'Del átomo al cifrado de tu web, contado con partículas: cúbits, el algoritmo de Shor, cosechar ahora y descifrar después, y los retículos de ML-KEM. Todo calculado con las ecuaciones de verdad.'
+              : 'From the atom to your website’s encryption, told with particles: qubits, Shor’s algorithm, harvest now and decrypt later, and the lattices of ML-KEM. All computed from the real equations.'}
+          </p>
+          <span className="btn story-teaser-btn">
+            {es ? 'Ver la historia' : 'Read the story'} <span aria-hidden="true">→</span>
+          </span>
+        </div>
+        <StoryReel />
+      </Link>
+    </section>
+  )
+}
+
+/**
+ * What is inside the story: a 16 s silent loop recorded from the story's own 3D (WebM, under
+ * 0.7 MB). Fetched only once the card comes near the screen, played only while it is on
+ * screen; with reduced motion, the first frame as a still image.
+ */
+function StoryReel() {
+  const video = useRef<HTMLVideoElement>(null)
+  const [near, setNear] = useState(false)
+  const still = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  useEffect(() => {
+    const el = video.current
+    if (!el || still || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setNear(true)
+          void el.play().catch(() => {})
+        } else el.pause()
+      },
+      { rootMargin: '200px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [still])
+  // The source arrives with the first approach: start it then.
+  useEffect(() => {
+    if (near) void video.current?.play().catch(() => {})
+  }, [near])
+  return (
+    <div className="story-preview" aria-hidden="true">
+      {still ? (
+        <img src={storyStillURL('1s')} alt="" width={640} height={640} decoding="async" />
+      ) : (
+        <video ref={video} src={near ? '/story-reel.webm' : undefined} poster={storyStillURL('1s')} muted loop playsInline preload="none" width={480} height={480} />
+      )}
     </div>
   )
 }
