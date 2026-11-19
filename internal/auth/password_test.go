@@ -50,7 +50,7 @@ func TestCheckPassword(t *testing.T) {
 		{strings.Repeat("a", 129), "ana@example.com", ErrPasswordTooLong},
 		{"123456789012", "ana@example.com", ErrPasswordCommon},
 		{"QWERTYUIOPASDFGHJKL", "ana@example.com", ErrPasswordCommon}, // case-insensitive
-		{"fizsar.lopez-2026!", "fizsar.lopez@example.com", ErrPasswordEmail},
+		{"usuario-2026!", "usuario@example.com", ErrPasswordEmail},
 		{"ana-is-a-good-name", "ana@example.com", nil}, // local parts under 4 characters are not checked
 	} {
 		if err := CheckPassword(tc.pw, tc.email); !errors.Is(err, tc.want) {
