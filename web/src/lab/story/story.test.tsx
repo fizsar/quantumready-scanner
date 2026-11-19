@@ -22,6 +22,7 @@ vi.mock('./engine', () => {
       return {
         setProgress: (p: number) => engine.progress.push(p),
         setFrame: (f: unknown) => engine.frames.push(f),
+        setMosca: () => {},
         start() {},
         stop() {},
         dispose() {},
@@ -142,11 +143,11 @@ describe('/lab/historia', () => {
     expect(document.querySelector('.story-still')?.getAttribute('src')).toBe('/lab/story-dt.png')
   })
 
-  it('scene 1: the label with the quantum numbers; hidden page; cited sources', async () => {
+  it('scene 1: the label with the quantum numbers; a public page (indexable); cited sources', async () => {
     media(() => true)
     renderAt('/lab/historia')
     await screen.findByRole('heading', { level: 1 })
-    expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, nofollow')
+    expect(document.head.querySelector('meta[name="robots"]')).toBeNull()
     expect(document.querySelector('.story-caption')).toBeNull()
     const panel = document.getElementById('story-step-1s')!.closest('.story-panel')!
     expect(panel.querySelector('.story-cap')?.textContent).toMatch(/energía E1 = −13,61 eV/)

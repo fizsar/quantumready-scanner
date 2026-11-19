@@ -48,4 +48,4 @@ export function pointBudget(cores: number, memory: number | undefined, coarse: b
 }
 
 /** Device pixel ratio for the canvas: at most 1.5 (points do not need more). */
-export const pixelRatio = (dpr: number) => Math.min(dpr || 1, 1.5)
+export const pixelRatio = (dpr: number) => Math.min(dpr || 1, 2)

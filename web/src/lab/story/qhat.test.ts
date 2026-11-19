@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFigure, DENSITY, figureBox, FIGURES, QHAT } from './figures'
+import { buildFigure, figureBox, FIGURES, QHAT } from './figures'
 
 const N = 60_000
 const { positions, looks } = buildFigure('qhat', N, 1)
@@ -30,9 +30,9 @@ describe('the Q̂ of the brand as a figure of particles', () => {
       const d = Math.min(Math.abs(k - 1) * Math.min(bowl.rx, bowl.ry), toSeg(x, y, tail[0], tail[1]), toSeg(x, y, hat[0], hat[1]), toSeg(x, y, hat[1], hat[2]))
       if (d > stroke || Math.abs(z) > stroke) off++
     }
-    expect(strokes.length).toBeGreaterThan(N / 10)
-    // The strokes are gaussian, a third of their thickness wide: beyond three sigmas, under 1 %.
-    expect(off / strokes.length).toBeLessThan(0.01)
+    expect(strokes.length).toBeGreaterThan(2000)
+    // Each stroke is a tube of dots around its line, narrower than the stroke: none strays.
+    expect(off).toBe(0)
   })
 
   it('all three parts are there, in proportion to their length', () => {
@@ -56,14 +56,12 @@ describe('the Q̂ of the brand as a figure of particles', () => {
     for (const s of strokes) expect(s[3] >= QHAT.hue[0] - 1e-6 && s[3] <= QHAT.hue[1] + 1e-6).toBe(true)
   })
 
-  it('reads solid: its strokes carry QHAT.dens times the particles per area of the other figures, plus a faint dust', () => {
-    const { bowl, tail, hat, stroke, dens } = QHAT
-    const oval = Math.PI * (3 * (bowl.rx + bowl.ry) - Math.sqrt((3 * bowl.rx + bowl.ry) * (bowl.rx + 3 * bowl.ry)))
-    const len = (a: number[], b: number[]) => Math.hypot(b[0] - a[0], b[1] - a[1])
-    const area = oval * stroke + len(tail[0], tail[1]) * stroke + (len(hat[0], hat[1]) + len(hat[1], hat[2])) * stroke * 0.8
-    expect(strokes.length / N).toBeCloseTo(area * dens * DENSITY, 2)
+  it('reads as distinct dots, not a fill: several particles stacked on each site, plus a few faint loose ones', () => {
+    const sites = new Set(strokes.map(([x, y, z]) => `${x.toFixed(5)},${y.toFixed(5)},${z.toFixed(5)}`))
+    expect(sites.size).toBeGreaterThan(500)
+    expect(sites.size).toBeLessThan(strokes.length / 2)
     expect(dust).toBeGreaterThan(0)
-    expect(dust).toBeLessThan(strokes.length)
+    expect(dust).toBeLessThan(strokes.length / 5)
   })
 
   it('its box is the glyph’s, centred between the hat and the tail', () => {

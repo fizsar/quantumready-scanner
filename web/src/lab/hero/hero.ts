@@ -41,6 +41,9 @@ export function createHero(canvas: HTMLCanvasElement, opts: HeroOptions): Hero {
     points: Math.min(opts.points, HERO_POINTS),
     seed: SEED,
     script: entryFrame,
+    waveGain: 0,
+    jitter: 0.012,
+    pointScale: 2.25,
     only: ENTRY_SHAPES,
     onReady: () => {
       drawn = true

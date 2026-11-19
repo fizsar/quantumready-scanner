@@ -91,9 +91,9 @@ describe("the home's entry: styles", () => {
 
   it('every text colour of the entry is a checked one, at 4.5:1 on what is behind it', () => {
     const colours = [...heroCss.matchAll(/(?<![-\w])color:\s*([^;]+);/g)].map((m) => m[1].trim())
-    for (const c of colours) expect(['var(--text)', 'var(--muted)', 'transparent', 'CanvasText']).toContain(c)
+    for (const c of colours) expect(['var(--text)', 'var(--muted)', 'var(--green)', 'transparent', 'CanvasText']).toContain(c)
     const surface = hexToken(tokensCss, 'surface-1')
-    for (const name of ['text', 'muted']) for (const back of [bg, glow, surface]) expect(contrast(hexToken(tokensCss, name), back), name).toBeGreaterThanOrEqual(4.5)
+    for (const name of ['text', 'muted', 'green']) for (const back of [bg, glow, surface]) expect(contrast(hexToken(tokensCss, name), back), name).toBeGreaterThanOrEqual(4.5)
     // The label sits on its own opaque pill, never straight over the scene.
     expect(rule('.hero-label')).toContain('background: var(--surface-1);')
     expect(rule('.hero-label')).toContain('color: var(--text);')
@@ -121,8 +121,8 @@ describe("the home's entry: styles", () => {
     expect(heroCss).toContain('animation-delay: var(--stagger);')
   })
 
-  it('the canvas fades in over the image with --dur-base, and the label leaves with a token too', () => {
+  it('the canvas fades in over the image with --dur-base, and the label fades out slowly, with a token too', () => {
     expect(rule('.hero-canvas')).toContain('transition: opacity var(--dur-base) linear;')
-    expect(rule('.hero-label')).toMatch(/opacity var\(--dur-fast\) var\(--ease-in\)/)
+    expect(rule('.hero-label')).toMatch(/opacity var\(--dur-slow\) var\(--ease-in\)/)
   })
 })

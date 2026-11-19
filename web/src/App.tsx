@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { Link, Route, Routes, useLocation } from 'react-router'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router'
 import type { Lang } from './api'
 import { useAuth } from './auth'
 import { useLang } from './i18n'
@@ -20,7 +20,7 @@ import { usePageMeta } from './usePageMeta'
 
 // The example reports (fixtures) load only on /examples.
 const Examples = lazy(() => import('./pages/Examples'))
-// Redesign prototype (hidden: noindex, not linked, not in the sitemap); its 3D code loads later still.
+// The story (/historia, linked from the home; /lab/historia redirects to it); its 3D code loads later still.
 const LabStory = lazy(() => import('./lab/story/Story'))
 
 export default function App() {
@@ -66,7 +66,8 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/demo" element={<DemoRoute />} />
           <Route path="/examples" element={<Suspense><Examples /></Suspense>} />
-          <Route path="/lab/historia" element={<Suspense><LabStory /></Suspense>} />
+          <Route path="/historia" element={<Suspense><LabStory /></Suspense>} />
+          <Route path="/lab/historia" element={<Navigate to={{ pathname: '/historia', search: window.location.search }} replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

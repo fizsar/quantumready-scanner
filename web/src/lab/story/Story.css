@@ -16,6 +16,16 @@
   z-index: 3;
 }
 
+/* No CRT scanlines over the story: their 1 px / 3 px stripes beat against the pixel grid and soften text and points. */
+body:has(.story)::after {
+  display: none;
+}
+.story-intro .h-title,
+.story-intro .prompt,
+.page:has(.story) .topbar {
+  text-shadow: none;
+}
+
 .story-intro {
   position: relative;
   z-index: 1;

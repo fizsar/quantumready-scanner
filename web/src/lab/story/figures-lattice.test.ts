@@ -35,15 +35,24 @@ describe('scene 7 figures: what is drawn comes from lattice.ts and mlkem.ts', ()
 
   it('every lattice point of the window, and only those, is lit', () => {
     // Points are √5 apart at least: a particle within 0.8 belongs to exactly one.
-    near(withWeight('lattice', 1.1).map(back), pointsIn(GOOD, WINDOW.x0, WINDOW.x1, WINDOW.y0, WINDOW.y1), 0.8)
+    near(withWeight('lattice', 1.6).map(back), pointsIn(GOOD, WINDOW.x0, WINDOW.x1, WINDOW.y0, WINDOW.y1), 0.8)
   })
 
-  it('the basis tips are the good basis, then the bad one; with the bad one, a ring at Babai’s answer (14, 8)', () => {
-    near(withWeight('lattice', 1.8).map(back), [...GOOD], 1.2)
-    near(withWeight('latticeBad', 1.8).map(back), [...BAD], 1.2)
+  it('the basis tips (where they end inside the window) are the good basis, then the bad one; with the bad one, a ring at Babai’s answer (14, 8)', () => {
+    const tips = (id: FigureId) => {
+      const { positions, looks } = get(id)
+      const out: [number, number][] = []
+      for (let i = 0; i < N; i++) if (Math.abs(looks[2 * i + 1] - 1.8) < 1e-6 && Math.abs(looks[2 * i] - 1) < 1e-6) out.push(back([positions[3 * i], positions[3 * i + 1], 0]))
+      return out
+    }
+    const inWin = (p: readonly number[]) => p[0] >= WINDOW.x0 && p[0] <= WINDOW.x1 && p[1] >= WINDOW.y0 && p[1] <= WINDOW.y1
+    near(tips('lattice'), GOOD.filter(inWin).map((p) => [p[0], p[1]] as [number, number]), 1.2)
+    const badIn = BAD.filter(inWin).map((p) => [p[0], p[1]] as [number, number])
+    if (badIn.length) near(tips('latticeBad'), badIn, 1.2)
+    else expect(tips('latticeBad')).toHaveLength(0) // both leave the window: cut at its edge, no head
     const { positions, looks } = get('latticeBad')
     const ring: [number, number][] = []
-    for (let i = 0; i < N; i++) if (Math.abs(looks[2 * i + 1] - 1.4) < 1e-6 && Math.abs(looks[2 * i]) < 1e-6) ring.push(back([positions[3 * i], positions[3 * i + 1], 0]))
+    for (let i = 0; i < N; i++) if (Math.abs(looks[2 * i + 1] - 1.8) < 1e-6 && Math.abs(looks[2 * i]) < 1e-6) ring.push(back([positions[3 * i], positions[3 * i + 1], 0]))
     const c = [ring.reduce((t, p) => t + p[0], 0) / ring.length, ring.reduce((t, p) => t + p[1], 0) / ring.length]
     expect(c.map(Math.round)).toEqual(babai(BAD, TARGET))
   })

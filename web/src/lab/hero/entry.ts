@@ -46,7 +46,8 @@ export const BREATH = 0.04
 /** The still image's camera (the story's first step), a little closer once condensed, and head-on for the logo. */
 const START: Cam = STEPS[0].cam
 const NEAR: Cam = { ...START, frame: 1.35 }
-const FRONT: Cam = { az: 0, el: 0.04, frame: 1, fov: START.fov }
+// frame 1.29: the glyph at about 70 % of the card (fit leaves a 10 % margin: 0.9 / 1.29 ≈ 0.7), centred.
+const FRONT: Cam = { az: 0, el: 0.04, frame: 1.29, fov: START.fov }
 
 const span = (ms: number, from: number, to: number) => Math.min(1, Math.max(0, (ms - from) / (to - from)))
 
