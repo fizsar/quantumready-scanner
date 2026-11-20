@@ -81,7 +81,7 @@ class CheckBasePins(unittest.TestCase):
         here = os.path.dirname(os.path.abspath(__file__))
         base, pins = c.parse(os.path.join(here, "..", "web", "Dockerfile"))
         self.assertIn("@sha256:", base)
-        self.assertEqual(set(pins), {"musl", "musl-utils", "zlib"})
+        self.assertEqual(set(pins), {"musl", "musl-utils", "zlib", "nginx"})
 
 
 if __name__ == "__main__":
