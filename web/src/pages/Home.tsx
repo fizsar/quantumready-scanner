@@ -178,8 +178,8 @@ function StoryTeaser({ lang }: { lang: 'es' | 'en' }) {
 }
 
 /**
- * What is inside the story: a 16 s silent loop recorded from the story's own 3D (WebM, under
- * 0.7 MB). Fetched only once the card comes near the screen, played only while it is on
+ * What is inside the story: a 16 s silent loop recorded from the story's own 3D (MP4 and WebM,
+ * each about 0.5 MB). Fetched only once the card comes near the screen, played only while it is on
  * screen; with reduced motion, the first frame as a still image.
  */
 function StoryReel() {
@@ -203,14 +203,21 @@ function StoryReel() {
   }, [still])
   // The source arrives with the first approach: start it then.
   useEffect(() => {
-    if (near) void video.current?.play().catch(() => {})
+    const v = video.current
+    if (!near || !v) return
+    v.load() // the <source> elements arrived: pick one, then play
+    void v.play().catch(() => {})
   }, [near])
   return (
     <div className="story-preview" aria-hidden="true">
       {still ? (
         <img src={storyStillURL('1s')} alt="" width={640} height={640} decoding="async" />
       ) : (
-        <video ref={video} src={near ? '/story-reel.webm' : undefined} poster={storyStillURL('1s')} muted loop playsInline preload="none" width={480} height={480} />
+        <video ref={video} poster={storyStillURL('1s')} muted loop playsInline preload="none" width={640} height={640}>
+          {/* MP4 (H.264, starts at once on iPhone) first, then WebM (VP9). Only once the card is near. */}
+          {near && <source src="/story-reel.mp4" type="video/mp4" />}
+          {near && <source src="/story-reel.webm" type="video/webm" />}
+        </video>
       )}
     </div>
   )

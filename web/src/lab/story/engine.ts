@@ -75,6 +75,11 @@ export interface StoryOptions {
 }
 
 const f = (v: number) => v.toFixed(6)
+/** ?timescale=x (0 < x ≤ 1), for recordings only: the scenes' clock runs x times as fast. */
+const TIMESCALE = (() => {
+  const v = typeof location === 'undefined' ? NaN : Number(new URLSearchParams(location.search).get('timescale'))
+  return v > 0 && v <= 1 ? v : 1
+})()
 /** One pass of the flowing particles along the circuit's wires (ms). */
 const FLOW_MS = 5000
 const vertex = /* glsl */ `
@@ -302,7 +307,7 @@ const unit = (c: [number, number, number]) => c.map((v) => v / 255) as [number, 
 
 export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Story {
   const renderer = new WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' })
-  const dpr = pixelRatio(window.devicePixelRatio)
+  let dpr = pixelRatio(window.devicePixelRatio)
   renderer.setPixelRatio(dpr)
   renderer.setClearColor(new Color().setRGB(...unit(BACKGROUND), SRGBColorSpace), 1)
   let failed = false
@@ -584,8 +589,10 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   let halvings = 0
   const frame = (t: number) => {
     raf = requestAnimationFrame(frame)
-    const dt = last ? Math.min(t - last, 100) : 16
+    const rawDt = last ? Math.min(t - last, 100) : 16
     last = t
+    // ?timescale=0.2 (recordings only): the scene's clock runs slower; a normal visit is 1.
+    const dt = rawDt * TIMESCALE
     clock += dt
     material.uniforms.uMosca.value.lerp(moscaTarget, 1 - Math.exp(-dt / 120))
     if (opts.smooth) {
@@ -621,12 +628,18 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       drawnOnce = true
       opts.onReady()
     }
-    // Adaptive load: if the first frames are slow, halve the particles (twice at most).
-    if (halvings < 2) {
-      if (++frames > 15) slowSum += dt
+    // Adaptive load, checked every 75 frames: under about 52 fps (phones), halve the
+    // particles (twice at most); if it is still slow after that, draw at a lower pixel ratio.
+    if (halvings < 3) {
+      if (++frames > 15) slowSum += rawDt
       if (frames === 75) {
-        if (slowSum / 60 > 24 && drawn > 10_000) {
-          setDrawn(Math.floor(drawn / 2))
+        if (slowSum / 60 > 19) {
+          if (halvings < 2 && drawn > 10_000) setDrawn(Math.floor(drawn / 2))
+          else if (dpr > 1) {
+            dpr = Math.max(1, dpr * 0.75)
+            renderer.setPixelRatio(dpr)
+            resize()
+          }
           halvings++
         }
         frames = 0
