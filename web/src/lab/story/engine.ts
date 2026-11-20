@@ -307,7 +307,7 @@ const unit = (c: [number, number, number]) => c.map((v) => v / 255) as [number, 
 
 export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Story {
   const renderer = new WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' })
-  let dpr = pixelRatio(window.devicePixelRatio)
+  const dpr = pixelRatio(window.devicePixelRatio)
   renderer.setPixelRatio(dpr)
   renderer.setClearColor(new Color().setRGB(...unit(BACKGROUND), SRGBColorSpace), 1)
   let failed = false
@@ -403,6 +403,8 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
   let clock = 0
   let bound = ''
   let lastT = Number.NaN
+  let lastFieldAt = -Infinity
+  let lastScrolledT = Number.NaN
   /** Whether a shape's data has arrived from the worker. */
   const ready = (s: Shape) => (s.kind === 'orbital' ? !!orbitals[s.index] : s.kind === 'figure' ? figures.has(s.id) : !!seeds)
   const bind = (side: 'A' | 'B', s: Shape) => {
@@ -475,8 +477,12 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     material.uniforms.uSwirl.value = same ? 0 : 1.4
     material.uniforms.uStagger.value = same ? 0 : 0.35
     // At rest the wave keeps evolving a little (its own time breathes around the scrolled one).
+    // (the physics is recomputed at most every 50 ms of the scene's clock: on a phone, every
+    // frame was enough to slow it down, and the adaptive load then blurred everything after)
     const tw = fr.t + 0.05 * Math.sin(time * 0.0009)
-    if ((a.kind === 'wave' || b.kind === 'wave') && tw !== lastT) {
+    if ((a.kind === 'wave' || b.kind === 'wave') && tw !== lastT && (fr.t !== lastScrolledT || time - lastFieldAt >= 50)) {
+      lastFieldAt = time
+      lastScrolledT = fr.t
       field(tw, fieldData)
       fieldTex.needsUpdate = true
       material.uniforms.uBase.value = fillBase(fieldData)
@@ -487,7 +493,7 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     // in the free part of the screen (camera.ts fit).
     const atom = fr.spin ?? (STEPS[fr.step].scene === 1 ? 1 - mix : 0)
     material.uniforms.uSpin.value = time * 0.00012 * atom
-    material.uniforms.uAlpha.value = storyAlpha(drawn) * (fr.gain ?? 1)
+    material.uniforms.uAlpha.value = alphaFor(drawn) * (fr.gain ?? 1)
     material.uniforms.uTime.value = time % FLOW_MS // small: float32 keeps its precision
     const box = lerpBox(shapeBox(a, fieldData), shapeBox(b, fieldData), mix)
     const shot = fit(box, fr.cam.az + 0.08 * Math.sin(time * 0.00009), fr.cam.el, fr.cam.frame, fr.cam.fov, frameNow())
@@ -561,7 +567,8 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
     // diameter = POINT × focal length (buffer px) / depth. The light per pixel
     // then depends neither on the canvas size, nor on the DPR, nor on the distance.
     const focal = (h * dpr) / 2 / Math.tan(((camera.fov / 2) * Math.PI) / 180)
-    material.uniforms.uSize.value = POINT * focal * storySize(drawn)
+    // The point size of the full cloud, even after halving it: fewer points, never bigger (blurrier) ones.
+    material.uniforms.uSize.value = POINT * focal * storySize(opts.points)
     material.uniforms.uMaxPx.value = MAX_POINT * h * dpr
     // Resizing clears the canvas: while the loop is stopped (a scene at rest,
     // or paused), draw the same moment again so it never goes blank.
@@ -570,10 +577,13 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       drew(probe)
     }
   }
+  // Per-point opacity for n drawn points at the full cloud's point size: the light per area
+  // stays the same when the cloud is halved (model.ts storyAlpha × the size it no longer grows by).
+  const alphaFor = (n: number) => Math.min(1, storyAlpha(n) * (storySize(n) / storySize(opts.points)) ** 2)
   const setDrawn = (n: number) => {
     drawn = n
     geometry.setDrawRange(0, n)
-    material.uniforms.uAlpha.value = storyAlpha(n)
+    material.uniforms.uAlpha.value = alphaFor(n)
     resize()
     canvas.dataset.drawn = String(n)
   }
@@ -629,17 +639,12 @@ export function createStory(canvas: HTMLCanvasElement, opts: StoryOptions): Stor
       opts.onReady()
     }
     // Adaptive load, checked every 75 frames: under about 52 fps (phones), halve the
-    // particles (twice at most); if it is still slow after that, draw at a lower pixel ratio.
-    if (halvings < 3) {
+    // particles (twice at most). The pixel ratio never drops: that is what looked blurry.
+    if (halvings < 2) {
       if (++frames > 15) slowSum += rawDt
       if (frames === 75) {
         if (slowSum / 60 > 19) {
-          if (halvings < 2 && drawn > 10_000) setDrawn(Math.floor(drawn / 2))
-          else if (dpr > 1) {
-            dpr = Math.max(1, dpr * 0.75)
-            renderer.setPixelRatio(dpr)
-            resize()
-          }
+          if (drawn > 10_000) setDrawn(Math.floor(drawn / 2))
           halvings++
         }
         frames = 0
