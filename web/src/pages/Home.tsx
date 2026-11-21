@@ -178,7 +178,7 @@ function StoryTeaser({ lang }: { lang: 'es' | 'en' }) {
 
 /**
  * What is inside the story: an animated image (like a GIF) recorded from the story's own 3D,
- * an 8.5 s seamless loop at 640 px: AVIF (592 KB), else WebP (1.4 MB). The still poster
+ * an 8.5 s seamless loop at 640 px: AVIF (592 KB), else WebP (967 KB). The still poster
  * (22 KB, fixed size) shows at once; the animation's sources are added only when the card
  * comes near the screen. With reduced motion no source matches: the poster stays.
  */
