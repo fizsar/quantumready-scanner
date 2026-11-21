@@ -177,51 +177,44 @@ function StoryTeaser({ lang }: { lang: 'es' | 'en' }) {
 }
 
 /**
- * What is inside the story: an MP4 loop (H.264, decoded by the hardware: smooth on phones and
- * desktops, unlike an animated AVIF/WebP) recorded from the story's own 3D, 8.5 s at 640 px,
- * 848 KB, played like a GIF (muted, looping, no controls). The 22 KB poster (fixed 640 × 640)
- * shows at once; the video is fetched when the card comes near and shows once it plays. With
- * reduced motion, only the poster.
+ * What is inside the story: an MP4 loop (H.264, decoded by the hardware) recorded from the
+ * story's own 3D, 8.5 s at 640 px, 848 KB: a native video played like a GIF (autoplay,
+ * muted, loop, playsinline), its 22 KB poster at once. The only thing done here is to give it
+ * its file when the card comes near; playing it, and pausing it off screen, is left to the
+ * browser (manual pauses, an opacity fade, a mask and a blend mode left it stuck on iPhone).
+ * With reduced motion, only the poster.
  */
 function StoryReel() {
-  const box = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
-  const [near, setNear] = useState(false)
-  const [playing, setPlaying] = useState(false)
   const still = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   useEffect(() => {
-    const el = box.current
-    if (!el || still || typeof IntersectionObserver === 'undefined') return
+    const v = video.current
+    if (!v || still) return
+    // React sets `muted` as a property only; iOS wants the attribute too before the source.
+    v.defaultMuted = true
+    v.muted = true
+    v.setAttribute('muted', '')
+    const go = () => {
+      v.src = '/story-reel.mp4'
+    }
+    if (typeof IntersectionObserver === 'undefined') return go()
     const io = new IntersectionObserver(
-      ([e]) => {
-        const v = video.current
-        if (e.isIntersecting) {
-          setNear(true)
-          if (v) {
-            v.muted = true
-            void v.play().catch(() => {})
-          }
-        } else v?.pause()
+      (es) => {
+        if (!es.some((e) => e.isIntersecting)) return
+        io.disconnect()
+        go()
       },
       { rootMargin: '300px' },
     )
-    io.observe(el)
+    io.observe(v)
     return () => io.disconnect()
   }, [still])
-  useEffect(() => {
-    const v = video.current
-    if (!near || !v) return
-    v.load() // the source arrived: load it, then play
-    v.muted = true
-    void v.play().catch(() => {})
-  }, [near])
   return (
-    <div ref={box} className="story-preview" aria-hidden="true">
-      <img src="/story-reel-poster.webp" alt="" width={640} height={640} decoding="async" />
-      {!still && (
-        <video ref={video} muted autoPlay loop playsInline preload="none" width={640} height={640} data-on={playing} onPlaying={() => setPlaying(true)}>
-          {near && <source src="/story-reel.mp4" type='video/mp4; codecs="avc1.640028"' />}
-        </video>
+    <div className="story-preview" aria-hidden="true">
+      {still ? (
+        <img src="/story-reel-poster.webp" alt="" width={640} height={640} decoding="async" />
+      ) : (
+        <video ref={video} muted autoPlay loop playsInline preload="none" poster="/story-reel-poster.webp" width={640} height={640} />
       )}
     </div>
   )
