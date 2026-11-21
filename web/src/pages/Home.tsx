@@ -177,36 +177,52 @@ function StoryTeaser({ lang }: { lang: 'es' | 'en' }) {
 }
 
 /**
- * What is inside the story: an animated image (like a GIF) recorded from the story's own 3D,
- * an 8.5 s seamless loop at 640 px: AVIF (592 KB), else WebP (967 KB). The still poster
- * (22 KB, fixed size) shows at once; the animation's sources are added only when the card
- * comes near the screen. With reduced motion no source matches: the poster stays.
+ * What is inside the story: an MP4 loop (H.264, decoded by the hardware: smooth on phones and
+ * desktops, unlike an animated AVIF/WebP) recorded from the story's own 3D, 8.5 s at 640 px,
+ * 848 KB, played like a GIF (muted, looping, no controls). The 22 KB poster (fixed 640 × 640)
+ * shows at once; the video is fetched when the card comes near and shows once it plays. With
+ * reduced motion, only the poster.
  */
 function StoryReel() {
   const box = useRef<HTMLDivElement>(null)
+  const video = useRef<HTMLVideoElement>(null)
   const [near, setNear] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const still = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   useEffect(() => {
     const el = box.current
-    if (!el || typeof IntersectionObserver === 'undefined') return
+    if (!el || still || typeof IntersectionObserver === 'undefined') return
     const io = new IntersectionObserver(
       ([e]) => {
-        if (!e.isIntersecting) return
-        setNear(true)
-        io.disconnect()
+        const v = video.current
+        if (e.isIntersecting) {
+          setNear(true)
+          if (v) {
+            v.muted = true
+            void v.play().catch(() => {})
+          }
+        } else v?.pause()
       },
       { rootMargin: '300px' },
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [])
-  const motion = '(prefers-reduced-motion: no-preference)'
+  }, [still])
+  useEffect(() => {
+    const v = video.current
+    if (!near || !v) return
+    v.load() // the source arrived: load it, then play
+    v.muted = true
+    void v.play().catch(() => {})
+  }, [near])
   return (
     <div ref={box} className="story-preview" aria-hidden="true">
-      <picture>
-        {near && <source type="image/avif" srcSet="/story-reel.avif" media={motion} />}
-        {near && <source type="image/webp" srcSet="/story-reel.webp" media={motion} />}
-        <img src="/story-reel-poster.webp" alt="" width={640} height={640} decoding="async" />
-      </picture>
+      <img src="/story-reel-poster.webp" alt="" width={640} height={640} decoding="async" />
+      {!still && (
+        <video ref={video} muted autoPlay loop playsInline preload="none" width={640} height={640} data-on={playing} onPlaying={() => setPlaying(true)}>
+          {near && <source src="/story-reel.mp4" type='video/mp4; codecs="avc1.640028"' />}
+        </video>
+      )}
     </div>
   )
 }
