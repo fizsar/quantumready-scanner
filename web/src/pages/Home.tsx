@@ -7,7 +7,6 @@ import { DemoCta } from '../components/DemoButton'
 import { HeroScene } from '../components/HeroScene'
 import '../Hero.css'
 import { HowItWorks } from '../components/HowItWorks'
-import { storyStillURL } from '../lab/story/load'
 import { ShowcaseHomeLinks } from '../components/ShowcaseLinks'
 import { useLang } from '../i18n'
 import { track } from '../metrics'
@@ -178,47 +177,36 @@ function StoryTeaser({ lang }: { lang: 'es' | 'en' }) {
 }
 
 /**
- * What is inside the story: a 16 s silent loop recorded from the story's own 3D (MP4 and WebM,
- * each about 0.5 MB). Fetched only once the card comes near the screen, played only while it is on
- * screen; with reduced motion, the first frame as a still image.
+ * What is inside the story: an animated image (like a GIF) recorded from the story's own 3D,
+ * an 8.5 s seamless loop at 640 px: AVIF (592 KB), else WebP (1.4 MB). The still poster
+ * (22 KB, fixed size) shows at once; the animation's sources are added only when the card
+ * comes near the screen. With reduced motion no source matches: the poster stays.
  */
 function StoryReel() {
-  const video = useRef<HTMLVideoElement>(null)
+  const box = useRef<HTMLDivElement>(null)
   const [near, setNear] = useState(false)
-  const still = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   useEffect(() => {
-    const el = video.current
-    if (!el || still || typeof IntersectionObserver === 'undefined') return
+    const el = box.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
     const io = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) {
-          setNear(true)
-          void el.play().catch(() => {})
-        } else el.pause()
+        if (!e.isIntersecting) return
+        setNear(true)
+        io.disconnect()
       },
-      { rootMargin: '200px' },
+      { rootMargin: '300px' },
     )
     io.observe(el)
     return () => io.disconnect()
-  }, [still])
-  // The source arrives with the first approach: start it then.
-  useEffect(() => {
-    const v = video.current
-    if (!near || !v) return
-    v.load() // the <source> elements arrived: pick one, then play
-    void v.play().catch(() => {})
-  }, [near])
+  }, [])
+  const motion = '(prefers-reduced-motion: no-preference)'
   return (
-    <div className="story-preview" aria-hidden="true">
-      {still ? (
-        <img src={storyStillURL('1s')} alt="" width={640} height={640} decoding="async" />
-      ) : (
-        <video ref={video} poster={storyStillURL('1s')} muted loop playsInline preload="none" width={640} height={640}>
-          {/* MP4 (H.264, starts at once on iPhone) first, then WebM (VP9). Only once the card is near. */}
-          {near && <source src="/story-reel.mp4" type="video/mp4" />}
-          {near && <source src="/story-reel.webm" type="video/webm" />}
-        </video>
-      )}
+    <div ref={box} className="story-preview" aria-hidden="true">
+      <picture>
+        {near && <source type="image/avif" srcSet="/story-reel.avif" media={motion} />}
+        {near && <source type="image/webp" srcSet="/story-reel.webp" media={motion} />}
+        <img src="/story-reel-poster.webp" alt="" width={640} height={640} decoding="async" />
+      </picture>
     </div>
   )
 }
