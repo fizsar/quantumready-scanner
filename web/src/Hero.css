@@ -331,3 +331,9 @@
     transform: none;
   }
 }
+/* The reel's video shows only once it really plays: until then, the poster under it. */
+.story-preview video { opacity: 0; transition: opacity 0.4s ease; }
+.story-preview video[data-on='true'] { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .story-preview video { transition: none; }
+}
