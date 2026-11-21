@@ -288,15 +288,17 @@
 .story-teaser:focus-visible .story-teaser-btn span {
   transform: translateX(4px);
 }
-/* The reel: a loop recorded from the story's 3D; round soft edges and `lighten`, no box. */
+/* The reel: a video loop recorded from the story's 3D, in a rounded frame. */
 .story-preview {
   position: relative;
   width: 100%;
   max-width: 22rem;
   aspect-ratio: 1;
   margin-inline: auto;
-  mask-image: radial-gradient(circle, #000 55%, transparent 72%);
-  -webkit-mask-image: radial-gradient(circle, #000 55%, transparent 72%);
+  /* No mask and no blend mode over the video: on iOS they force it through software. */
+  border-radius: 12px;
+  overflow: hidden;
+  background: #05060b;
 }
 .story-preview img,
 .story-preview video {
@@ -307,8 +309,7 @@
 }
 .story-preview img,
 .story-preview video {
-  object-fit: contain;
-  mix-blend-mode: lighten;
+  object-fit: cover;
 }
 @media (max-width: 720px) {
   .story-teaser {
@@ -330,10 +331,4 @@
   .story-teaser:focus-visible .story-teaser-btn span {
     transform: none;
   }
-}
-/* The reel's video shows only once it really plays: until then, the poster under it. */
-.story-preview video { opacity: 0; transition: opacity 0.4s ease; }
-.story-preview video[data-on='true'] { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .story-preview video { transition: none; }
 }
