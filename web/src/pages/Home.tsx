@@ -179,13 +179,14 @@ function StoryTeaser({ lang }: { lang: 'es' | 'en' }) {
 /**
  * What is inside the story: an MP4 loop (H.264, decoded by the hardware) recorded from the
  * story's own 3D, 8.5 s at 640 px, 848 KB: a native video played like a GIF (autoplay,
- * muted, loop, playsinline), its 22 KB poster at once. The only thing done here is to give it
- * its file when the card comes near; playing it, and pausing it off screen, is left to the
- * browser (manual pauses, an opacity fade, a mask and a blend mode left it stuck on iPhone).
- * With reduced motion, only the poster.
+ * muted, loop, playsinline), its 22 KB poster at once. Here it only gets its file when the
+ * card comes near; playing and pausing off screen are left to the browser. If the browser
+ * refuses to autoplay (iPhone in Low Power Mode), an animated image takes its place (400 px:
+ * AVIF 388 KB, else WebP 674 KB): never a play button. With reduced motion, only the poster.
  */
 function StoryReel() {
   const video = useRef<HTMLVideoElement>(null)
+  const [fallback, setFallback] = useState(false)
   const still = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   useEffect(() => {
     const v = video.current
@@ -194,25 +195,45 @@ function StoryReel() {
     v.defaultMuted = true
     v.muted = true
     v.setAttribute('muted', '')
+    let ok = false
+    let timer = 0
+    const onPlaying = () => {
+      ok = true
+    }
+    v.addEventListener('playing', onPlaying)
     const go = () => {
       v.src = '/story-reel.mp4'
+      void v.play()?.catch(() => !ok && setFallback(true))
+      timer = window.setTimeout(() => !ok && v.paused && setFallback(true), 4000)
     }
-    if (typeof IntersectionObserver === 'undefined') return go()
-    const io = new IntersectionObserver(
-      (es) => {
-        if (!es.some((e) => e.isIntersecting)) return
-        io.disconnect()
-        go()
-      },
-      { rootMargin: '300px' },
-    )
-    io.observe(v)
-    return () => io.disconnect()
+    let io: IntersectionObserver | null = null
+    if (typeof IntersectionObserver === 'undefined') go()
+    else {
+      io = new IntersectionObserver(
+        (es) => {
+          if (!es.some((e) => e.isIntersecting)) return
+          io?.disconnect()
+          go()
+        },
+        { rootMargin: '300px' },
+      )
+      io.observe(v)
+    }
+    return () => {
+      io?.disconnect()
+      window.clearTimeout(timer)
+      v.removeEventListener('playing', onPlaying)
+    }
   }, [still])
   return (
     <div className="story-preview" aria-hidden="true">
       {still ? (
         <img src="/story-reel-poster.webp" alt="" width={640} height={640} decoding="async" />
+      ) : fallback ? (
+        <picture>
+          <source type="image/avif" srcSet="/story-reel-anim.avif" />
+          <img src="/story-reel-anim.webp" alt="" width={400} height={400} decoding="async" />
+        </picture>
       ) : (
         <video ref={video} muted autoPlay loop playsInline preload="none" poster="/story-reel-poster.webp" width={640} height={640} />
       )}

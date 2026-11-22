@@ -311,6 +311,12 @@
 .story-preview video {
   object-fit: cover;
 }
+/* Never Safari's own play button over the reel (the whole card is a link). */
+.story-preview video::-webkit-media-controls,
+.story-preview video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
 @media (max-width: 720px) {
   .story-teaser {
     grid-template-columns: 1fr;
