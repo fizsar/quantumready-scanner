@@ -39,7 +39,7 @@ const MemoSourcesBody = memo(function SourcesBody({ lang }: { lang: Lang }) {
 export default function Story() {
   const { lang } = useLang()
   const tx = TEXT[lang]
-  usePageMeta(`${tx.title} · QuantumReady`)
+  usePageMeta(`${tx.title} · QuantumReady`, false, tx.lead)
   const [chosen] = useState<Mode>(() => chooseMode())
   const [failed, setFailed] = useState(false)
   const mode: Mode = failed ? { kind: 'still', reason: 'no-webgl2' } : chosen

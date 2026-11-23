@@ -18,7 +18,7 @@ export function Home() {
   const navigate = useNavigate()
   const inputId = useId()
   const errorId = useId()
-  usePageMeta(t('meta.home'))
+  usePageMeta(t('meta.home'), false, t('meta.homeDescription'))
 
   const [targets, setTargets] = useState<string[] | null>(null)
   const [mode, setMode] = useState({ open: false, proof: false })

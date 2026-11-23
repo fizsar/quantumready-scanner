@@ -12,22 +12,27 @@
          file as its @font-face, so Vite emits one hashed asset. crossorigin: fonts are fetched in
          CORS mode, and a preload without it is wasted. -->
     <link rel="preload" href="/src/assets/fonts/bricolage-400-latin.woff2" as="font" type="font/woff2" crossorigin />
-    <title>QuantumReady · Post-quantum audit of your website</title>
+    <title>QuantumReady · Post-quantum TLS scanner (ML-KEM, X25519MLKEM768)</title>
     <meta
       name="description"
-      content="Check whether your website already uses post-quantum key exchange (ML-KEM), which TLS versions and ciphers it accepts and which TLS certificate it presents. Results in plain language, in English and Spanish."
+      content="QuantumReady, a free post-quantum TLS scanner: check whether your website offers ML-KEM key exchange (X25519MLKEM768), which TLS versions and ciphers it accepts and its TLS certificate, in plain language."
     />
     <!-- The SPA moves it to the current page (usePageMeta); this is the home page. -->
     <link rel="canonical" href="https://quantumready.fizsar.com/" />
+    <!-- Both languages of each page (?lang=es / ?lang=en) and x-default (the app picks the
+         visitor's language); usePageMeta moves them to the current page. -->
+    <link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/?lang=es" />
+    <link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/" />
 
     <!-- One preview for every route (SPA, no prerender yet). -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="QuantumReady" />
     <meta property="og:url" content="https://quantumready.fizsar.com/" />
-    <meta property="og:title" content="QuantumReady · Post-quantum audit of your website" />
+    <meta property="og:title" content="QuantumReady · Post-quantum TLS scanner (ML-KEM, X25519MLKEM768)" />
     <meta
       property="og:description"
-      content="Is your website ready for the quantum era? Post-quantum key exchange (ML-KEM), TLS versions, ciphers and the TLS certificate, explained in plain language."
+      content="A free post-quantum TLS scanner: ML-KEM key exchange (X25519MLKEM768), TLS versions, ciphers and the TLS certificate, explained in plain language."
     />
     <meta property="og:locale" content="en_GB" />
     <meta property="og:locale:alternate" content="es_ES" />
@@ -37,18 +42,18 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="QuantumReady: is your website ready for the quantum era? Post-quantum key exchange and TLS audit."
+      content="QuantumReady: post-quantum TLS scanner (ML-KEM, X25519MLKEM768)."
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="QuantumReady · Post-quantum audit of your website" />
+    <meta name="twitter:title" content="QuantumReady · Post-quantum TLS scanner (ML-KEM, X25519MLKEM768)" />
     <meta
       name="twitter:description"
-      content="Is your website ready for the quantum era? ML-KEM, TLS versions, ciphers and the TLS certificate, in plain language."
+      content="A free post-quantum TLS scanner: ML-KEM (X25519MLKEM768), TLS versions, ciphers and the TLS certificate, in plain language."
     />
     <meta name="twitter:image" content="https://quantumready.fizsar.com/og.png" />
     <meta
       name="twitter:image:alt"
-      content="QuantumReady: is your website ready for the quantum era? Post-quantum key exchange and TLS audit."
+      content="QuantumReady: post-quantum TLS scanner (ML-KEM, X25519MLKEM768)."
     />
 
     <!-- Structured data: a data block, never executed, so script-src 'self' does not apply. -->
@@ -58,14 +63,19 @@
         "@type": "WebApplication",
         "name": "QuantumReady",
         "url": "https://quantumready.fizsar.com/",
-        "description": "Post-quantum readiness audit of a website: post-quantum key exchange (ML-KEM), TLS versions, ciphers and the TLS certificate, explained in plain language.",
+        "description": "Free post-quantum TLS scanner: whether a website offers ML-KEM key exchange (X25519MLKEM768), which TLS versions and ciphers it accepts and its TLS certificate, explained in plain language.",
         "applicationCategory": "SecurityApplication",
         "operatingSystem": "Any (web browser)",
         "browserRequirements": "Requires JavaScript",
         "inLanguage": ["en", "es"],
         "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
         "image": "https://quantumready.fizsar.com/og.png",
-        "creator": { "@type": "Person", "name": "fizsar", "url": "https://fizsar.com/" }
+        "author": { "@type": "Person", "name": "Fiz Sar López", "url": "https://fizsar.com/" },
+        "creator": { "@type": "Person", "name": "Fiz Sar López", "url": "https://fizsar.com/" },
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+        "sameAs": ["https://github.com/fizsar/quantumready-scanner"],
+        "isBasedOn": { "@type": "SoftwareSourceCode", "codeRepository": "https://github.com/fizsar/quantumready-scanner", "programmingLanguage": ["Go", "TypeScript"] }
       }
     </script>
   </head>

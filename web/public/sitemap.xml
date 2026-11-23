@@ -1,12 +1,77 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Public pages only. /architecture and /examples come with showcase S3 and S4
-     (deployed together in S6), /privacy with M1, /about-scans with the first
-     deploy of main; scan results are noindex and never listed. -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://quantumready.fizsar.com/</loc></url>
-  <url><loc>https://quantumready.fizsar.com/architecture</loc></url>
-  <url><loc>https://quantumready.fizsar.com/examples</loc></url>
-  <url><loc>https://quantumready.fizsar.com/privacy</loc></url>
-  <url><loc>https://quantumready.fizsar.com/about-scans</loc></url>
-  <url><loc>https://quantumready.fizsar.com/historia</loc></url>
+<!-- Public pages, each in both languages (?lang=es, ?lang=en) with its hreflang alternates
+     and x-default (the path alone). Scan results and account pages are noindex and never listed. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://quantumready.fizsar.com/?lang=es</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/historia?lang=es</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/historia?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/historia?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/historia"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/historia?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/historia?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/historia?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/historia"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/architecture?lang=es</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/architecture?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/architecture?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/architecture"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/architecture?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/architecture?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/architecture?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/architecture"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/examples?lang=es</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/examples?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/examples?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/examples"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/examples?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/examples?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/examples?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/examples"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/about-scans?lang=es</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/about-scans?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/about-scans?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/about-scans"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/about-scans?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/about-scans?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/about-scans?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/about-scans"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/privacy?lang=es</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/privacy?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/privacy?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/privacy"/>
+  </url>
+  <url>
+    <loc>https://quantumready.fizsar.com/privacy?lang=en</loc>
+    <xhtml:link rel="alternate" hreflang="es" href="https://quantumready.fizsar.com/privacy?lang=es"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://quantumready.fizsar.com/privacy?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://quantumready.fizsar.com/privacy"/>
+  </url>
 </urlset>
