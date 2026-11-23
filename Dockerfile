@@ -6,7 +6,7 @@
 # usage stats; run by hand).
 # Only /worker carries the scanner's GODEBUG settings (see cmd/worker).
 
-FROM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS build
+FROM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 # Modules in a layer, not in a cache mount: the CI's layer cache (buildx,
@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" \
       -o /out/ ./cmd/api ./cmd/migrate ./cmd/worker ./cmd/mailer ./cmd/qradmin
 
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:d62067879de890a1def9da0e7766b7d20810a5e5555cef8506b752437d7a3e88
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:8ce6dd87e9823c5b48dcfb2c8604714ccb351ce59607327bcc4957448da279b5
 ARG VERSION=dev
 ARG COMMIT=unknown
 LABEL org.opencontainers.image.source="https://github.com/fizsar/quantumready-saas" \
