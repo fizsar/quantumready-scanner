@@ -178,11 +178,11 @@ function StoryTeaser({ lang }: { lang: 'es' | 'en' }) {
 
 /**
  * What is inside the story: an MP4 loop (H.264, decoded by the hardware) recorded from the
- * story's own 3D, 8.5 s at 640 px, 848 KB: a native video played like a GIF (autoplay,
- * muted, loop, playsinline), its 22 KB poster at once. Here it only gets its file when the
+ * story's own 3D through its morphs, 7.4 s at 640 px, 746 KB: a native video played like a GIF (autoplay,
+ * muted, loop, playsinline), its 12 KB poster at once. Here it only gets its file when the
  * card comes near; playing and pausing off screen are left to the browser. If the browser
  * refuses to autoplay (iPhone in Low Power Mode), an animated image takes its place (400 px:
- * AVIF 388 KB, else WebP 674 KB): never a play button. With reduced motion, only the poster.
+ * AVIF 363 KB, else WebP 636 KB): never a play button. With reduced motion, only the poster.
  */
 function StoryReel() {
   const video = useRef<HTMLVideoElement>(null)
