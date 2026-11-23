@@ -8,7 +8,9 @@ const STORAGE_KEY = 'qr.lang'
 // Exported for the claims test (test/forbidden.ts forbiddenClaims).
 export const dict = {
   es: {
-    'meta.home': 'QuantumReady · Auditoría post-cuántica de tu web',
+    'meta.home': 'QuantumReady · Escáner TLS post-cuántico (ML-KEM, X25519MLKEM768)',
+    'meta.homeDescription':
+      'QuantumReady, escáner TLS post-cuántico gratuito: comprueba si tu web ofrece intercambio de claves ML-KEM (X25519MLKEM768), qué versiones de TLS y cifrados acepta y su certificado TLS, en lenguaje claro.',
     'meta.scan': 'Resultado de {host} · QuantumReady',
     'meta.notFound': 'Página no encontrada · QuantumReady',
     'nav.lang': 'Idioma',
@@ -192,6 +194,8 @@ export const dict = {
     'home.proving': 'Comprobando que no eres un robot (un segundo, en tu navegador)…',
     'home.aboutScans': 'Qué hace el escáner, desde qué IP analiza y cómo excluir tu dominio',
     'meta.about': 'Cómo funciona el escáner · QuantumReady',
+    'meta.aboutDescription':
+      'Qué hace el escáner de QuantumReady al analizar una web, desde qué IP lo hace, sus límites y cómo excluir tu dominio de los análisis públicos.',
     'about.title': 'Cómo funciona el escáner',
     'about.lead': 'QuantumReady revisa cómo cifra una web sus conexiones. Si has visto conexiones nuestras en los registros de tu servidor, esto es lo que hacían.',
     'about.what.title': 'Qué hace',
@@ -264,7 +268,9 @@ export const dict = {
     'invite.exists': 'Esa dirección ya tiene cuenta: entra con su contraseña para aceptar.',
   },
   en: {
-    'meta.home': 'QuantumReady · Post-quantum audit of your website',
+    'meta.home': 'QuantumReady · Post-quantum TLS scanner (ML-KEM, X25519MLKEM768)',
+    'meta.homeDescription':
+      'QuantumReady, a free post-quantum TLS scanner: check whether your website offers ML-KEM key exchange (X25519MLKEM768), which TLS versions and ciphers it accepts and its TLS certificate, in plain language.',
     'meta.scan': '{host} result · QuantumReady',
     'meta.notFound': 'Page not found · QuantumReady',
     'nav.lang': 'Language',
@@ -446,6 +452,8 @@ export const dict = {
     'home.proving': 'Checking you are not a robot (a second, in your browser)…',
     'home.aboutScans': 'What the scanner does, which IP it scans from and how to exclude your domain',
     'meta.about': 'How the scanner works · QuantumReady',
+    'meta.aboutDescription':
+      'What the QuantumReady scanner does when it checks a website, which IP it scans from, its limits and how to exclude your domain from public scans.',
     'about.title': 'How the scanner works',
     'about.lead': "QuantumReady checks how a website encrypts its connections. If you saw connections from us in your server's logs, this is what they were doing.",
     'about.what.title': 'What it does',

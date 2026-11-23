@@ -11,7 +11,7 @@ const SCANNER_PTR = 'quantumready.fizsar.com'
 export function AboutScans() {
   const { t } = useLang()
   const accounts = useAccountsEnabled()
-  usePageMeta(t('meta.about'))
+  usePageMeta(t('meta.about'), false, t('meta.aboutDescription'))
   const sections: [string, string[]][] = [
     [t('about.what.title'), [t('about.what.1'), t('about.what.2'), t('about.what.3')]],
     [t('about.from.title'), [t('about.from.1', { ip: SCANNER_IP, ptr: SCANNER_PTR }), t('about.from.2')]],
