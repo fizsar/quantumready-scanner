@@ -1,6 +1,6 @@
 # QuantumReady
 
-[![CI](https://github.com/fizsar/quantumready-saas/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fizsar/quantumready-saas/actions/workflows/ci.yml)
+[![CI](https://github.com/fizsar/quantumready-scanner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fizsar/quantumready-scanner/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
 **EN** · [ES](README.es.md)
