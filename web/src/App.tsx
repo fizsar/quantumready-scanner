@@ -73,6 +73,10 @@ export default function App() {
       </main>
 
       <footer className="footer">
+        <a className="footer-by" href="https://fizsar.com">
+          <img src="/fs-symbol.svg" alt="" width="27" height="24" />
+          {t('footer.by')}
+        </a>
         <a href="https://fizsar.com">← fizsar.com</a>
         <Link to="/about-scans">{t('nav.about')}</Link>
         <ShowcaseFooterLinks />
