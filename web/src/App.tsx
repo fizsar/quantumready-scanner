@@ -110,7 +110,7 @@ function PageViews() {
   return null
 }
 
-/** The AGPL's "Source code" link, at the deployed commit; only once QR_SOURCE_URL is set. */
+/** The AGPL's "Source code" link: the public repository, only once QR_SOURCE_URL is set. */
 function SourceLink() {
   const { t } = useLang()
   const url = useSourceURL()

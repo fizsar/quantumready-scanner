@@ -4,9 +4,9 @@ import { json, stubFetch } from './test/fixtures'
 import { renderAt } from './test/render'
 
 // The AGPL's "Source code" link in the footer: only when the server sends
-// an https URL (QR_SOURCE_URL), pointing at the deployed commit.
+// an https URL (QR_SOURCE_URL): the public repository.
 const base = { hosts: ['fizsar.com'], port: 443 }
-const commitURL = 'https://github.com/fizsar/quantumready-saas/tree/5637c0d'
+const commitURL = 'https://github.com/fizsar/quantumready-scanner'
 
 async function footerAfterTargets(targets: object, lang?: 'en') {
   const fetch = stubFetch((url) => (url === '/api/targets' ? json(targets) : json({ error: { code: 'not_found', message: 'x' } }, 404)))
@@ -17,7 +17,7 @@ async function footerAfterTargets(targets: object, lang?: 'en') {
 }
 
 describe('source code link', () => {
-  it('links to the deployed commit when the server says where (es)', async () => {
+  it('links to the public repository when the server says where (es)', async () => {
     const footer = await footerAfterTargets({ ...base, source: commitURL })
     const link = await screen.findByRole('link', { name: 'Código fuente' })
     expect(footer.contains(link)).toBe(true)

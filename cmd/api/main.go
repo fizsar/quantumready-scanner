@@ -84,7 +84,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	source, err := sourceConfig(os.Getenv, commit)
+	source, err := sourceConfig(os.Getenv)
 	if err != nil {
 		return err
 	}
